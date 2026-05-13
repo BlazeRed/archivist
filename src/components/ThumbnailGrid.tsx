@@ -1,72 +1,290 @@
+import { useMemo, useCallback, useState, memo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { List, RowComponentProps } from 'react-window';
+import { convertFileSrc } from '@tauri-apps/api/core';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
-import { convertFileSrc } from '@tauri-apps/api/core';
+import { useGroupUIStore } from '../stores/groupUIStore';
+import type { Image } from '../types';
+
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
 
 const SIZES = {
-  small: { px: 120, cols: 6, gap: 8, gridCols: 6 },
-  medium: { px: 180, cols: 4, gap: 10, gridCols: 4 },
-  large: { px: 280, cols: 3, gap: 12, gridCols: 3 },
+  small:  { px: 120, cols: 6, gap: 8,  rowH: 134 },
+  medium: { px: 180, cols: 4, gap: 10, rowH: 196 },
+  large:  { px: 280, cols: 3, gap: 12, rowH: 296 },
+} as const;
+
+type SizeKey = keyof typeof SIZES;
+
+type HeaderRow = { type: 'header'; label: string };
+type ImagesRow = { type: 'images'; images: Image[] };
+type TimelineRow = HeaderRow | ImagesRow;
+
+function buildRows(images: Image[], cols: number, noDateLabel: string): TimelineRow[] {
+  const groups = new Map<string, Image[]>();
+
+  for (const img of images) {
+    let key: string;
+    if (!img.taken_at) {
+      key = '__nodate__';
+    } else {
+      const d = new Date(img.taken_at);
+      key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    }
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(img);
+  }
+
+  // Sort: dated groups desc, No Date last
+  const sortedKeys = [...groups.keys()].sort((a, b) => {
+    if (a === '__nodate__') return 1;
+    if (b === '__nodate__') return -1;
+    return b.localeCompare(a);
+  });
+
+  const rows: TimelineRow[] = [];
+  for (const key of sortedKeys) {
+    const imgs = groups.get(key)!;
+
+    let label: string;
+    if (key === '__nodate__') {
+      label = noDateLabel;
+    } else {
+      const [year, month] = key.split('-').map(Number);
+      label = `${year}  ›  ${MONTH_NAMES[month - 1]}`;
+    }
+
+    rows.push({ type: 'header', label });
+
+    for (let i = 0; i < imgs.length; i += cols) {
+      rows.push({ type: 'images', images: imgs.slice(i, i + cols) });
+    }
+  }
+
+  return rows;
+}
+
+type RowProps = {
+  rows: TimelineRow[];
+  sizeKey: SizeKey;
+  archivePath: string;
+  isSelectionMode: boolean;
+  selectedImageIds: Set<string>;
+  onImageClick: (img: Image) => void;
+  onToggleSelect: (id: string) => void;
 };
+
+const ThumbnailCell = memo(function ThumbnailCell({
+  image,
+  archivePath,
+  sizeKey,
+  isSelectionMode,
+  isSelected,
+  onImageClick,
+  onToggleSelect,
+}: {
+  image: Image;
+  archivePath: string;
+  sizeKey: SizeKey;
+  isSelectionMode: boolean;
+  isSelected: boolean;
+  onImageClick: (img: Image) => void;
+  onToggleSelect: (id: string) => void;
+}) {
+  const { px } = SIZES[sizeKey];
+  const imageUrl = archivePath
+    ? convertFileSrc(`${archivePath}/${image.file_path}`)
+    : '';
+
+  return (
+    <div
+      style={{ width: px, height: px }}
+      onClick={() => onImageClick(image)}
+      className={`relative bg-[#E8F3FB] border rounded-md overflow-hidden cursor-pointer flex-shrink-0 transition-all ${
+        isSelected
+          ? 'ring-2 ring-[#0084C5] border-[#0084C5]'
+          : 'border-[rgba(0,45,88,0.15)] hover:ring-2 hover:ring-[#0084C5]'
+      }`}
+    >
+      {imageUrl && (
+        <img
+          src={imageUrl}
+          alt={image.filename}
+          className="w-full h-full object-cover"
+          loading="lazy"
+        />
+      )}
+
+      {/* No date badge */}
+      {!image.taken_at && (
+        <div
+          className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#E6A817]"
+          title="No date"
+        />
+      )}
+
+      {/* Selection checkbox */}
+      {isSelectionMode && (
+        <div
+          className="absolute top-1 left-1"
+          onClick={(e) => { e.stopPropagation(); onToggleSelect(image.id); }}
+        >
+          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+            isSelected ? 'bg-[#0084C5] border-[#0084C5]' : 'bg-white/80 border-[rgba(0,45,88,0.4)]'
+          }`}>
+            {isSelected && (
+              <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Filename bar */}
+      <div className="absolute bottom-0 left-0 right-0 bg-[rgba(0,45,88,0.6)] px-1 py-0.5">
+        <p className="text-[10px] text-white truncate">{image.filename}</p>
+      </div>
+    </div>
+  );
+});
+
+function TimelineRowComponent({
+  index,
+  style,
+  rows,
+  sizeKey,
+  archivePath,
+  isSelectionMode,
+  selectedImageIds,
+  onImageClick,
+  onToggleSelect,
+}: RowComponentProps<RowProps>) {
+  const row = rows[index];
+  const size = SIZES[sizeKey];
+
+  if (row.type === 'header') {
+    return (
+      <div style={style} className="flex items-center px-6 bg-[#D2E8F7] border-b border-[rgba(0,45,88,0.12)]">
+        <span className="text-[13px] font-semibold text-[#002D58] tracking-wide">{row.label}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div style={style} className="flex items-start px-6 pt-2">
+      <div className="flex flex-wrap" style={{ gap: size.gap }}>
+        {row.images.map(img => (
+          <ThumbnailCell
+            key={img.id}
+            image={img}
+            archivePath={archivePath}
+            sizeKey={sizeKey}
+            isSelectionMode={isSelectionMode}
+            isSelected={selectedImageIds.has(img.id)}
+            onImageClick={onImageClick}
+            onToggleSelect={onToggleSelect}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function ThumbnailGrid() {
   const { t } = useTranslation();
   const { images, selectImage, loading } = useTimelineStore();
   const { config } = useAppConfigStore();
+  const { isSelectionMode, selectedImageIds, toggleSelection } = useGroupUIStore();
+  const [stickyLabel, setStickyLabel] = useState('');
 
-  const size = SIZES[config.thumbnail_size];
+  const sizeKey = config.thumbnail_size as SizeKey;
+  const size = SIZES[sizeKey];
+
+  const rows = useMemo(
+    () => buildRows(images, size.cols, t('timeline.noDateHeader')),
+    [images, size.cols, t]
+  );
+
+  const getRowHeight = useCallback(
+    (index: number) => (rows[index]?.type === 'header' ? 40 : size.rowH),
+    [rows, size.rowH]
+  );
+
+  const handleImageClick = useCallback(
+    (img: Image) => {
+      if (isSelectionMode) {
+        toggleSelection(img.id);
+      } else {
+        selectImage(img);
+      }
+    },
+    [isSelectionMode, toggleSelection, selectImage]
+  );
+
+  const rowProps = useMemo<RowProps>(
+    () => ({
+      rows,
+      sizeKey,
+      archivePath: config.archive_path,
+      isSelectionMode,
+      selectedImageIds,
+      onImageClick: handleImageClick,
+      onToggleSelect: toggleSelection,
+    }),
+    [rows, sizeKey, config.archive_path, isSelectionMode, selectedImageIds, handleImageClick, toggleSelection]
+  );
+
+  const handleRowsRendered = useCallback(
+    (visibleRows: { startIndex: number; stopIndex: number }) => {
+      for (let i = visibleRows.startIndex; i >= 0; i--) {
+        if (rows[i]?.type === 'header') {
+          setStickyLabel((rows[i] as HeaderRow).label);
+          return;
+        }
+      }
+    },
+    [rows]
+  );
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-[#002D58] opacity-55">{t('common.loading')}</p>
+      <div className="flex items-center justify-center h-full">
+        <p className="text-[rgba(0,45,88,0.55)]">{t('common.loading')}</p>
       </div>
     );
   }
 
   if (images.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-[#002D58] opacity-55">{t('timeline.noPhotos')}</p>
+      <div className="flex items-center justify-center h-full">
+        <p className="text-[rgba(0,45,88,0.55)]">{t('timeline.noPhotos')}</p>
       </div>
     );
   }
 
   return (
-    <div 
-      className="grid gap-2"
-      style={{ 
-        gridTemplateColumns: `repeat(${size.gridCols}, minmax(${size.px}px, 1fr))` 
-      }}
-    >
-      {images.map((image) => {
-        const imageUrl = config.archive_path 
-          ? convertFileSrc(`${config.archive_path}/${image.file_path}`)
-          : '';
+    <div className="relative h-full">
+      {/* Sticky header overlay */}
+      {stickyLabel && (
+        <div className="absolute top-0 left-0 right-0 z-10 h-10 flex items-center px-6 bg-[#D2E8F7]/95 backdrop-blur-sm border-b border-[rgba(0,45,88,0.12)] pointer-events-none">
+          <span className="text-[13px] font-semibold text-[#002D58] tracking-wide">{stickyLabel}</span>
+        </div>
+      )}
 
-        return (
-          <div 
-            key={image.id}
-            onClick={() => selectImage(image)}
-            className="relative bg-[#E8F3FB] border border-[rgba(0,45,88,0.15)] rounded-md overflow-hidden cursor-pointer hover:ring-2 hover:ring-[#0084C5] transition-all aspect-square"
-          >
-            {imageUrl && (
-              <img 
-                src={imageUrl} 
-                alt={image.filename}
-                className="w-full h-full object-cover"
-                loading="lazy"
-              />
-            )}
-            {!image.has_exif && (
-              <div className="absolute top-1 right-1 w-[7px] h-[7px] rounded-full bg-[#E6A817]" title="Missing EXIF date" />
-            )}
-            <div className="absolute bottom-0 left-0 right-0 bg-[rgba(0,45,88,0.6)] p-1">
-              <p className="text-[10px] text-white truncate">{image.filename}</p>
-            </div>
-          </div>
-        );
-      })}
+      <List
+        rowComponent={TimelineRowComponent}
+        rowCount={rows.length}
+        rowHeight={getRowHeight}
+        rowProps={rowProps}
+        onRowsRendered={handleRowsRendered}
+        className="h-full"
+        style={{ height: '100%' }}
+      />
     </div>
   );
 }

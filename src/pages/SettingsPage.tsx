@@ -26,25 +26,25 @@ export function SettingsPage() {
 
   const handleRescan = async () => {
     if (!config.archive_path) return;
-    
+
     setRescanLoading(true);
     setRescanResult(null);
-    
+
     try {
       const count = await invoke<number>('rescan_archive');
-      setRescanResult(`Found ${count} new images`);
+      setRescanResult(t('settings.rescanFound', { count }));
       fetchImages();
     } catch (e) {
-      setRescanResult(`Error: ${e}`);
+      setRescanResult(t('settings.rescanError', { error: String(e) }));
     }
-    
+
     setRescanLoading(false);
   };
 
   return (
     <div className="p-6">
       <h1 className="text-[22px] font-medium text-[#002D58] mb-6">{t('settings.title')}</h1>
-      
+
       <div className="space-y-6 max-w-md">
         {/* Archive Path */}
         <div>
@@ -61,7 +61,7 @@ export function SettingsPage() {
               onClick={selectArchiveFolder}
               className="px-3 py-2 bg-[#002D58] text-[#D2E8F7] rounded-lg text-sm font-medium"
             >
-              Browse
+              {t('common.browse')}
             </button>
           </div>
         </div>
@@ -90,70 +90,65 @@ export function SettingsPage() {
             onChange={(e) => setConfig({ thumbnail_size: e.target.value as 'small' | 'medium' | 'large' })}
             className="w-full px-3 py-2 bg-[#F4F9FD] border border-[rgba(0,45,88,0.28)] rounded-lg text-sm text-[#002D58]"
           >
-            <option value="small">Small (120px)</option>
-            <option value="medium">Medium (180px)</option>
-            <option value="large">Large (280px)</option>
+            <option value="small">{t('settings.sizeSmall')}</option>
+            <option value="medium">{t('settings.sizeMedium')}</option>
+            <option value="large">{t('settings.sizeLarge')}</option>
           </select>
         </div>
 
-        {/* UI Mode - Only show in beginner mode */}
-        {config.ui_mode === 'beginner' && (
-          <div>
-            <label className="block text-sm font-medium text-[#002D58] mb-2">{t('settings.uiMode')}</label>
-            <p className="text-xs text-[rgba(0,45,88,0.55)] mb-2">
-              Switch to Advanced mode for more options
+        {/* Archive Management */}
+        <div className="border-t border-[rgba(0,45,88,0.15)] pt-6">
+          <h3 className="text-sm font-medium text-[#002D58] mb-4">{t('settings.archiveManagement')}</h3>
+
+          <button
+            onClick={handleRescan}
+            disabled={rescanLoading || !config.archive_path}
+            className={`px-4 py-2 rounded-lg text-sm font-medium ${
+              rescanLoading || !config.archive_path
+                ? 'bg-[rgba(0,45,88,0.15)] text-[rgba(0,45,88,0.55)]'
+                : 'bg-[#2A9EAD] text-white'
+            }`}
+          >
+            {rescanLoading ? t('common.loading') : t('settings.rescanArchive')}
+          </button>
+
+          {rescanResult && (
+            <p className={`mt-2 text-sm ${rescanResult.includes('Error') ? 'text-[#C0392B]' : 'text-[#2A9EAD]'}`}>
+              {rescanResult}
             </p>
+          )}
+        </div>
+
+        {/* Advanced Settings */}
+        <div className="border-t border-[rgba(0,45,88,0.15)] pt-6">
+          <h3 className="text-sm font-medium text-[#002D58] mb-4">{t('settings.advancedSettings')}</h3>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs text-[rgba(0,45,88,0.55)] mb-1">{t('settings.blockSize')}</label>
+              <input
+                type="number"
+                value={config.block_size}
+                onChange={(e) => setConfig({ block_size: parseInt(e.target.value) || 50 })}
+                className="w-24 px-2 py-1 bg-[#F4F9FD] border border-[rgba(0,45,88,0.28)] rounded text-sm text-[#002D58]"
+                min={10}
+                max={200}
+              />
+              <p className="text-[10px] text-[rgba(0,45,88,0.45)] mt-1">{t('settings.blockSizeDesc')}</p>
+            </div>
+
+            <div>
+              <label className="block text-xs text-[rgba(0,45,88,0.55)] mb-1">{t('settings.lastImportSource')}</label>
+              <input
+                type="text"
+                value={config.last_import_source}
+                readOnly
+                className="w-full px-2 py-1 bg-[#F4F9FD] border border-[rgba(0,45,88,0.28)] rounded text-sm text-[rgba(0,45,88,0.55)] cursor-default"
+                placeholder="—"
+              />
+            </div>
           </div>
-        )}
-
-        {/* Rescan Archive - Advanced Mode */}
-        {config.ui_mode === 'advanced' && (
-          <>
-            <div className="border-t border-[rgba(0,45,88,0.15)] pt-6">
-              <h3 className="text-sm font-medium text-[#002D58] mb-4">Archive Management</h3>
-              
-              <button
-                onClick={handleRescan}
-                disabled={rescanLoading || !config.archive_path}
-                className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                  rescanLoading || !config.archive_path
-                    ? 'bg-[rgba(0,45,88,0.15)] text-[rgba(0,45,88,0.55)]'
-                    : 'bg-[#2A9EAD] text-white'
-                }`}
-              >
-                {rescanLoading ? 'Scanning...' : t('settings.rescanArchive')}
-              </button>
-              
-              {rescanResult && (
-                <p className={`mt-2 text-sm ${rescanResult.includes('Error') ? 'text-[#C0392B]' : 'text-[#2A9EAD]'}`}>
-                  {rescanResult}
-                </p>
-              )}
-            </div>
-
-            {/* Advanced Settings */}
-            <div className="border-t border-[rgba(0,45,88,0.15)] pt-6">
-              <h3 className="text-sm font-medium text-[#002D58] mb-4">Advanced Settings</h3>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs text-[rgba(0,45,88,0.55)] mb-1">Block Size</label>
-                  <input
-                    type="number"
-                    value={config.block_size}
-                    onChange={(e) => setConfig({ block_size: parseInt(e.target.value) || 50 })}
-                    className="w-24 px-2 py-1 bg-[#F4F9FD] border border-[rgba(0,45,88,0.28)] rounded text-sm text-[#002D58]"
-                    min={10}
-                    max={200}
-                  />
-                  <p className="text-[10px] text-[rgba(0,45,88,0.45)] mt-1">
-                    Images processed per batch during import
-                  </p>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
+        </div>
       </div>
     </div>
   );

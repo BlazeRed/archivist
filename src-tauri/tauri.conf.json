@@ -20,9 +20,14 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["**"]
+      }
     }
   },
+  "plugins": {},
   "bundle": {
     "active": true,
     "targets": "all",

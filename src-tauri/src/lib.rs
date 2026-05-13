@@ -61,6 +61,11 @@ fn get_images_in_group(state: tauri::State<'_, Arc<AppState>>, group_id: i64) ->
 }
 
 #[tauri::command]
+fn get_groups_for_image(state: tauri::State<'_, Arc<AppState>>, image_id: String) -> Result<Vec<i64>, error::AppError> {
+    state.db.get_groups_for_image(&image_id)
+}
+
+#[tauri::command]
 fn scan_source(source_path: String) -> Result<Vec<commands::ScannedImage>, error::AppError> {
     commands::scan_source(&source_path)
 }
@@ -128,6 +133,7 @@ pub fn run() {
             add_image_to_group,
             remove_image_from_group,
             get_images_in_group,
+            get_groups_for_image,
             scan_source,
             analyze_image,
             create_import_plan,

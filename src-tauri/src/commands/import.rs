@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-use chrono::Utc;
 use crate::{exif, hasher, thumbnail, error::AppError};
 use crate::db::image::NewImage;
 
@@ -255,21 +254,14 @@ pub fn execute_import(
 }
 
 fn destination_path(archive_root: &str, taken_at: &Option<String>) -> String {
-    let now = Utc::now();
-    
-    let (year, month) = if let Some(ref dt) = taken_at {
-        if let Ok(naive) = chrono::DateTime::parse_from_rfc3339(dt) {
-            (naive.format("%Y").to_string(), naive.format("%m").to_string())
-        } else {
-            (now.format("%Y").to_string(), now.format("%m").to_string())
+    if let Some(ref dt) = taken_at {
+        if let Ok(parsed) = chrono::DateTime::parse_from_rfc3339(dt) {
+            let year = parsed.format("%Y").to_string();
+            let month: u32 = parsed.format("%m").to_string().parse().unwrap_or(1);
+            return format!("{}/{}/{}", archive_root, year, month_label(month));
         }
-    } else {
-        (now.format("%Y").to_string(), now.format("%m").to_string())
-    };
-    
-    let month_name = month_label(month.parse().unwrap_or(1));
-    
-    format!("{}/{}/{}", archive_root, year, month_name)
+    }
+    format!("{}/No Date", archive_root)
 }
 
 const MONTHS: &[&str] = &[

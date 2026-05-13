@@ -105,7 +105,7 @@ impl super::Database {
 
     pub fn get_images_in_group(&self, group_id: i64) -> Result<Vec<String>, super::AppError> {
         let conn = self.connection();
-        
+
         let mut stmt = conn.prepare(
             "SELECT image_id FROM image_groups WHERE group_id = ?1"
         )?;
@@ -114,5 +114,18 @@ impl super::Database {
             .collect::<Result<Vec<String>, _>>()?;
 
         Ok(image_ids)
+    }
+
+    pub fn get_groups_for_image(&self, image_id: &str) -> Result<Vec<i64>, super::AppError> {
+        let conn = self.connection();
+
+        let mut stmt = conn.prepare(
+            "SELECT group_id FROM image_groups WHERE image_id = ?1"
+        )?;
+
+        let group_ids = stmt.query_map([image_id], |row| row.get(0))?
+            .collect::<Result<Vec<i64>, _>>()?;
+
+        Ok(group_ids)
     }
 }
