@@ -80,7 +80,10 @@
     "selectGroup": "Select a group to view its photos",
     "namePlaceholder": "Group name",
     "deleteConfirm": "Delete this group? This will not delete the images.",
-    "selectedPhotosInfo": "{{count}} photos selected — they will be added to the new group"
+    "selectedPhotosInfo": "{{count}} photos selected — they will be added to the new group",
+    "addPhotosTitle": "Add Photos",
+    "addPhotosConfirm": "Add {{count}} photos",
+    "allPhotosAdded": "All photos are already in this group"
   },
   "settings": {
     "title": "Settings",

@@ -6,6 +6,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { useGroupStore } from '../stores/dataStore';
 import { useGroupUIStore } from '../stores/groupUIStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
+import { AddPhotosModal } from '../components/AddPhotosModal';
 import type { Image } from '../types';
 
 interface ExportResult {
@@ -22,6 +23,8 @@ export function GroupsPage() {
   const [newGroupName, setNewGroupName] = useState('');
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [groupImages, setGroupImages] = useState<Image[]>([]);
+  const [deletingGroupId, setDeletingGroupId] = useState<number | null>(null);
+  const [showAddPhotos, setShowAddPhotos] = useState(false);
 
   const { selectedImageIds, isSelectionMode, clearSelection, getSelectedCount } = useGroupUIStore();
 
@@ -68,14 +71,18 @@ export function GroupsPage() {
     }
   };
 
-  const handleDeleteGroup = async (id: number) => {
-    if (confirm(t('groups.deleteConfirm'))) {
-      await deleteGroup(id);
-      if (selectedGroupId === id) {
-        setSelectedGroupId(null);
-        setGroupImages([]);
-      }
+  const handleDeleteGroup = (id: number) => {
+    setDeletingGroupId(id);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (deletingGroupId === null) return;
+    await deleteGroup(deletingGroupId);
+    if (selectedGroupId === deletingGroupId) {
+      setSelectedGroupId(null);
+      setGroupImages([]);
     }
+    setDeletingGroupId(null);
   };
 
   const handleSelectGroup = async (groupId: number) => {
@@ -86,6 +93,25 @@ export function GroupsPage() {
       setGroupImages(allImages.filter(img => imageIds.includes(img.id)));
     } catch (e) {
       console.error('Failed to load group images:', e);
+    }
+  };
+
+  const handlePhotosAdded = async () => {
+    setShowAddPhotos(false);
+    if (selectedGroupId !== null) {
+      await handleSelectGroup(selectedGroupId);
+    }
+    fetchGroups();
+  };
+
+  const handleRemoveFromGroup = async (imageId: string) => {
+    if (selectedGroupId === null) return;
+    try {
+      await invoke('remove_image_from_group', { imageId, groupId: selectedGroupId });
+      setGroupImages(prev => prev.filter(img => img.id !== imageId));
+      fetchGroups();
+    } catch (e) {
+      console.error('Failed to remove image from group:', e);
     }
   };
 
@@ -106,6 +132,7 @@ export function GroupsPage() {
   }
 
   const archivePath = config.archive_path.replace(/\/+$/, '');
+  const deletingGroup = groups.find(g => g.id === deletingGroupId);
 
   return (
     <div className="flex h-[calc(100vh-52px)]">
@@ -155,6 +182,12 @@ export function GroupsPage() {
               </h1>
               <div className="flex gap-2">
                 <button
+                  onClick={() => setShowAddPhotos(true)}
+                  className="px-3 py-1.5 bg-[#0084C5] text-white text-sm rounded-lg font-medium"
+                >
+                  {t('groups.addPhotosTitle')}
+                </button>
+                <button
                   onClick={() => handleExportGroup(selectedGroupId)}
                   className="px-3 py-1.5 bg-[#2A9EAD] text-white text-sm rounded-lg font-medium"
                 >
@@ -180,7 +213,7 @@ export function GroupsPage() {
                   return (
                     <div
                       key={img.id}
-                      className="bg-[#E8F3FB] rounded-lg overflow-hidden border border-[rgba(0,45,88,0.1)]"
+                      className="group relative bg-[#E8F3FB] rounded-lg overflow-hidden border border-[rgba(0,45,88,0.1)]"
                     >
                       {url && (
                         <div className="aspect-square bg-[#001A36] overflow-hidden">
@@ -192,6 +225,13 @@ export function GroupsPage() {
                           />
                         </div>
                       )}
+                      <button
+                        onClick={() => handleRemoveFromGroup(img.id)}
+                        title={t('detail.removeFromGroup')}
+                        className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[#C0392B]"
+                      >
+                        ×
+                      </button>
                       <div className="p-2">
                         <p className="text-xs text-[#002D58] truncate font-medium">{img.filename}</p>
                         <p className="text-[10px] text-[rgba(0,45,88,0.45)] mt-0.5">
@@ -246,6 +286,40 @@ export function GroupsPage() {
               </button>
               <button
                 onClick={() => { setShowCreateModal(false); setNewGroupName(''); }}
+                className="px-4 py-2 border border-[rgba(0,45,88,0.3)] text-[#002D58] rounded-lg text-sm"
+              >
+                {t('common.cancel')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add photos modal */}
+      {showAddPhotos && selectedGroupId !== null && (
+        <AddPhotosModal
+          groupId={selectedGroupId}
+          existingImageIds={new Set(groupImages.map(img => img.id))}
+          onClose={() => setShowAddPhotos(false)}
+          onAdded={handlePhotosAdded}
+        />
+      )}
+
+      {/* Delete confirm modal */}
+      {deletingGroupId !== null && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[#E8F3FB] p-6 rounded-xl w-96">
+            <h3 className="text-lg font-medium text-[#002D58] mb-2">{t('common.delete')} "{deletingGroup?.name}"</h3>
+            <p className="text-sm text-[rgba(0,45,88,0.65)] mb-6">{t('groups.deleteConfirm')}</p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 bg-[#C0392B] text-white rounded-lg text-sm font-medium"
+              >
+                {t('common.delete')}
+              </button>
+              <button
+                onClick={() => setDeletingGroupId(null)}
                 className="px-4 py-2 border border-[rgba(0,45,88,0.3)] text-[#002D58] rounded-lg text-sm"
               >
                 {t('common.cancel')}
