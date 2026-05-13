@@ -85,6 +85,18 @@ fn execute_import(
     commands::execute_import(plan, resolutions, &archive_path, &state.db)
 }
 
+#[tauri::command]
+fn export_group(
+    state: tauri::State<'_, Arc<AppState>>,
+    group_id: i64,
+    dest_path: String,
+) -> Result<commands::ExportResult, error::AppError> {
+    let archive_path = state.get_archive_path().ok_or_else(|| error::AppError::ArchiveNotFound {
+        path: "No archive path set".to_string(),
+    })?;
+    commands::export_group(&state.db, group_id, &dest_path, &archive_path)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app_state = Arc::new(
@@ -110,6 +122,7 @@ pub fn run() {
             analyze_image,
             create_import_plan,
             execute_import,
+            export_group,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

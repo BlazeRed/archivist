@@ -11,14 +11,24 @@ archivist/
 ├── src/                          # React frontend
 │   ├── components/               # React components
 │   │   ├── Topbar.tsx            # Navigation bar with mode/language toggles
-│   │   └── ...
+│   │   ├── FilterPanel.tsx       # Timeline year/month filters
+│   │   ├── ThumbnailGrid.tsx     # Responsive image grid
+│   │   ├── ImageDetail.tsx       # Full image view modal
+│   │   ├── ProgressBar.tsx       # Import progress indicator
+│   │   └── ConflictReview.tsx    # Conflict resolution UI
 │   ├── pages/                    # Route pages
 │   │   ├── TimelinePage.tsx      # Photo timeline view
 │   │   ├── GroupsPage.tsx        # Group management
 │   │   ├── ImportPage.tsx        # Import wizard
 │   │   └── SettingsPage.tsx      # App settings
 │   ├── stores/                   # Zustand state stores
-│   │   └── appConfigStore.ts     # App configuration store
+│   │   ├── appConfigStore.ts     # App configuration store
+│   │   ├── dataStore.ts          # Images & groups data
+│   │   ├── importStore.ts        # Import wizard state
+│   │   ├── timelineStore.ts      # Timeline filtering/selection
+│   │   └── groupUIStore.ts       # Multi-selection for groups
+│   ├── types/                    # TypeScript types
+│   │   └── index.ts              # Image, Group types
 │   ├── i18n/                     # Internationalization
 │   │   ├── index.ts              # i18next configuration
 │   │   └── locales/
@@ -30,19 +40,24 @@ archivist/
 ├── src-tauri/                    # Rust backend
 │   ├── src/
 │   │   ├── main.rs               # Tauri entry point
-│   │   ├── lib.rs                # Library root
-│   │   ├── error.rs              # Unified error type
-│   │   ├── exif.rs               # EXIF extraction
+│   │   ├── lib.rs                # Library root + Tauri commands
+│   │   ├── error.rs              # Unified error type (AppError)
+│   │   ├── exif.rs               # EXIF extraction with fallback
+│   │   ├── hasher.rs             # SHA256 hash computation
 │   │   ├── thumbnail.rs          # Thumbnail generation
-│   │   ├── commands/             # Tauri commands
+│   │   ├── state.rs              # App state management
+│   │   ├── commands/
 │   │   │   ├── import.rs         # Import pipeline
-│   │   │   └── ...
+│   │   │   └── export.rs         # Group export
 │   │   └── db/                   # Database layer
+│   │       ├── mod.rs            # Database init + schema
+│   │       ├── image.rs          # Image CRUD
+│   │       └── group.rs          # Group CRUD
 │   ├── Cargo.toml                # Rust dependencies
 │   └── tauri.conf.json           # Tauri configuration
 ├── package.json
 ├── vite.config.ts
-└── tailwind.config.js            # (or via @tailwindcss/vite plugin)
+└── AGENTS.md                     # This file
 ```
 
 ## Implementation Milestones
@@ -50,12 +65,12 @@ archivist/
 | Milestone | Description | Status |
 |-----------|-------------|--------|
 | **M1** | Scaffold: Tauri + React + Tailwind + i18n + routing | ✅ Done |
-| **M2** | Database: SQLite schema, migrations, Rust CRUD | Pending |
-| **M3** | EXIF + Hash: exif.rs, hasher.rs, thumbnail.rs with tests | Pending |
-| **M4** | Import Core: Full backend import pipeline | Pending |
-| **M5** | Import UI: Wizard + conflict review + progress | Pending |
-| **M6** | Timeline: Virtualized timeline + filters | Pending |
-| **M7** | Groups: Group management + export | Pending |
+| **M2** | Database: SQLite schema, migrations, Rust CRUD | ✅ Done |
+| **M3** | EXIF + Hash: exif.rs, hasher.rs, thumbnail.rs with tests | ✅ Done |
+| **M4** | Import Core: Full backend import pipeline | ✅ Done |
+| **M5** | Import UI: Wizard + conflict review + progress | ✅ Done |
+| **M6** | Timeline: Timeline + filters + image detail | ✅ Done |
+| **M7** | Groups: Group management + export | ✅ Done |
 | **M8** | Settings: Both modes + persistence | Pending |
 | **M9** | Polish: Mode toggle, notifications, error handling | Pending |
 
@@ -86,8 +101,8 @@ CREATE TABLE image_groups (
     image_id TEXT NOT NULL,
     group_id INTEGER NOT NULL,
     PRIMARY KEY (image_id, group_id),
-    FOREIGN KEY (image_id) REFERENCES images(id),
-    FOREIGN KEY (group_id) REFERENCES groups(id)
+    FOREIGN KEY (image_id) REFERENCES images(id) ON DELETE CASCADE,
+    FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE
 );
 ```
 
@@ -168,15 +183,40 @@ interface AppConfig {
 }
 ```
 
+**useImportStore**: Import wizard state (scanning → analyzing → review → importing → complete)
+
+**useTimelineStore**: Timeline filtering and image selection
+
+**useGroupStore**: Groups CRUD operations
+
+**useGroupUIStore**: Multi-selection UI for adding images to groups
+
 ## Tauri Commands (Backend)
 
-- `scan_source(path)` → List images in source folder
-- `analyze_batch(images, archive_path)` → Extract EXIF, compute hash, detect conflicts
-- `execute_import(plan, resolutions)` → Copy files to archive
-- `get_images(filters)` → Query images from DB
-- `create_group(name, image_ids)` → Create group
+- `init_archive(archive_path)` → Initialize archive
+- `get_image_count()` → Get total image count
+- `get_all_images()` → Get all images
+- `get_images_by_date(year, month)` → Get images by year/month
+- `get_all_groups()` → Get all groups with image counts
+- `create_group(name)` → Create new group
+- `delete_group(id)` → Delete group
+- `add_image_to_group(image_id, group_id)` → Add image to group
+- `remove_image_from_group(image_id, group_id)` → Remove from group
+- `get_images_in_group(group_id)` → Get image IDs in group
+- `scan_source(source_path)` → Scan source folder for images
+- `analyze_image(scanned)` → Analyze single image (EXIF, hash, dimensions)
+- `create_import_plan(images)` → Create import plan
+- `execute_import(plan, resolutions, archive_path)` → Execute import
 - `export_group(group_id, dest_path)` → Export group to folder
-- `rescan_archive(archive_path)` → Re-scan archive folder
+
+## Rust Tests
+
+All modules have unit tests:
+- `exif.rs`: Date parsing, fallback cascade
+- `hasher.rs`: Hash determinism, verification
+- `thumbnail.rs`: Size presets, image resizing
+
+Run tests with: `cargo test`
 
 ## Critical Rules (Non-Negotiable)
 
