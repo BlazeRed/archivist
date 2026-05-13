@@ -1,0 +1,69 @@
+{
+  "app": {
+    "name": "Archivist",
+    "tagline": "Photographic archive organizer"
+  },
+  "nav": {
+    "timeline": "Timeline",
+    "groups": "Groups",
+    "import": "Import",
+    "settings": "Settings"
+  },
+  "common": {
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "save": "Save",
+    "delete": "Delete",
+    "close": "Close",
+    "loading": "Loading..."
+  },
+  "import": {
+    "title": "Import",
+    "selectSource": "Select source folder",
+    "selectDestination": "Select archive folder",
+    "analyzing": "Analyzing images...",
+    "analyzingProgress": "Analyzing {{current}} of {{total}}",
+    "importing": "Importing...",
+    "importProgress": "Importing {{current}} of {{total}}",
+    "complete": "Import complete",
+    "sourceCleanup": "Delete the {{count}} source images?",
+    "noDate": "No Date",
+    "missingDate": "Missing date — placed in No Date"
+  },
+  "timeline": {
+    "title": "Timeline",
+    "allPhotos": "All Photos",
+    "noPhotos": "No photos in archive",
+    "filter": "Filter"
+  },
+  "groups": {
+    "title": "Groups",
+    "create": "Create Group",
+    "noGroups": "No groups created",
+    "selectPhotos": "Select photos to add"
+  },
+  "settings": {
+    "title": "Settings",
+    "archivePath": "Archive folder",
+    "language": "Language",
+    "uiMode": "UI Mode",
+    "beginner": "Beginner",
+    "advanced": "Advanced",
+    "thumbnailSize": "Thumbnail size",
+    "rescanArchive": "Rescan archive"
+  },
+  "conflicts": {
+    "title": "Review Conflicts",
+    "keepExisting": "Keep existing",
+    "replace": "Replace with new",
+    "keepBoth": "Keep both"
+  },
+  "status": {
+    "success": "Success",
+    "warning": "Warning",
+    "error": "Error",
+    "info": "Info"
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "app": {
+    "name": "Archivist",
+    "tagline": "Organizzatore di archivi fotografici"
+  },
+  "nav": {
+    "timeline": "Cronologia",
+    "groups": "Gruppi",
+    "import": "Importa",
+    "settings": "Impostazioni"
+  },
+  "common": {
+    "cancel": "Annulla",
+    "confirm": "Conferma",
+    "back": "Indietro",
+    "next": "Avanti",
+    "save": "Salva",
+    "delete": "Elimina",
+    "close": "Chiudi",
+    "loading": "Caricamento..."
+  },
+  "import": {
+    "title": "Importa",
+    "selectSource": "Seleziona cartella sorgente",
+    "selectDestination": "Seleziona cartella archivio",
+    "analyzing": "Analizzo le immagini...",
+    "analyzingProgress": "Analizzo {{current}} di {{total}}",
+    "importing": "Importazione...",
+    "importProgress": "Importo {{current}} di {{total}}",
+    "complete": "Importazione completata",
+    "sourceCleanup": "Eliminare le {{count}} foto sorgente?",
+    "noDate": "Senza data",
+    "missingDate": "Data mancante — inserita in Senza data"
+  },
+  "timeline": {
+    "title": "Cronologia",
+    "allPhotos": "Tutte le foto",
+    "noPhotos": "Nessuna foto nell'archivio",
+    "filter": "Filtro"
+  },
+  "groups": {
+    "title": "Gruppi",
+    "create": "Crea gruppo",
+    "noGroups": "Nessun gruppo creato",
+    "selectPhotos": "Seleziona foto da aggiungere"
+  },
+  "settings": {
+    "title": "Impostazioni",
+    "archivePath": "Cartella archivio",
+    "language": "Lingua",
+    "uiMode": "Modalità interfaccia",
+    "beginner": "Base",
+    "advanced": "Avanzato",
+    "thumbnailSize": "Dimensione miniature",
+    "rescanArchive": "Riscansiona archivio"
+  },
+  "conflicts": {
+    "title": "Rivedi conflitti",
+    "keepExisting": "Mantieni esistente",
+    "replace": "Sostituisci con nuovo",
+    "keepBoth": "Mantieni entrambi"
+  },
+  "status": {
+    "success": "Successo",
+    "warning": "Attenzione",
+    "error": "Errore",
+    "info": "Info"
+  }
+}
