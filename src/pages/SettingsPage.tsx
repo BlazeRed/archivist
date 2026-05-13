@@ -1,26 +1,72 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { open } from '@tauri-apps/plugin-dialog';
+import { invoke } from '@tauri-apps/api/core';
 import { useAppConfigStore } from '../stores/appConfigStore';
+import { useTimelineStore } from '../stores/timelineStore';
 
 export function SettingsPage() {
   const { t, i18n } = useTranslation();
   const { config, setConfig } = useAppConfigStore();
+  const { fetchImages } = useTimelineStore();
+  const [rescanLoading, setRescanLoading] = useState(false);
+  const [rescanResult, setRescanResult] = useState<string | null>(null);
+
+  const selectArchiveFolder = async () => {
+    const selected = await open({ directory: true, title: 'Select archive folder' });
+    if (selected) {
+      setConfig({ archive_path: selected as string });
+      try {
+        await invoke('init_archive', { archivePath: selected });
+      } catch (e) {
+        console.error('Failed to init archive:', e);
+      }
+    }
+  };
+
+  const handleRescan = async () => {
+    if (!config.archive_path) return;
+    
+    setRescanLoading(true);
+    setRescanResult(null);
+    
+    try {
+      const count = await invoke<number>('rescan_archive');
+      setRescanResult(`Found ${count} new images`);
+      fetchImages();
+    } catch (e) {
+      setRescanResult(`Error: ${e}`);
+    }
+    
+    setRescanLoading(false);
+  };
 
   return (
     <div className="p-6">
       <h1 className="text-[22px] font-medium text-[#002D58] mb-6">{t('settings.title')}</h1>
       
       <div className="space-y-6 max-w-md">
+        {/* Archive Path */}
         <div>
           <label className="block text-sm font-medium text-[#002D58] mb-2">{t('settings.archivePath')}</label>
-          <input
-            type="text"
-            value={config.archive_path}
-            onChange={(e) => setConfig({ archive_path: e.target.value })}
-            className="w-full px-3 py-2 bg-[#F4F9FD] border border-[rgba(0,45,88,0.28)] rounded-lg text-sm text-[#002D58]"
-            placeholder="/path/to/archive"
-          />
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={config.archive_path}
+              onChange={(e) => setConfig({ archive_path: e.target.value })}
+              className="flex-1 px-3 py-2 bg-[#F4F9FD] border border-[rgba(0,45,88,0.28)] rounded-lg text-sm text-[#002D58]"
+              placeholder="/path/to/archive"
+            />
+            <button
+              onClick={selectArchiveFolder}
+              className="px-3 py-2 bg-[#002D58] text-[#D2E8F7] rounded-lg text-sm font-medium"
+            >
+              Browse
+            </button>
+          </div>
         </div>
 
+        {/* Language */}
         <div>
           <label className="block text-sm font-medium text-[#002D58] mb-2">{t('settings.language')}</label>
           <select
@@ -36,6 +82,7 @@ export function SettingsPage() {
           </select>
         </div>
 
+        {/* Thumbnail Size */}
         <div>
           <label className="block text-sm font-medium text-[#002D58] mb-2">{t('settings.thumbnailSize')}</label>
           <select
@@ -43,11 +90,70 @@ export function SettingsPage() {
             onChange={(e) => setConfig({ thumbnail_size: e.target.value as 'small' | 'medium' | 'large' })}
             className="w-full px-3 py-2 bg-[#F4F9FD] border border-[rgba(0,45,88,0.28)] rounded-lg text-sm text-[#002D58]"
           >
-            <option value="small">Small</option>
-            <option value="medium">Medium</option>
-            <option value="large">Large</option>
+            <option value="small">Small (120px)</option>
+            <option value="medium">Medium (180px)</option>
+            <option value="large">Large (280px)</option>
           </select>
         </div>
+
+        {/* UI Mode - Only show in beginner mode */}
+        {config.ui_mode === 'beginner' && (
+          <div>
+            <label className="block text-sm font-medium text-[#002D58] mb-2">{t('settings.uiMode')}</label>
+            <p className="text-xs text-[rgba(0,45,88,0.55)] mb-2">
+              Switch to Advanced mode for more options
+            </p>
+          </div>
+        )}
+
+        {/* Rescan Archive - Advanced Mode */}
+        {config.ui_mode === 'advanced' && (
+          <>
+            <div className="border-t border-[rgba(0,45,88,0.15)] pt-6">
+              <h3 className="text-sm font-medium text-[#002D58] mb-4">Archive Management</h3>
+              
+              <button
+                onClick={handleRescan}
+                disabled={rescanLoading || !config.archive_path}
+                className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                  rescanLoading || !config.archive_path
+                    ? 'bg-[rgba(0,45,88,0.15)] text-[rgba(0,45,88,0.55)]'
+                    : 'bg-[#2A9EAD] text-white'
+                }`}
+              >
+                {rescanLoading ? 'Scanning...' : t('settings.rescanArchive')}
+              </button>
+              
+              {rescanResult && (
+                <p className={`mt-2 text-sm ${rescanResult.includes('Error') ? 'text-[#C0392B]' : 'text-[#2A9EAD]'}`}>
+                  {rescanResult}
+                </p>
+              )}
+            </div>
+
+            {/* Advanced Settings */}
+            <div className="border-t border-[rgba(0,45,88,0.15)] pt-6">
+              <h3 className="text-sm font-medium text-[#002D58] mb-4">Advanced Settings</h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs text-[rgba(0,45,88,0.55)] mb-1">Block Size</label>
+                  <input
+                    type="number"
+                    value={config.block_size}
+                    onChange={(e) => setConfig({ block_size: parseInt(e.target.value) || 50 })}
+                    className="w-24 px-2 py-1 bg-[#F4F9FD] border border-[rgba(0,45,88,0.28)] rounded text-sm text-[#002D58]"
+                    min={10}
+                    max={200}
+                  />
+                  <p className="text-[10px] text-[rgba(0,45,88,0.45)] mt-1">
+                    Images processed per batch during import
+                  </p>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

@@ -71,7 +71,7 @@ archivist/
 | **M5** | Import UI: Wizard + conflict review + progress | ✅ Done |
 | **M6** | Timeline: Timeline + filters + image detail | ✅ Done |
 | **M7** | Groups: Group management + export | ✅ Done |
-| **M8** | Settings: Both modes + persistence | Pending |
+| **M8** | Settings: Both modes + persistence | ✅ Done |
 | **M9** | Polish: Mode toggle, notifications, error handling | Pending |
 
 ## Database Schema (SQLite)

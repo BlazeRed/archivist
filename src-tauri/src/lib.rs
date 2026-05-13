@@ -97,6 +97,16 @@ fn export_group(
     commands::export_group(&state.db, group_id, &dest_path, &archive_path)
 }
 
+#[tauri::command]
+fn rescan_archive(
+    state: tauri::State<'_, Arc<AppState>>,
+) -> Result<usize, error::AppError> {
+    let archive_path = state.get_archive_path().ok_or_else(|| error::AppError::ArchiveNotFound {
+        path: "No archive path set".to_string(),
+    })?;
+    commands::rescan_archive(&archive_path, &state.db)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app_state = Arc::new(
@@ -123,6 +133,7 @@ pub fn run() {
             create_import_plan,
             execute_import,
             export_group,
+            rescan_archive,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
