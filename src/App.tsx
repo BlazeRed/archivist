@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom';
 import { Topbar } from './components/Topbar';
+import { ToastContainer } from './components/Toast';
 import { TimelinePage } from './pages/TimelinePage';
 import { GroupsPage } from './pages/GroupsPage';
 import { ImportPage } from './pages/ImportPage';
@@ -17,6 +18,7 @@ function App() {
           <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </main>
+      <ToastContainer />
     </div>
   );
 }

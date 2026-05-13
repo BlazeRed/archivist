@@ -72,7 +72,7 @@ archivist/
 | **M6** | Timeline: Timeline + filters + image detail | ✅ Done |
 | **M7** | Groups: Group management + export | ✅ Done |
 | **M8** | Settings: Both modes + persistence | ✅ Done |
-| **M9** | Polish: Mode toggle, notifications, error handling | Pending |
+| **M9** | Polish: Mode toggle, notifications, error handling | ✅ Done |
 
 ## Database Schema (SQLite)
 
