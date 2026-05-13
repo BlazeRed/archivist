@@ -4,6 +4,7 @@ pub mod state;
 pub mod exif;
 pub mod hasher;
 pub mod thumbnail;
+pub mod commands;
 
 use std::sync::Arc;
 use state::AppState;
@@ -59,6 +60,31 @@ fn get_images_in_group(state: tauri::State<'_, Arc<AppState>>, group_id: i64) ->
     state.db.get_images_in_group(group_id)
 }
 
+#[tauri::command]
+fn scan_source(source_path: String) -> Result<Vec<commands::ScannedImage>, error::AppError> {
+    commands::scan_source(&source_path)
+}
+
+#[tauri::command]
+fn analyze_image(scanned: commands::ScannedImage) -> Result<commands::AnalyzedImage, error::AppError> {
+    commands::analyze_image(&scanned)
+}
+
+#[tauri::command]
+fn create_import_plan(images: Vec<commands::AnalyzedImage>) -> commands::ImportPlan {
+    commands::create_import_plan(images)
+}
+
+#[tauri::command]
+fn execute_import(
+    state: tauri::State<'_, Arc<AppState>>,
+    plan: commands::ImportPlan,
+    resolutions: Vec<commands::ImportResolution>,
+    archive_path: String,
+) -> Result<commands::ImportResult, error::AppError> {
+    commands::execute_import(plan, resolutions, &archive_path, &state.db)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app_state = Arc::new(
@@ -80,6 +106,10 @@ pub fn run() {
             add_image_to_group,
             remove_image_from_group,
             get_images_in_group,
+            scan_source,
+            analyze_image,
+            create_import_plan,
+            execute_import,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
