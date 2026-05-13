@@ -112,6 +112,35 @@ fn rescan_archive(
     commands::rescan_archive(&archive_path, &state.db)
 }
 
+#[tauri::command]
+fn save_config(app: tauri::AppHandle, config: serde_json::Value) -> Result<(), error::AppError> {
+    use tauri::Manager;
+    let dir = app.path().app_data_dir()
+        .map_err(|e| error::AppError::FileWrite { path: "app_data_dir".into(), message: e.to_string() })?;
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| error::AppError::FileWrite { path: dir.to_string_lossy().into(), message: e.to_string() })?;
+    let path = dir.join("app_config.json");
+    let json = serde_json::to_string_pretty(&config)
+        .map_err(|e| error::AppError::FileWrite { path: path.to_string_lossy().into(), message: e.to_string() })?;
+    std::fs::write(&path, json)
+        .map_err(|e| error::AppError::FileWrite { path: path.to_string_lossy().into(), message: e.to_string() })?;
+    Ok(())
+}
+
+#[tauri::command]
+fn load_config(app: tauri::AppHandle) -> Option<serde_json::Value> {
+    use tauri::Manager;
+    let dir = app.path().app_data_dir().ok()?;
+    let path = dir.join("app_config.json");
+    let content = std::fs::read_to_string(path).ok()?;
+    serde_json::from_str(&content).ok()
+}
+
+#[tauri::command]
+fn path_exists(path: String) -> bool {
+    std::path::Path::new(&path).exists()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app_state = Arc::new(
@@ -140,6 +169,9 @@ pub fn run() {
             execute_import,
             export_group,
             rescan_archive,
+            save_config,
+            load_config,
+            path_exists,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

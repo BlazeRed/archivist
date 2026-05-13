@@ -66,6 +66,7 @@
     "noDateHeader": "No Date",
     "archiveNotSet": "Set an archive path in Settings to view photos.",
     "openArchive": "Open Archive",
+    "clearFilter": "Clear filters",
     "photos": "photos"
   },
   "groups": {

@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useTimelineStore } from '../stores/timelineStore';
 
@@ -10,9 +11,32 @@ export function FilterPanel() {
   const { t } = useTranslation();
   const { filter, setFilter, availableYears, availableGroups, images, allImages } = useTimelineStore();
 
+  const isFiltered = filter.noDate || filter.year !== null || filter.month !== null || filter.groupId !== null;
+  const clearFilter = () => setFilter({ year: null, month: null, noDate: false, groupId: null });
+
+  const availableMonths = useMemo(() => {
+    if (!filter.year) return [];
+    const months = new Set(
+      allImages
+        .filter(img => img.taken_at && new Date(img.taken_at).getFullYear() === filter.year)
+        .map(img => new Date(img.taken_at!).getMonth() + 1)
+    );
+    return [...months].sort((a, b) => a - b);
+  }, [allImages, filter.year]);
+
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-semibold text-[#002D58]">{t('timeline.filter')}</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-[#002D58]">{t('timeline.filter')}</h3>
+        {isFiltered && (
+          <button
+            onClick={clearFilter}
+            className="text-xs text-[#0084C5] underline"
+          >
+            {t('timeline.clearFilter')}
+          </button>
+        )}
+      </div>
 
       {/* No Date toggle */}
       <label className="flex items-center gap-2 cursor-pointer">
@@ -50,8 +74,8 @@ export function FilterPanel() {
             className="w-full px-3 py-2 bg-[#F4F9FD] border border-[rgba(0,45,88,0.28)] rounded-lg text-sm text-[#002D58]"
           >
             <option value="">{t('timeline.allMonths')}</option>
-            {MONTHS.map((name, idx) => (
-              <option key={idx + 1} value={idx + 1}>{name}</option>
+            {availableMonths.map(m => (
+              <option key={m} value={m}>{MONTHS[m - 1]}</option>
             ))}
           </select>
         </div>

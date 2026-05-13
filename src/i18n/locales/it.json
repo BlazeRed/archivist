@@ -66,6 +66,7 @@
     "noDateHeader": "Senza data",
     "archiveNotSet": "Imposta un percorso archivio nelle Impostazioni.",
     "openArchive": "Apri Archivio",
+    "clearFilter": "Azzera filtri",
     "photos": "foto"
   },
   "groups": {

@@ -71,7 +71,7 @@ export function TimelinePage() {
   return (
     <div className="flex h-[calc(100vh-52px)] relative">
       {/* Sidebar */}
-      <aside className="w-56 flex-shrink-0 p-4 border-r border-[rgba(0,45,88,0.15)] overflow-y-auto">
+      <aside className="w-56 flex-shrink-0 p-4 border-r border-[rgba(0,45,88,0.15)] bg-[#E8F3FB] overflow-y-auto">
         <FilterPanel />
       </aside>
 

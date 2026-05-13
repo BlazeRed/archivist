@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { invoke } from '@tauri-apps/api/core';
 
 interface AppConfig {
   archive_path: string;
@@ -21,7 +22,9 @@ export const useAppConfigStore = create<AppConfigStore>((set) => ({
     last_import_source: '',
     block_size: 50,
   },
-  setConfig: (newConfig) => set((state) => ({
-    config: { ...state.config, ...newConfig }
-  })),
+  setConfig: (newConfig) => set((state) => {
+    const config = { ...state.config, ...newConfig };
+    invoke('save_config', { config }).catch(console.error);
+    return { config };
+  }),
 }));
