@@ -1,0 +1,73 @@
+import { create } from 'zustand';
+import { invoke } from '@tauri-apps/api/core';
+import type { Image, GroupWithCount } from '../types';
+
+interface ImageStore {
+  images: Image[];
+  loading: boolean;
+  error: string | null;
+  fetchImages: () => Promise<void>;
+  fetchImagesByDate: (year: number, month?: number) => Promise<void>;
+}
+
+export const useImageStore = create<ImageStore>((set) => ({
+  images: [],
+  loading: false,
+  error: null,
+
+  fetchImages: async () => {
+    set({ loading: true, error: null });
+    try {
+      const images = await invoke<Image[]>('get_all_images');
+      set({ images, loading: false });
+    } catch (e) {
+      set({ error: String(e), loading: false });
+    }
+  },
+
+  fetchImagesByDate: async (year: number, month?: number) => {
+    set({ loading: true, error: null });
+    try {
+      const images = await invoke<Image[]>('get_images_by_date', { year, month });
+      set({ images, loading: false });
+    } catch (e) {
+      set({ error: String(e), loading: false });
+    }
+  },
+}));
+
+interface GroupStore {
+  groups: GroupWithCount[];
+  loading: boolean;
+  error: string | null;
+  fetchGroups: () => Promise<void>;
+  createGroup: (name: string) => Promise<number>;
+  deleteGroup: (id: number) => Promise<void>;
+}
+
+export const useGroupStore = create<GroupStore>((set, get) => ({
+  groups: [],
+  loading: false,
+  error: null,
+
+  fetchGroups: async () => {
+    set({ loading: true, error: null });
+    try {
+      const groups = await invoke<GroupWithCount[]>('get_all_groups');
+      set({ groups, loading: false });
+    } catch (e) {
+      set({ error: String(e), loading: false });
+    }
+  },
+
+  createGroup: async (name: string) => {
+    const id = await invoke<number>('create_group', { name });
+    await get().fetchGroups();
+    return id;
+  },
+
+  deleteGroup: async (id: number) => {
+    await invoke('delete_group', { id });
+    await get().fetchGroups();
+  },
+}));
