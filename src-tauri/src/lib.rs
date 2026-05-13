@@ -3,24 +3,11 @@ pub mod error;
 pub mod state;
 
 use std::sync::Arc;
-use tauri::Manager;
 use state::AppState;
-
-fn get_db_path(archive_path: &str) -> std::path::PathBuf {
-    std::path::Path::new(archive_path)
-        .join(".archivist")
-        .join("archivist.db")
-}
 
 #[tauri::command]
 fn init_archive(state: tauri::State<'_, Arc<AppState>>, archive_path: String) -> Result<(), error::AppError> {
-    state.set_archive_path(archive_path.clone());
-    let db_path = get_db_path(&archive_path);
-    let new_state = AppState::new(db_path)?;
-    let new_db = Arc::new(new_state.db);
-    
-    // Replace the database in state - we need to restructure this
-    // For now, just return success and we'll manage db path in commands
+    state.set_archive_path(archive_path);
     Ok(())
 }
 
