@@ -1,6 +1,9 @@
 pub mod db;
 pub mod error;
 pub mod state;
+pub mod exif;
+pub mod hasher;
+pub mod thumbnail;
 
 use std::sync::Arc;
 use state::AppState;
