@@ -21,7 +21,7 @@ interface ExportResult {
 
 export function GroupsPage() {
   const { t } = useTranslation();
-  const { groups, fetchGroups, createGroup, deleteGroup } = useGroupStore();
+  const { groups, fetchGroups, createGroup, updateGroup, deleteGroup } = useGroupStore();
   const { config, setConfig } = useAppConfigStore();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
@@ -29,6 +29,8 @@ export function GroupsPage() {
   const [groupImages, setGroupImages] = useState<Image[]>([]);
   const [deletingGroupId, setDeletingGroupId] = useState<number | null>(null);
   const [showAddPhotos, setShowAddPhotos] = useState(false);
+  const [editingGroupId, setEditingGroupId] = useState<number | null>(null);
+  const [editingName, setEditingName] = useState('');
 
   const { selectedImageIds, isSelectionMode, clearSelection, getSelectedCount } = useGroupUIStore();
 
@@ -108,6 +110,20 @@ export function GroupsPage() {
     fetchGroups();
   };
 
+  const handleStartEdit = (e: React.MouseEvent, group: { id: number; name: string }) => {
+    e.stopPropagation();
+    setEditingGroupId(group.id);
+    setEditingName(group.name);
+  };
+
+  const handleConfirmEdit = async () => {
+    if (editingGroupId === null || !editingName.trim()) return;
+    await updateGroup(editingGroupId, editingName.trim());
+    setEditingGroupId(null);
+  };
+
+  const handleCancelEdit = () => setEditingGroupId(null);
+
   const handleRemoveFromGroup = async (imageId: string) => {
     if (selectedGroupId === null) return;
     try {
@@ -149,16 +165,44 @@ export function GroupsPage() {
             {groups.map(group => (
               <div
                 key={group.id}
-                onClick={() => handleSelectGroup(group.id)}
+                onClick={() => editingGroupId !== group.id && handleSelectGroup(group.id)}
                 className={cn(
-                  'p-3 rounded-lg cursor-pointer transition-colors',
+                  'group/item p-3 rounded-lg cursor-pointer transition-colors',
                   selectedGroupId === group.id
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-muted hover:bg-primary/10'
                 )}
               >
-                <p className="font-medium text-sm">{group.name}</p>
-                <p className={cn('text-xs', selectedGroupId === group.id ? 'text-primary-foreground/70' : 'text-muted-foreground')}>
+                {editingGroupId === group.id ? (
+                  <input
+                    autoFocus
+                    className="w-full text-sm font-medium bg-transparent border-b border-current outline-none"
+                    value={editingName}
+                    onChange={e => setEditingName(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleConfirmEdit();
+                      if (e.key === 'Escape') handleCancelEdit();
+                    }}
+                    onBlur={handleConfirmEdit}
+                    onClick={e => e.stopPropagation()}
+                  />
+                ) : (
+                  <div className="flex items-center justify-between gap-1">
+                    <p className="font-medium text-sm truncate">{group.name}</p>
+                    <button
+                      onClick={e => handleStartEdit(e, group)}
+                      className={cn(
+                        'flex-shrink-0 opacity-0 group-hover/item:opacity-100 transition-opacity p-0.5 rounded',
+                        selectedGroupId === group.id ? 'hover:bg-primary-foreground/20' : 'hover:bg-primary/20'
+                      )}
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="1.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M11.5 2.5a2.121 2.121 0 013 3L5 15H2v-3L11.5 2.5z" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                <p className={cn('text-xs mt-0.5', selectedGroupId === group.id ? 'text-primary-foreground/70' : 'text-muted-foreground')}>
                   {t('groups.photosCount', { count: group.image_count })}
                 </p>
               </div>

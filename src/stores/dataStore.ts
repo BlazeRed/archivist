@@ -42,6 +42,7 @@ interface GroupStore {
   error: string | null;
   fetchGroups: () => Promise<void>;
   createGroup: (name: string) => Promise<number>;
+  updateGroup: (id: number, name: string) => Promise<void>;
   deleteGroup: (id: number) => Promise<void>;
 }
 
@@ -64,6 +65,11 @@ export const useGroupStore = create<GroupStore>((set, get) => ({
     const id = await invoke<number>('create_group', { name });
     await get().fetchGroups();
     return id;
+  },
+
+  updateGroup: async (id: number, name: string) => {
+    await invoke('update_group', { id, name });
+    await get().fetchGroups();
   },
 
   deleteGroup: async (id: number) => {
