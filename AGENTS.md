@@ -68,7 +68,7 @@ archivist/
 │   └── tauri.conf.json           # Tauri configuration
 ├── .github/
 │   └── workflows/
-│       └── release.yml           # Cross-platform build (Linux + Windows + macOS)
+│       └── release.yml           # Cross-platform release builds (Linux + Windows + macOS)
 ├── package.json
 ├── vite.config.ts
 └── AGENTS.md                     # This file
@@ -206,7 +206,6 @@ All variants use `hover:brightness-90` or `hover:brightness-95` — never `[a]:h
 interface AppConfig {
   archive_path: string;
   language: 'en' | 'it';
-  ui_mode: 'beginner' | 'advanced';
   thumbnail_size: 'small' | 'medium' | 'large';
   last_import_source: string;
   block_size: number;
@@ -269,7 +268,7 @@ All registered in `lib.rs`. New commands must be added both as `#[tauri::command
 
 ## Cross-Platform Builds (GitHub Actions)
 
-`.github/workflows/release.yml` (at project root, one level above `archivist/`):
+`.github/workflows/release.yml` (inside `archivist/`, at the git repo root):
 - Triggered by `v*` tags or `workflow_dispatch`
 - Matrix: `ubuntu-22.04`, `windows-latest`, `macos-latest` × 2 (Intel + Apple Silicon)
 - Each runner builds natively — no cross-compilation
@@ -301,7 +300,6 @@ Run tests with: `cd src-tauri && cargo test`
 {
   "archive_path": "/path/to/archive",
   "language": "en",
-  "ui_mode": "beginner",
   "thumbnail_size": "medium",
   "last_import_source": "",
   "block_size": 50

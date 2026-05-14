@@ -11,7 +11,6 @@ Photographic archive organizer built with Tauri v2 + React + TypeScript.
 - Export groups to a destination folder
 - Archive rescan to pick up manually added files
 - Bilingual UI (English / Italian) — folder names always in English on disk
-- Beginner (4-step wizard) and Advanced (dual-pane) import modes
 
 ## Development
 

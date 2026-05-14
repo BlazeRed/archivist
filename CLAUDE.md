@@ -51,7 +51,7 @@ Tauri v2 desktop app. Two runtimes communicate via `invoke()`:
 
 | Store | Owns |
 |-------|------|
-| `appConfigStore` | `AppConfig` (archive path, language, ui_mode, thumbnail_size) |
+| `appConfigStore` | `AppConfig` (archive path, language, thumbnail_size) |
 | `dataStore` | Images + groups loaded from DB (`useImageStore`, `useGroupStore`) |
 | `importStore` | Import wizard state machine (scanning → analyzing → review → importing → complete) |
 | `timelineStore` | Year-range filter (`yearFrom`/`yearTo`), month filter, selected image |
