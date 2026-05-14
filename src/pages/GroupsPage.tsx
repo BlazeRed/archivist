@@ -8,6 +8,10 @@ import { useGroupUIStore } from '../stores/groupUIStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { AddPhotosModal } from '../components/AddPhotosModal';
 import type { Image } from '../types';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 
 interface ExportResult {
   copied: number;
@@ -118,14 +122,9 @@ export function GroupsPage() {
   if (!config.archive_path) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-52px)]">
-        <div className="bg-[#E8F3FB] px-8 py-6 rounded-xl text-center max-w-sm">
-          <p className="text-[rgba(0,45,88,0.55)] text-sm mb-4">{t('timeline.archiveNotSet')}</p>
-          <button
-            onClick={handleOpenArchive}
-            className="px-5 py-2 bg-[#0084C5] text-white rounded-lg text-sm font-medium"
-          >
-            {t('timeline.openArchive')}
-          </button>
+        <div className="bg-card px-8 py-6 rounded-xl text-center max-w-sm">
+          <p className="text-muted-foreground text-sm mb-4">{t('timeline.archiveNotSet')}</p>
+          <Button onClick={handleOpenArchive}>{t('timeline.openArchive')}</Button>
         </div>
       </div>
     );
@@ -137,33 +136,29 @@ export function GroupsPage() {
   return (
     <div className="flex h-[calc(100vh-52px)]">
       {/* Sidebar */}
-      <aside className="w-72 p-4 border-r border-[rgba(0,45,88,0.15)] bg-[#E8F3FB] flex flex-col">
+      <aside className="w-72 p-4 border-r border-border bg-card flex flex-col">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-medium text-[#002D58]">{t('groups.title')}</h2>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="px-3 py-1 bg-[#0084C5] text-white text-sm rounded-lg"
-          >
-            +
-          </button>
+          <h2 className="text-lg font-medium text-foreground">{t('groups.title')}</h2>
+          <Button size="icon-sm" onClick={() => setShowCreateModal(true)}>+</Button>
         </div>
 
         {groups.length === 0 ? (
-          <p className="text-sm text-[rgba(0,45,88,0.55)]">{t('groups.noGroups')}</p>
+          <p className="text-sm text-muted-foreground">{t('groups.noGroups')}</p>
         ) : (
           <div className="space-y-2 overflow-y-auto flex-1">
             {groups.map(group => (
               <div
                 key={group.id}
                 onClick={() => handleSelectGroup(group.id)}
-                className={`p-3 rounded-lg cursor-pointer transition-colors ${
+                className={cn(
+                  'p-3 rounded-lg cursor-pointer transition-colors',
                   selectedGroupId === group.id
-                    ? 'bg-[#0084C5] text-white'
-                    : 'bg-[#F4F9FD] hover:bg-[rgba(0,132,197,0.1)]'
-                }`}
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted hover:bg-primary/10'
+                )}
               >
                 <p className="font-medium text-sm">{group.name}</p>
-                <p className={`text-xs ${selectedGroupId === group.id ? 'text-white/70' : 'text-[rgba(0,45,88,0.55)]'}`}>
+                <p className={cn('text-xs', selectedGroupId === group.id ? 'text-primary-foreground/70' : 'text-muted-foreground')}>
                   {t('groups.photosCount', { count: group.image_count })}
                 </p>
               </div>
@@ -177,33 +172,24 @@ export function GroupsPage() {
         {selectedGroupId ? (
           <div>
             <div className="flex justify-between items-center mb-4">
-              <h1 className="text-[22px] font-medium text-[#002D58]">
+              <h1 className="text-[22px] font-medium text-foreground">
                 {groups.find(g => g.id === selectedGroupId)?.name}
               </h1>
               <div className="flex gap-2">
-                <button
-                  onClick={() => setShowAddPhotos(true)}
-                  className="px-3 py-1.5 bg-[#0084C5] text-white text-sm rounded-lg font-medium"
-                >
+                <Button size="sm" onClick={() => setShowAddPhotos(true)}>
                   {t('groups.addPhotosTitle')}
-                </button>
-                <button
-                  onClick={() => handleExportGroup(selectedGroupId)}
-                  className="px-3 py-1.5 bg-[#2A9EAD] text-white text-sm rounded-lg font-medium"
-                >
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => handleExportGroup(selectedGroupId)}>
                   {t('groups.export')}
-                </button>
-                <button
-                  onClick={() => handleDeleteGroup(selectedGroupId)}
-                  className="px-3 py-1.5 bg-[#C0392B] text-white text-sm rounded-lg font-medium"
-                >
+                </Button>
+                <Button size="sm" variant="destructive" onClick={() => handleDeleteGroup(selectedGroupId)}>
                   {t('common.delete')}
-                </button>
+                </Button>
               </div>
             </div>
 
             {groupImages.length === 0 ? (
-              <p className="text-[rgba(0,45,88,0.55)] text-sm">{t('groups.noPhotos')}</p>
+              <p className="text-muted-foreground text-sm">{t('groups.noPhotos')}</p>
             ) : (
               <div className="grid grid-cols-4 gap-3">
                 {groupImages.map(img => {
@@ -213,7 +199,7 @@ export function GroupsPage() {
                   return (
                     <div
                       key={img.id}
-                      className="group relative bg-[#E8F3FB] rounded-lg overflow-hidden border border-[rgba(0,45,88,0.1)]"
+                      className="group relative bg-card rounded-lg overflow-hidden border border-border"
                     >
                       {url && (
                         <div className="aspect-square bg-[#001A36] overflow-hidden">
@@ -228,13 +214,13 @@ export function GroupsPage() {
                       <button
                         onClick={() => handleRemoveFromGroup(img.id)}
                         title={t('detail.removeFromGroup')}
-                        className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[#C0392B]"
+                        className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive"
                       >
                         ×
                       </button>
                       <div className="p-2">
-                        <p className="text-xs text-[#002D58] truncate font-medium">{img.filename}</p>
-                        <p className="text-[10px] text-[rgba(0,45,88,0.45)] mt-0.5">
+                        <p className="text-xs text-foreground truncate font-medium">{img.filename}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
                           {img.taken_at
                             ? new Date(img.taken_at).toLocaleDateString()
                             : t('detail.noDate')}
@@ -248,52 +234,43 @@ export function GroupsPage() {
           </div>
         ) : (
           <div className="flex items-center justify-center h-full">
-            <p className="text-[rgba(0,45,88,0.55)] text-sm">{t('groups.selectGroup')}</p>
+            <p className="text-muted-foreground text-sm">{t('groups.selectGroup')}</p>
           </div>
         )}
       </main>
 
-      {/* Create modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-[#E8F3FB] p-6 rounded-xl w-96">
-            <h3 className="text-lg font-medium text-[#002D58] mb-4">{t('groups.create')}</h3>
+      {/* Create group modal */}
+      <Dialog open={showCreateModal} onOpenChange={(open) => { if (!open) { setShowCreateModal(false); setNewGroupName(''); } }}>
+        <DialogContent className="w-96">
+          <DialogHeader>
+            <DialogTitle>{t('groups.create')}</DialogTitle>
+          </DialogHeader>
 
-            {isSelectionMode && (
-              <div className="mb-4 p-3 bg-[rgba(42,158,173,0.12)] rounded-lg">
-                <p className="text-sm text-[#2A9EAD]">
-                  {t('groups.selectedPhotosInfo', { count: getSelectedCount() })}
-                </p>
-              </div>
-            )}
-
-            <input
-              type="text"
-              value={newGroupName}
-              onChange={(e) => setNewGroupName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleCreateGroup()}
-              placeholder={t('groups.namePlaceholder')}
-              className="w-full px-3 py-2 bg-[#F4F9FD] border border-[rgba(0,45,88,0.28)] rounded-lg text-sm text-[#002D58] mb-4"
-              autoFocus
-            />
-
-            <div className="flex gap-3">
-              <button
-                onClick={handleCreateGroup}
-                className="px-4 py-2 bg-[#0084C5] text-white rounded-lg text-sm font-medium"
-              >
-                {t('common.confirm')}
-              </button>
-              <button
-                onClick={() => { setShowCreateModal(false); setNewGroupName(''); }}
-                className="px-4 py-2 border border-[rgba(0,45,88,0.3)] text-[#002D58] rounded-lg text-sm"
-              >
-                {t('common.cancel')}
-              </button>
+          {isSelectionMode && (
+            <div className="p-3 bg-accent/12 rounded-lg">
+              <p className="text-sm text-accent">
+                {t('groups.selectedPhotosInfo', { count: getSelectedCount() })}
+              </p>
             </div>
+          )}
+
+          <Input
+            type="text"
+            value={newGroupName}
+            onChange={(e) => setNewGroupName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleCreateGroup()}
+            placeholder={t('groups.namePlaceholder')}
+            autoFocus
+          />
+
+          <div className="flex gap-3 justify-end">
+            <Button onClick={handleCreateGroup}>{t('common.confirm')}</Button>
+            <Button variant="outline" onClick={() => { setShowCreateModal(false); setNewGroupName(''); }}>
+              {t('common.cancel')}
+            </Button>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {/* Add photos modal */}
       {showAddPhotos && selectedGroupId !== null && (
@@ -306,28 +283,18 @@ export function GroupsPage() {
       )}
 
       {/* Delete confirm modal */}
-      {deletingGroupId !== null && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-[#E8F3FB] p-6 rounded-xl w-96">
-            <h3 className="text-lg font-medium text-[#002D58] mb-2">{t('common.delete')} "{deletingGroup?.name}"</h3>
-            <p className="text-sm text-[rgba(0,45,88,0.65)] mb-6">{t('groups.deleteConfirm')}</p>
-            <div className="flex gap-3">
-              <button
-                onClick={handleConfirmDelete}
-                className="px-4 py-2 bg-[#C0392B] text-white rounded-lg text-sm font-medium"
-              >
-                {t('common.delete')}
-              </button>
-              <button
-                onClick={() => setDeletingGroupId(null)}
-                className="px-4 py-2 border border-[rgba(0,45,88,0.3)] text-[#002D58] rounded-lg text-sm"
-              >
-                {t('common.cancel')}
-              </button>
-            </div>
+      <Dialog open={deletingGroupId !== null} onOpenChange={(open) => { if (!open) setDeletingGroupId(null); }}>
+        <DialogContent className="w-96">
+          <DialogHeader>
+            <DialogTitle>{t('common.delete')} "{deletingGroup?.name}"</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">{t('groups.deleteConfirm')}</p>
+          <div className="flex gap-3 justify-end">
+            <Button variant="destructive" onClick={handleConfirmDelete}>{t('common.delete')}</Button>
+            <Button variant="outline" onClick={() => setDeletingGroupId(null)}>{t('common.cancel')}</Button>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

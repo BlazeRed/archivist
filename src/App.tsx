@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { Routes, Route } from 'react-router-dom';
 import { Topbar } from './components/Topbar';
-import { ToastContainer } from './components/Toast';
+import { Toaster } from './components/ui/sonner';
 import { TimelinePage } from './pages/TimelinePage';
 import { GroupsPage } from './pages/GroupsPage';
 import { ImportPage } from './pages/ImportPage';
@@ -42,7 +42,7 @@ function App() {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#D2E8F7]">
+    <div className="min-h-screen flex flex-col bg-background">
       <Topbar />
       <main className="flex-1">
         <Routes>
@@ -52,7 +52,7 @@ function App() {
           <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </main>
-      <ToastContainer />
+      <Toaster />
     </div>
   );
 }

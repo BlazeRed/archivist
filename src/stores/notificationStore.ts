@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { toast } from 'sonner';
 
 export type NotificationType = 'success' | 'warning' | 'error' | 'info';
 
@@ -11,40 +12,19 @@ export interface Notification {
 }
 
 interface NotificationState {
-  notifications: Notification[];
   addNotification: (type: NotificationType, title: string, message: string) => void;
   removeNotification: (id: string) => void;
   clearAll: () => void;
 }
 
-export const useNotificationStore = create<NotificationState>((set) => ({
-  notifications: [],
-
+export const useNotificationStore = create<NotificationState>(() => ({
   addNotification: (type, title, message) => {
-    const id = Math.random().toString(36).substring(7);
-    const notification: Notification = {
-      id,
-      type,
-      title,
-      message,
-      timestamp: Date.now(),
-    };
-    set((state) => ({
-      notifications: [...state.notifications, notification],
-    }));
-    
-    setTimeout(() => {
-      set((state) => ({
-        notifications: state.notifications.filter((n) => n.id !== id),
-      }));
-    }, 5000);
+    const desc = message || undefined;
+    if (type === 'success') toast.success(title, { description: desc });
+    else if (type === 'warning') toast.warning(title, { description: desc });
+    else if (type === 'error') toast.error(title, { description: desc });
+    else toast.info(title, { description: desc });
   },
-
-  removeNotification: (id) => {
-    set((state) => ({
-      notifications: state.notifications.filter((n) => n.id !== id),
-    }));
-  },
-
-  clearAll: () => set({ notifications: [] }),
+  removeNotification: () => {},
+  clearAll: () => {},
 }));

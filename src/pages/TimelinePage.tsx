@@ -8,6 +8,8 @@ import { useGroupUIStore } from '../stores/groupUIStore';
 import { FilterPanel } from '../components/FilterPanel';
 import { ThumbnailGrid } from '../components/ThumbnailGrid';
 import { ImageDetail } from '../components/ImageDetail';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export function TimelinePage() {
   const { t } = useTranslation();
@@ -15,7 +17,7 @@ export function TimelinePage() {
   const { config, setConfig } = useAppConfigStore();
   const { isSelectionMode, selectedImageIds, clearSelection, getSelectedCount } = useGroupUIStore();
 
-  const [addToGroupId, setAddToGroupId] = useState<number | ''>('');
+  const [addToGroupId, setAddToGroupId] = useState<string>('');
   const [addingToGroup, setAddingToGroup] = useState(false);
 
   const handleOpenArchive = async () => {
@@ -55,14 +57,9 @@ export function TimelinePage() {
   if (!config.archive_path) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-52px)]">
-        <div className="bg-[#E8F3FB] px-8 py-6 rounded-xl text-center max-w-sm">
-          <p className="text-[rgba(0,45,88,0.55)] text-sm mb-4">{t('timeline.archiveNotSet')}</p>
-          <button
-            onClick={handleOpenArchive}
-            className="px-5 py-2 bg-[#0084C5] text-white rounded-lg text-sm font-medium"
-          >
-            {t('timeline.openArchive')}
-          </button>
+        <div className="bg-card px-8 py-6 rounded-xl text-center max-w-sm">
+          <p className="text-muted-foreground text-sm mb-4">{t('timeline.archiveNotSet')}</p>
+          <Button onClick={handleOpenArchive}>{t('timeline.openArchive')}</Button>
         </div>
       </div>
     );
@@ -71,7 +68,7 @@ export function TimelinePage() {
   return (
     <div className="flex h-[calc(100vh-52px)] relative">
       {/* Sidebar */}
-      <aside className="w-56 flex-shrink-0 p-4 border-r border-[rgba(0,45,88,0.15)] bg-[#E8F3FB] overflow-y-auto">
+      <aside className="w-56 flex-shrink-0 p-4 border-r border-border bg-card overflow-y-auto">
         <FilterPanel />
       </aside>
 
@@ -83,41 +80,39 @@ export function TimelinePage() {
 
         {/* Selection action bar */}
         {isSelectionMode && (
-          <div className="flex-shrink-0 h-14 bg-[#002D58] flex items-center px-6 gap-4 shadow-lg">
-            <span className="text-[#D2E8F7] text-sm font-medium">
+          <div className="flex-shrink-0 h-14 bg-foreground flex items-center px-6 gap-4 shadow-lg">
+            <span className="text-background text-sm font-medium">
               {t('timeline.selected', { count: getSelectedCount() })}
             </span>
 
             {availableGroups.length > 0 && (
               <div className="flex items-center gap-2 ml-auto">
-                <select
-                  value={addToGroupId}
-                  onChange={(e) => setAddToGroupId(e.target.value ? Number(e.target.value) : '')}
-                  className="px-3 py-1.5 bg-[rgba(255,255,255,0.12)] border border-[rgba(255,255,255,0.25)] rounded-lg text-sm text-white"
-                >
-                  <option value="" className="text-[#002D58] bg-white">{t('timeline.filterGroups')}…</option>
-                  {availableGroups.map(g => (
-                    <option key={g.id} value={g.id} className="text-[#002D58] bg-white">
-                      {g.name}
-                    </option>
-                  ))}
-                </select>
-                <button
+                <Select value={addToGroupId} onValueChange={setAddToGroupId}>
+                  <SelectTrigger className="w-48 bg-white/12 border-white/25 text-white">
+                    <SelectValue placeholder={`${t('timeline.filterGroups')}…`} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableGroups.map(g => (
+                      <SelectItem key={g.id} value={g.id.toString()}>{g.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
                   onClick={handleAddToGroup}
                   disabled={!addToGroupId || addingToGroup || getSelectedCount() === 0}
-                  className="px-4 py-1.5 bg-[#0084C5] text-white rounded-lg text-sm font-medium disabled:opacity-40"
                 >
                   {t('timeline.addToGroup')}
-                </button>
+                </Button>
               </div>
             )}
 
-            <button
+            <Button
+              variant="outline"
               onClick={clearSelection}
-              className="px-3 py-1.5 border border-[rgba(255,255,255,0.3)] text-[#D2E8F7] rounded-lg text-sm"
+              className="border-white/30 text-background hover:text-foreground"
             >
               {t('timeline.cancelSelection')}
-            </button>
+            </Button>
           </div>
         )}
       </main>

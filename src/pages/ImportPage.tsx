@@ -4,6 +4,8 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { useImportStore } from '../stores/importStore';
 import { ConflictReview } from '../components/ConflictReview';
 import { ProgressBar } from '../components/ProgressBar';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 function StepIndicator({ current }: { current: number }) {
   return (
@@ -11,20 +13,15 @@ function StepIndicator({ current }: { current: number }) {
       {[1, 2, 3, 4].map((s) => (
         <div key={s} className="flex items-center">
           <div
-            className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
-              current >= s
-                ? 'bg-[#0084C5] text-white'
-                : 'bg-[#E8F3FB] text-[rgba(0,45,88,0.55)]'
-            }`}
+            className={cn(
+              'w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors',
+              current >= s ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground'
+            )}
           >
             {s}
           </div>
           {s < 4 && (
-            <div
-              className={`w-16 h-0.5 transition-colors ${
-                current > s ? 'bg-[#0084C5]' : 'bg-[rgba(0,45,88,0.15)]'
-              }`}
-            />
+            <div className={cn('w-16 h-0.5 transition-colors', current > s ? 'bg-primary' : 'bg-border')} />
           )}
         </div>
       ))}
@@ -50,18 +47,15 @@ function FolderRow({
   const { t } = useTranslation();
   if (path) {
     return (
-      <div className="p-3 bg-[#F4F9FD] rounded-lg flex items-center justify-between gap-3">
+      <div className="p-3 bg-muted rounded-lg flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs text-[rgba(0,45,88,0.45)] mb-0.5">{label}</p>
-          <p className="text-sm text-[#002D58] truncate font-mono">{path}</p>
+          <p className="text-xs text-muted-foreground mb-0.5">{label}</p>
+          <p className="text-sm text-foreground truncate font-mono">{path}</p>
         </div>
         {onChangeTrigger && (
-          <button
-            onClick={onChangeTrigger}
-            className="shrink-0 text-xs text-[#0084C5] underline"
-          >
+          <Button variant="link" size="xs" onClick={onChangeTrigger} className="shrink-0 p-0 h-auto">
             {t(changeLabelKey ?? 'common.change')}
-          </button>
+          </Button>
         )}
       </div>
     );
@@ -69,7 +63,7 @@ function FolderRow({
   return (
     <button
       onClick={onSelect}
-      className="w-full py-8 border-2 border-dashed border-[rgba(0,45,88,0.2)] rounded-xl text-[rgba(0,45,88,0.55)] hover:border-[#0084C5] hover:text-[#0084C5] transition-colors text-sm font-medium"
+      className="w-full py-8 border-2 border-dashed border-border rounded-xl text-muted-foreground hover:border-primary hover:text-primary transition-colors text-sm font-medium"
     >
       {t(selectLabelKey)}
     </button>
@@ -121,39 +115,34 @@ export function ImportPage() {
   if (phase === 'complete') {
     return (
       <div className="p-6 max-w-2xl mx-auto">
-        <div className="bg-[#E8F3FB] p-8 rounded-xl text-center">
-          <div className="w-12 h-12 rounded-full bg-[rgba(42,158,173,0.15)] flex items-center justify-center mx-auto mb-4">
+        <div className="bg-card p-8 rounded-xl text-center">
+          <div className="w-12 h-12 rounded-full bg-accent/15 flex items-center justify-center mx-auto mb-4">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
               <path
                 d="M3 10.5L8 15.5L17 5"
-                stroke="#2A9EAD"
+                stroke="var(--accent)"
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
             </svg>
           </div>
-          <h2 className="text-xl font-semibold text-[#002D58] mb-4">{t('import.complete')}</h2>
+          <h2 className="text-xl font-semibold text-foreground mb-4">{t('import.complete')}</h2>
           <div className="flex justify-center gap-8 mb-6">
             <div>
-              <p className="text-3xl font-bold text-[#0084C5]">{result?.imported ?? 0}</p>
-              <p className="text-xs text-[rgba(0,45,88,0.55)] mt-1">{t('import.imported')}</p>
+              <p className="text-3xl font-bold text-primary">{result?.imported ?? 0}</p>
+              <p className="text-xs text-muted-foreground mt-1">{t('import.imported')}</p>
             </div>
-            <div className="w-px bg-[rgba(0,45,88,0.15)]" />
+            <div className="w-px bg-border" />
             <div>
-              <p className="text-3xl font-bold text-[rgba(0,45,88,0.4)]">{result?.skipped ?? 0}</p>
-              <p className="text-xs text-[rgba(0,45,88,0.55)] mt-1">{t('import.skipped')}</p>
+              <p className="text-3xl font-bold text-muted-foreground">{result?.skipped ?? 0}</p>
+              <p className="text-xs text-muted-foreground mt-1">{t('import.skipped')}</p>
             </div>
           </div>
           {result && result.errors.length > 0 && (
-            <p className="text-sm text-[#C0392B] mb-4">{t('import.errors', { count: result.errors.length })}</p>
+            <p className="text-sm text-destructive mb-4">{t('import.errors', { count: result.errors.length })}</p>
           )}
-          <button
-            onClick={handleReset}
-            className="px-6 py-2 bg-[#0084C5] text-white rounded-lg font-medium"
-          >
-            {t('common.confirm')}
-          </button>
+          <Button onClick={handleReset}>{t('common.confirm')}</Button>
         </div>
       </div>
     );
@@ -162,17 +151,12 @@ export function ImportPage() {
   if (phase === 'error') {
     return (
       <div className="p-6 max-w-2xl mx-auto">
-        <div className="bg-[#E8F3FB] p-6 rounded-xl">
-          <h2 className="text-base font-semibold text-[#C0392B] mb-2">{t('status.error')}</h2>
-          <pre className="text-sm text-[#002D58] mb-5 bg-[#F4F9FD] p-3 rounded-lg overflow-x-auto whitespace-pre-wrap break-all">
+        <div className="bg-card p-6 rounded-xl">
+          <h2 className="text-base font-semibold text-destructive mb-2">{t('status.error')}</h2>
+          <pre className="text-sm text-foreground mb-5 bg-muted p-3 rounded-lg overflow-x-auto whitespace-pre-wrap break-all">
             {error}
           </pre>
-          <button
-            onClick={handleReset}
-            className="px-4 py-2 bg-[#0084C5] text-white rounded-lg font-medium"
-          >
-            {t('common.back')}
-          </button>
+          <Button onClick={handleReset}>{t('common.back')}</Button>
         </div>
       </div>
     );
@@ -180,17 +164,15 @@ export function ImportPage() {
 
   return (
     <div className="p-6 max-w-2xl mx-auto">
-      <h1 className="text-[22px] font-medium text-[#002D58] mb-6">{t('import.title')}</h1>
+      <h1 className="text-[22px] font-medium text-foreground mb-6">{t('import.title')}</h1>
 
       <StepIndicator current={step} />
 
       {/* Step 1 – Select source folder */}
       {step === 1 && (
-        <div className="bg-[#E8F3FB] p-6 rounded-xl">
-          <h3 className="text-base font-semibold text-[#002D58] mb-1">
-            {t('import.step1Title')}
-          </h3>
-          <p className="text-sm text-[rgba(0,45,88,0.55)] mb-5">{t('import.step1Desc')}</p>
+        <div className="bg-card p-6 rounded-xl">
+          <h3 className="text-base font-semibold text-foreground mb-1">{t('import.step1Title')}</h3>
+          <p className="text-sm text-muted-foreground mb-5">{t('import.step1Desc')}</p>
 
           <div className="mb-5">
             <FolderRow
@@ -203,33 +185,23 @@ export function ImportPage() {
           </div>
 
           <div className="flex justify-end">
-            <button
-              onClick={() => setStep(2)}
-              disabled={!sourcePath}
-              className={`px-5 py-2 rounded-lg font-medium ${
-                sourcePath
-                  ? 'bg-[#0084C5] text-white'
-                  : 'bg-[rgba(0,45,88,0.12)] text-[rgba(0,45,88,0.4)] cursor-not-allowed'
-              }`}
-            >
+            <Button onClick={() => setStep(2)} disabled={!sourcePath}>
               {t('common.next')} →
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
       {/* Step 2 – Select archive folder */}
       {step === 2 && (
-        <div className="bg-[#E8F3FB] p-6 rounded-xl">
-          <h3 className="text-base font-semibold text-[#002D58] mb-1">
-            {t('import.step2Title')}
-          </h3>
-          <p className="text-sm text-[rgba(0,45,88,0.55)] mb-5">{t('import.step2Desc')}</p>
+        <div className="bg-card p-6 rounded-xl">
+          <h3 className="text-base font-semibold text-foreground mb-1">{t('import.step2Title')}</h3>
+          <p className="text-sm text-muted-foreground mb-5">{t('import.step2Desc')}</p>
 
           <div className="space-y-2 mb-5">
-            <div className="p-3 bg-[#F4F9FD] rounded-lg">
-              <p className="text-xs text-[rgba(0,45,88,0.45)] mb-0.5">{t('import.source')}</p>
-              <p className="text-sm text-[#002D58] truncate font-mono">{sourcePath}</p>
+            <div className="p-3 bg-muted rounded-lg">
+              <p className="text-xs text-muted-foreground mb-0.5">{t('import.source')}</p>
+              <p className="text-sm text-foreground truncate font-mono">{sourcePath}</p>
             </div>
             <FolderRow
               label={t('import.archive')}
@@ -241,66 +213,39 @@ export function ImportPage() {
           </div>
 
           <div className="flex justify-between items-center">
-            <button
-              onClick={() => setStep(1)}
-              className="px-4 py-2 border border-[rgba(0,45,88,0.3)] text-[#002D58] rounded-lg font-medium"
-            >
-              ← {t('common.back')}
-            </button>
-            <button
-              onClick={() => setStep(3)}
-              disabled={!archivePath}
-              className={`px-5 py-2 rounded-lg font-medium ${
-                archivePath
-                  ? 'bg-[#0084C5] text-white'
-                  : 'bg-[rgba(0,45,88,0.12)] text-[rgba(0,45,88,0.4)] cursor-not-allowed'
-              }`}
-            >
-              {t('common.next')} →
-            </button>
+            <Button variant="outline" onClick={() => setStep(1)}>← {t('common.back')}</Button>
+            <Button onClick={() => setStep(3)} disabled={!archivePath}>{t('common.next')} →</Button>
           </div>
         </div>
       )}
 
       {/* Step 3 – Analyze photos */}
       {step === 3 && (
-        <div className="bg-[#E8F3FB] p-6 rounded-xl">
-          <h3 className="text-base font-semibold text-[#002D58] mb-1">
-            {t('import.step3Title')}
-          </h3>
-          <p className="text-sm text-[rgba(0,45,88,0.55)] mb-5">{t('import.step3Desc')}</p>
+        <div className="bg-card p-6 rounded-xl">
+          <h3 className="text-base font-semibold text-foreground mb-1">{t('import.step3Title')}</h3>
+          <p className="text-sm text-muted-foreground mb-5">{t('import.step3Desc')}</p>
 
           <div className="space-y-2 mb-5">
-            <div className="p-3 bg-[#F4F9FD] rounded-lg">
-              <p className="text-xs text-[rgba(0,45,88,0.45)] mb-0.5">{t('import.source')}</p>
-              <p className="text-sm text-[#002D58] truncate font-mono">{sourcePath}</p>
+            <div className="p-3 bg-muted rounded-lg">
+              <p className="text-xs text-muted-foreground mb-0.5">{t('import.source')}</p>
+              <p className="text-sm text-foreground truncate font-mono">{sourcePath}</p>
             </div>
-            <div className="p-3 bg-[#F4F9FD] rounded-lg">
-              <p className="text-xs text-[rgba(0,45,88,0.45)] mb-0.5">{t('import.archive')}</p>
-              <p className="text-sm text-[#002D58] truncate font-mono">{archivePath}</p>
+            <div className="p-3 bg-muted rounded-lg">
+              <p className="text-xs text-muted-foreground mb-0.5">{t('import.archive')}</p>
+              <p className="text-sm text-foreground truncate font-mono">{archivePath}</p>
             </div>
           </div>
 
           {phase === 'idle' && (
             <div className="flex justify-between items-center">
-              <button
-                onClick={() => setStep(2)}
-                className="px-4 py-2 border border-[rgba(0,45,88,0.3)] text-[#002D58] rounded-lg font-medium"
-              >
-                ← {t('common.back')}
-              </button>
-              <button
-                onClick={handleStartAnalysis}
-                className="px-5 py-2 bg-[#0084C5] text-white rounded-lg font-medium"
-              >
-                {t('import.startAnalysis')}
-              </button>
+              <Button variant="outline" onClick={() => setStep(2)}>← {t('common.back')}</Button>
+              <Button onClick={handleStartAnalysis}>{t('import.startAnalysis')}</Button>
             </div>
           )}
 
           {isAnalyzing && (
             <div className="mt-2">
-              <p className="text-sm font-medium text-[#002D58] mb-3">
+              <p className="text-sm font-medium text-foreground mb-3">
                 {phase === 'scanning' ? t('import.scanningFolder') : t('import.analyzing')}
               </p>
               <ProgressBar
@@ -314,29 +259,19 @@ export function ImportPage() {
 
           {phase === 'review' && importPlan && (
             <>
-              <div className="p-4 bg-[rgba(42,158,173,0.1)] rounded-xl mb-4">
-                <p className="text-sm font-medium text-[#2A9EAD]">
+              <div className="p-4 bg-accent/10 rounded-xl mb-4">
+                <p className="text-sm font-medium text-accent">
                   {t('import.analysisComplete', { count: importPlan.images.length })}
                 </p>
                 {importPlan.conflicts_count > 0 && (
-                  <p className="text-xs text-[#E6A817] mt-1">
+                  <p className="text-xs text-[var(--color-warning)] mt-1">
                     {t('import.conflicts', { count: importPlan.conflicts_count })}
                   </p>
                 )}
               </div>
               <div className="flex justify-between items-center">
-                <button
-                  onClick={() => setStep(2)}
-                  className="px-4 py-2 border border-[rgba(0,45,88,0.3)] text-[#002D58] rounded-lg font-medium"
-                >
-                  ← {t('common.back')}
-                </button>
-                <button
-                  onClick={() => setStep(4)}
-                  className="px-5 py-2 bg-[#0084C5] text-white rounded-lg font-medium"
-                >
-                  {t('common.next')} →
-                </button>
+                <Button variant="outline" onClick={() => setStep(2)}>← {t('common.back')}</Button>
+                <Button onClick={() => setStep(4)}>{t('common.next')} →</Button>
               </div>
             </>
           )}

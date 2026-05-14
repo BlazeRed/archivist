@@ -3,7 +3,8 @@ import { invoke } from '@tauri-apps/api/core';
 import type { Image, GroupWithCount } from '../types';
 
 export interface TimelineFilter {
-  year: number | null;
+  yearFrom: number | null;
+  yearTo: number | null;
   month: number | null;
   noDate: boolean;
   groupId: number | null;
@@ -35,12 +36,13 @@ function applyClientFilter(all: Image[], filter: TimelineFilter, groupIds: Set<s
     return result.filter(img => !img.taken_at);
   }
 
-  if (filter.year !== null) {
+  if (filter.yearFrom !== null && filter.yearTo !== null) {
     result = result.filter(img => {
       if (!img.taken_at) return false;
-      return new Date(img.taken_at).getFullYear() === filter.year;
+      const y = new Date(img.taken_at).getFullYear();
+      return y >= filter.yearFrom! && y <= filter.yearTo!;
     });
-    if (filter.month !== null) {
+    if (filter.yearFrom === filter.yearTo && filter.month !== null) {
       result = result.filter(img => {
         if (!img.taken_at) return false;
         return new Date(img.taken_at).getMonth() + 1 === filter.month;
@@ -57,7 +59,7 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
   loading: false,
   error: null,
   selectedImage: null,
-  filter: { year: null, month: null, noDate: false, groupId: null },
+  filter: { yearFrom: null, yearTo: null, month: null, noDate: false, groupId: null },
   availableYears: [],
   availableGroups: [],
 
@@ -94,9 +96,9 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
 
   setFilter: async (partial) => {
     const newFilter = { ...get().filter, ...partial };
-    // reset month when year cleared, reset noDate/groupId when incompatible
-    if (partial.year !== undefined && partial.year === null) newFilter.month = null;
-    if (partial.noDate) { newFilter.year = null; newFilter.month = null; newFilter.groupId = null; }
+    // reset month when year range cleared or spans multiple years
+    if (partial.noDate) { newFilter.yearFrom = null; newFilter.yearTo = null; newFilter.month = null; newFilter.groupId = null; }
+    if (newFilter.yearFrom === null || newFilter.yearTo === null || newFilter.yearFrom !== newFilter.yearTo) newFilter.month = null;
     if (partial.groupId !== undefined && partial.groupId !== null) newFilter.noDate = false;
 
     set({ filter: newFilter });

@@ -4,6 +4,9 @@ import { invoke } from '@tauri-apps/api/core';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import type { Image } from '../types';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -92,53 +95,51 @@ export function AddPhotosModal({ groupId, existingImageIds, onClose, onAdded }: 
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-      <div className="bg-[#D2E8F7] w-[90vw] h-[85vh] rounded-xl flex flex-col overflow-hidden shadow-2xl">
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[rgba(0,45,88,0.15)] bg-[#E8F3FB] flex-shrink-0">
-          <h2 className="text-lg font-medium text-[#002D58]">{t('groups.addPhotosTitle')}</h2>
-          <button
-            onClick={onClose}
-            className="w-7 h-7 rounded-full flex items-center justify-center text-[rgba(0,45,88,0.55)] hover:text-[#002D58] hover:bg-[rgba(0,45,88,0.08)] text-xl leading-none transition-colors"
-          >
-            ×
-          </button>
-        </div>
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="w-[90vw] max-w-[90vw] h-[85vh] max-h-[85vh] p-0 flex flex-col overflow-hidden">
+        <DialogHeader className="flex-shrink-0 px-6 py-4 border-b border-border bg-card">
+          <DialogTitle className="text-foreground">{t('groups.addPhotosTitle')}</DialogTitle>
+        </DialogHeader>
 
         <div className="flex flex-1 min-h-0">
           {/* Filter sidebar */}
-          <aside className="w-52 flex-shrink-0 p-4 border-r border-[rgba(0,45,88,0.15)] bg-[#E8F3FB] flex flex-col gap-3">
-            <h3 className="text-sm font-semibold text-[#002D58]">{t('timeline.filter')}</h3>
+          <aside className="w-52 flex-shrink-0 p-4 border-r border-border bg-card flex flex-col gap-3">
+            <h3 className="text-sm font-semibold text-foreground">{t('timeline.filter')}</h3>
 
-            <select
-              value={filterYear ?? ''}
-              onChange={(e) => {
-                setFilterYear(e.target.value ? Number(e.target.value) : null);
+            <Select
+              value={filterYear?.toString() ?? ''}
+              onValueChange={(v) => {
+                setFilterYear(Number(v));
                 setFilterMonth(null);
               }}
-              className="w-full px-3 py-2 bg-[#F4F9FD] border border-[rgba(0,45,88,0.28)] rounded-lg text-sm text-[#002D58]"
             >
-              <option value="">{t('timeline.allYears')}</option>
-              {availableYears.map(y => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder={t('timeline.allYears')} />
+              </SelectTrigger>
+              <SelectContent>
+                {availableYears.map(y => (
+                  <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
             {filterYear && (
-              <select
-                value={filterMonth ?? ''}
-                onChange={(e) => setFilterMonth(e.target.value ? Number(e.target.value) : null)}
-                className="w-full px-3 py-2 bg-[#F4F9FD] border border-[rgba(0,45,88,0.28)] rounded-lg text-sm text-[#002D58]"
+              <Select
+                value={filterMonth?.toString() ?? ''}
+                onValueChange={(v) => setFilterMonth(Number(v))}
               >
-                <option value="">{t('timeline.allMonths')}</option>
-                {availableMonths.map(m => (
-                  <option key={m} value={m}>{MONTH_NAMES[m - 1]}</option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={t('timeline.allMonths')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableMonths.map(m => (
+                    <SelectItem key={m} value={m.toString()}>{MONTH_NAMES[m - 1]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
 
-            <p className="text-xs text-[rgba(0,45,88,0.55)] mt-auto">
+            <p className="text-xs text-muted-foreground mt-auto">
               {filteredImages.length} {t('timeline.photos')}
             </p>
           </aside>
@@ -147,7 +148,7 @@ export function AddPhotosModal({ groupId, existingImageIds, onClose, onAdded }: 
           <main className="flex-1 overflow-y-auto p-4">
             {filteredImages.length === 0 ? (
               <div className="flex items-center justify-center h-full">
-                <p className="text-[rgba(0,45,88,0.55)] text-sm">{t('groups.allPhotosAdded')}</p>
+                <p className="text-muted-foreground text-sm">{t('groups.allPhotosAdded')}</p>
               </div>
             ) : (
               <div
@@ -165,8 +166,8 @@ export function AddPhotosModal({ groupId, existingImageIds, onClose, onAdded }: 
                       onClick={() => toggleSelect(img.id)}
                       className={`relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all ${
                         isSelected
-                          ? 'border-[#0084C5] ring-2 ring-[#0084C5]/30'
-                          : 'border-transparent hover:border-[rgba(0,132,197,0.4)]'
+                          ? 'border-primary ring-2 ring-primary/30'
+                          : 'border-transparent hover:border-primary/40'
                       }`}
                     >
                       <div className="aspect-square bg-[#001A36] overflow-hidden">
@@ -180,11 +181,10 @@ export function AddPhotosModal({ groupId, existingImageIds, onClose, onAdded }: 
                         )}
                       </div>
 
-                      {/* Checkbox overlay */}
                       <div
                         className={`absolute top-1.5 left-1.5 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
                           isSelected
-                            ? 'bg-[#0084C5] border-[#0084C5]'
+                            ? 'bg-primary border-primary'
                             : 'bg-black/30 border-white/70'
                         }`}
                       >
@@ -201,9 +201,9 @@ export function AddPhotosModal({ groupId, existingImageIds, onClose, onAdded }: 
                         )}
                       </div>
 
-                      <div className="p-1.5 bg-[#E8F3FB]">
-                        <p className="text-[10px] text-[#002D58] truncate font-medium">{img.filename}</p>
-                        <p className="text-[9px] text-[rgba(0,45,88,0.45)]">
+                      <div className="p-1.5 bg-card">
+                        <p className="text-[10px] text-foreground truncate font-medium">{img.filename}</p>
+                        <p className="text-[9px] text-muted-foreground">
                           {img.taken_at
                             ? new Date(img.taken_at).toLocaleDateString()
                             : t('detail.noDate')}
@@ -218,30 +218,25 @@ export function AddPhotosModal({ groupId, existingImageIds, onClose, onAdded }: 
         </div>
 
         {/* Action bar */}
-        <div className="flex items-center gap-4 px-6 py-4 border-t border-[rgba(0,45,88,0.15)] bg-[#002D58] flex-shrink-0">
-          <span className="text-[#D2E8F7] text-sm font-medium">
+        <div className="flex items-center gap-4 px-6 py-4 border-t border-border bg-foreground flex-shrink-0">
+          <span className="text-background text-sm font-medium">
             {t('timeline.selected', { count: selectedIds.size })}
           </span>
           <div className="ml-auto flex gap-3">
-            <button
+            <Button
               onClick={handleAdd}
               disabled={selectedIds.size === 0 || adding}
-              className="px-4 py-2 bg-[#0084C5] text-white rounded-lg text-sm font-medium disabled:opacity-40 transition-opacity"
             >
               {selectedIds.size > 0
                 ? t('groups.addPhotosConfirm', { count: selectedIds.size })
                 : t('groups.addPhotosTitle')}
-            </button>
-            <button
-              onClick={onClose}
-              className="px-4 py-2 border border-[rgba(255,255,255,0.3)] text-[#D2E8F7] rounded-lg text-sm"
-            >
+            </Button>
+            <Button variant="outline" onClick={onClose} className="border-white/30 text-background hover:text-foreground">
               {t('common.cancel')}
-            </button>
+            </Button>
           </div>
         </div>
-
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
