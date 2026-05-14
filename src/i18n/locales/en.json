@@ -19,7 +19,8 @@
     "close": "Close",
     "loading": "Loading...",
     "browse": "Browse",
-    "change": "Change"
+    "change": "Change",
+    "noThumbnail": "No thumbnail available"
   },
   "import": {
     "title": "Import",

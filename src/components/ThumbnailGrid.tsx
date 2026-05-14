@@ -95,6 +95,7 @@ const ThumbnailCell = memo(function ThumbnailCell({
   onImageClick: (img: Image) => void;
   onToggleSelect: (id: string) => void;
 }) {
+  const { t } = useTranslation();
   const { px } = SIZES[sizeKey];
   const root = archivePath.replace(/\/+$/, '');
   const thumbnailUrl = root && image.thumbnail_path
@@ -111,13 +112,22 @@ const ThumbnailCell = memo(function ThumbnailCell({
           : 'border-[rgba(0,45,88,0.15)] hover:ring-2 hover:ring-[#0084C5]'
       }`}
     >
-      {thumbnailUrl && (
+      {thumbnailUrl ? (
         <img
           src={thumbnailUrl}
           alt={image.filename}
           className="w-full h-full object-cover"
           loading="lazy"
         />
+      ) : (
+        <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-[rgba(0,45,88,0.4)]">
+          <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <line x1="3" y1="3" x2="21" y2="21"/>
+            <circle cx="8.5" cy="8.5" r="1.5"/>
+          </svg>
+          <p className="text-[8px] text-center px-1 leading-tight">{t('common.noThumbnail')}</p>
+        </div>
       )}
 
       {/* No date badge */}

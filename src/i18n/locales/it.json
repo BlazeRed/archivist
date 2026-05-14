@@ -19,7 +19,8 @@
     "close": "Chiudi",
     "loading": "Caricamento...",
     "browse": "Sfoglia",
-    "change": "Cambia"
+    "change": "Cambia",
+    "noThumbnail": "Anteprima non disponibile"
   },
   "import": {
     "title": "Importa",

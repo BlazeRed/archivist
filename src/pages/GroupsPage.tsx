@@ -245,16 +245,25 @@ export function GroupsPage() {
                       key={img.id}
                       className="group relative bg-card rounded-lg overflow-hidden border border-border"
                     >
-                      {thumbnailUrl && (
-                        <div className="aspect-square bg-[#001A36] overflow-hidden">
+                      <div className="aspect-square bg-[#001A36] overflow-hidden">
+                        {thumbnailUrl ? (
                           <img
                             src={thumbnailUrl}
                             alt={img.filename}
                             className="w-full h-full object-cover"
                             loading="lazy"
                           />
-                        </div>
-                      )}
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-white/40">
+                            <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                              <line x1="3" y1="3" x2="21" y2="21"/>
+                              <circle cx="8.5" cy="8.5" r="1.5"/>
+                            </svg>
+                            <p className="text-[9px] text-center px-1 leading-tight">{t('common.noThumbnail')}</p>
+                          </div>
+                        )}
+                      </div>
                       <button
                         onClick={() => handleRemoveFromGroup(img.id)}
                         title={t('detail.removeFromGroup')}

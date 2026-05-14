@@ -275,14 +275,23 @@ export function AddPhotosModal({
                           }`}
                           style={{ width: 150, height: 150 }}
                         >
-                          <div className="w-full h-full bg-card">
-                            {thumbnailUrl && (
+                          <div className="w-full h-full bg-card flex flex-col items-center justify-center">
+                            {thumbnailUrl ? (
                               <img
                                 src={thumbnailUrl}
                                 alt={img.filename}
                                 className="w-full h-full object-cover"
                                 loading="lazy"
                               />
+                            ) : (
+                              <div className="flex flex-col items-center justify-center gap-1 text-muted-foreground">
+                                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                  <line x1="3" y1="3" x2="21" y2="21"/>
+                                  <circle cx="8.5" cy="8.5" r="1.5"/>
+                                </svg>
+                                <p className="text-[9px] text-center px-1 leading-tight">{t('common.noThumbnail')}</p>
+                              </div>
                             )}
                           </div>
 
