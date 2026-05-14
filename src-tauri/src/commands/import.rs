@@ -222,8 +222,10 @@ pub fn execute_import(
             image.filename.clone()
         };
         
+        let is_keep_both = resolution.map_or(false, |r| matches!(r.action, ImportAction::KeepBoth));
+
         let dest_path = PathBuf::from(&dest_dir).join(&final_filename);
-        
+
         match std::fs::create_dir_all(&dest_dir) {
             Ok(_) => {},
             Err(e) => {
@@ -258,8 +260,18 @@ pub fn execute_import(
                     &final_filename
                 );
 
+                let entry_id = if is_keep_both {
+                    let stem = Path::new(&final_filename)
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or(final_filename.as_str());
+                    format!("{}_{}", image.hash, stem)
+                } else {
+                    image.hash.clone()
+                };
+
                 let new_image = NewImage {
-                    id: image.hash.clone(),
+                    id: entry_id,
                     filename: final_filename,
                     file_path: relative_path,
                     taken_at: image.taken_at,

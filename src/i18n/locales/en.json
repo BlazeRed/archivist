@@ -128,7 +128,13 @@
     "title": "Review Conflicts",
     "keepExisting": "Keep existing",
     "replace": "Replace with new",
-    "keepBoth": "Keep both"
+    "keepBoth": "Keep both",
+    "applyToAll": "Apply to all:",
+    "noConflicts": "No conflicts — all {{count}} photos ready to import.",
+    "conflictsFound": "{{count}} conflict(s) — choose how to handle each:",
+    "existingPath": "Archived copy:",
+    "incoming": "New",
+    "inArchive": "In archive"
   },
   "status": {
     "success": "Success",

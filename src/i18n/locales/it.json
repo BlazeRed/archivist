@@ -128,7 +128,13 @@
     "title": "Rivedi conflitti",
     "keepExisting": "Mantieni esistente",
     "replace": "Sostituisci con nuovo",
-    "keepBoth": "Mantieni entrambi"
+    "keepBoth": "Mantieni entrambi",
+    "applyToAll": "Applica a tutti:",
+    "noConflicts": "Nessun conflitto — {{count}} foto pronte per l'importazione.",
+    "conflictsFound": "{{count}} conflitto/i — scegli come gestire ciascuno:",
+    "existingPath": "Copia archiviata:",
+    "incoming": "Nuovo",
+    "inArchive": "In archivio"
   },
   "status": {
     "success": "Successo",
