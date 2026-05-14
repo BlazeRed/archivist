@@ -100,7 +100,9 @@
     "advancedSettings": "Advanced Settings",
     "blockSize": "Block size",
     "blockSizeDesc": "Images processed per batch during import",
-    "lastImportSource": "Last import source"
+    "lastImportSource": "Last import source",
+    "closeArchive": "Close archive",
+    "closeArchiveDesc": "Disconnect from the current archive"
   },
   "detail": {
     "title": "Details",

@@ -5,6 +5,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { getVersion } from '@tauri-apps/api/app';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { useTimelineStore } from '../stores/timelineStore';
+import { useImageStore, useGroupStore } from '../stores/dataStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,6 +15,8 @@ export function SettingsPage() {
   const { t, i18n } = useTranslation();
   const { config, setConfig } = useAppConfigStore();
   const { fetchImages } = useTimelineStore();
+  const clearImages = useImageStore((s) => s.clearImages);
+  const clearGroups = useGroupStore((s) => s.clearGroups);
   const [rescanLoading, setRescanLoading] = useState(false);
   const [rescanResult, setRescanResult] = useState<string | null>(null);
   const [appVersion, setAppVersion] = useState<string>('');
@@ -32,6 +35,12 @@ export function SettingsPage() {
         console.error('Failed to init archive:', e);
       }
     }
+  };
+
+  const handleCloseArchive = () => {
+    clearImages();
+    clearGroups();
+    setConfig({ archive_path: '' });
   };
 
   const handleRescan = async () => {
@@ -115,13 +124,27 @@ export function SettingsPage() {
         <div className="border-t border-border pt-6">
           <h3 className="text-sm font-medium text-foreground mb-4">{t('settings.archiveManagement')}</h3>
 
-          <Button
-            onClick={handleRescan}
-            disabled={rescanLoading || !config.archive_path}
-            variant="secondary"
-          >
-            {rescanLoading ? t('common.loading') : t('settings.rescanArchive')}
-          </Button>
+          <div className="flex items-start gap-3 flex-wrap">
+            <Button
+              onClick={handleRescan}
+              disabled={rescanLoading || !config.archive_path}
+              variant="secondary"
+            >
+              {rescanLoading ? t('common.loading') : t('settings.rescanArchive')}
+            </Button>
+
+            {config.archive_path && (
+              <div>
+                <Button
+                  onClick={handleCloseArchive}
+                  variant="destructive"
+                >
+                  {t('settings.closeArchive')}
+                </Button>
+                <p className="mt-1 text-[11px] text-muted-foreground">{t('settings.closeArchiveDesc')}</p>
+              </div>
+            )}
+          </div>
 
           {rescanResult && (
             <p className={`mt-2 text-sm ${rescanResult.includes('Error') ? 'text-destructive' : 'text-accent'}`}>

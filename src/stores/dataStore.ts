@@ -8,6 +8,7 @@ interface ImageStore {
   error: string | null;
   fetchImages: () => Promise<void>;
   fetchImagesByDate: (year: number, month?: number) => Promise<void>;
+  clearImages: () => void;
 }
 
 export const useImageStore = create<ImageStore>((set) => ({
@@ -34,6 +35,8 @@ export const useImageStore = create<ImageStore>((set) => ({
       set({ error: String(e), loading: false });
     }
   },
+
+  clearImages: () => set({ images: [], loading: false, error: null }),
 }));
 
 interface GroupStore {
@@ -44,6 +47,7 @@ interface GroupStore {
   createGroup: (name: string) => Promise<number>;
   updateGroup: (id: number, name: string) => Promise<void>;
   deleteGroup: (id: number) => Promise<void>;
+  clearGroups: () => void;
 }
 
 export const useGroupStore = create<GroupStore>((set, get) => ({
@@ -76,4 +80,6 @@ export const useGroupStore = create<GroupStore>((set, get) => ({
     await invoke('delete_group', { id });
     await get().fetchGroups();
   },
+
+  clearGroups: () => set({ groups: [], loading: false, error: null }),
 }));

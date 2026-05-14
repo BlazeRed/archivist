@@ -100,7 +100,9 @@
     "advancedSettings": "Impostazioni avanzate",
     "blockSize": "Dimensione blocco",
     "blockSizeDesc": "Immagini elaborate per batch durante l'importazione",
-    "lastImportSource": "Ultima sorgente di importazione"
+    "lastImportSource": "Ultima sorgente di importazione",
+    "closeArchive": "Chiudi archivio",
+    "closeArchiveDesc": "Disconnettiti dall'archivio corrente"
   },
   "detail": {
     "title": "Dettagli",
