@@ -268,7 +268,7 @@ export function AddPhotosModal({
                         <div
                           key={img.id}
                           onClick={() => toggleSelect(img.id)}
-                          className={`relative cursor-pointer rounded-md overflow-hidden border-2 transition-all flex-shrink-0 ${
+                          className={`relative cursor-pointer rounded-md overflow-hidden border-2 transition-all shrink-0 ${
                             isSelected
                               ? "border-primary ring-2 ring-primary/30"
                               : "border-transparent hover:border-primary/40"
@@ -326,7 +326,7 @@ export function AddPhotosModal({
         </div>
 
         {/* Action bar */}
-        <div className="flex items-center gap-4 px-6 py-4 border-t border-border bg-foreground flex-shrink-0">
+        <div className="flex items-center gap-4 px-6 py-4 border-t border-border bg-foreground shrink-0">
           <span className="text-background text-sm font-medium">
             {t("timeline.selected", { count: selectedIds.size })}
           </span>
