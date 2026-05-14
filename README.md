@@ -46,6 +46,31 @@ git push origin v0.1.0
 A draft GitHub Release is created automatically with all platform installers attached.
 The workflow can also be triggered manually from the Actions tab (`workflow_dispatch`).
 
+### Bumping the version
+
+Version must be updated in three files before tagging:
+
+| File | Field |
+|------|-------|
+| `src-tauri/tauri.conf.json` | `"version"` |
+| `src-tauri/Cargo.toml` | `version` (line 3) |
+| `package.json` | `"version"` |
+
+```bash
+# 1. Edit version in all three files (e.g. 0.2.0)
+
+# 2. Commit
+git add src-tauri/tauri.conf.json src-tauri/Cargo.toml package.json
+git commit -m "chore: bump version to 0.2.0"
+
+# 3. Tag and push — triggers the release workflow
+git tag v0.2.0
+git push origin main
+git push origin v0.2.0
+```
+
+Tag name and version in files must match.
+
 | Platform | Artifacts |
 |----------|-----------|
 | Linux | `.deb`, `.AppImage` |
