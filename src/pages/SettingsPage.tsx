@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
+import { getVersion } from '@tauri-apps/api/app';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { useTimelineStore } from '../stores/timelineStore';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,11 @@ export function SettingsPage() {
   const { fetchImages } = useTimelineStore();
   const [rescanLoading, setRescanLoading] = useState(false);
   const [rescanResult, setRescanResult] = useState<string | null>(null);
+  const [appVersion, setAppVersion] = useState<string>('');
+
+  useEffect(() => {
+    getVersion().then(setAppVersion).catch(() => {});
+  }, []);
 
   const selectArchiveFolder = async () => {
     const selected = await open({ directory: true, title: 'Select archive folder' });
@@ -46,7 +52,7 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="p-6">
+    <div className="relative p-6 h-[calc(100vh-52px)]">
       <h1 className="text-[22px] font-medium text-foreground mb-6">{t('settings.title')}</h1>
 
       <div className="space-y-6 max-w-md">
@@ -155,6 +161,12 @@ export function SettingsPage() {
           </div>
         </div>
       </div>
+
+      {appVersion && (
+        <p className="absolute bottom-4 right-6 text-xs text-muted-foreground select-none">
+          v{appVersion}
+        </p>
+      )}
     </div>
   );
 }
