@@ -260,8 +260,8 @@ export function AddPhotosModal({
                   </div>
                   <div className="flex flex-wrap gap-2 px-6 py-3">
                     {group.images.map((img) => {
-                      const url = archivePath
-                        ? convertFileSrc(`${archivePath}/${img.file_path}`)
+                      const thumbnailUrl = archivePath && img.thumbnail_path
+                        ? convertFileSrc(`${archivePath}/${img.thumbnail_path}`)
                         : "";
                       const isSelected = selectedIds.has(img.id);
                       return (
@@ -276,9 +276,9 @@ export function AddPhotosModal({
                           style={{ width: 150, height: 150 }}
                         >
                           <div className="w-full h-full bg-card">
-                            {url && (
+                            {thumbnailUrl && (
                               <img
-                                src={url}
+                                src={thumbnailUrl}
                                 alt={img.filename}
                                 className="w-full h-full object-cover"
                                 loading="lazy"

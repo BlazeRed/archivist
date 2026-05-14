@@ -216,13 +216,30 @@ pub fn execute_import(
         
         match std::fs::copy(&image.path, &dest_path) {
             Ok(_) => {
-                let relative_path = format!("{}/{}", 
+                let thumbnail_abs = PathBuf::from(archive_path)
+                    .join(".archivist/thumbnails")
+                    .join(format!("{}.jpg", &image.hash));
+                let thumbnail_rel = format!(".archivist/thumbnails/{}.jpg", &image.hash);
+                let stored_thumbnail = if thumbnail_abs.exists() {
+                    Some(thumbnail_rel.clone())
+                } else {
+                    match crate::thumbnail::generate_thumbnail(
+                        &dest_path,
+                        &thumbnail_abs,
+                        &crate::thumbnail::ThumbnailSize::medium(),
+                    ) {
+                        Ok(_) => Some(thumbnail_rel),
+                        Err(_) => None,
+                    }
+                };
+
+                let relative_path = format!("{}/{}",
                     Path::new(&dest_dir).strip_prefix(archive_path)
                         .map(|p| p.to_string_lossy().to_string())
                         .unwrap_or_else(|_| dest_dir.clone()),
                     &final_filename
                 );
-                
+
                 let new_image = NewImage {
                     id: image.hash.clone(),
                     filename: final_filename,
@@ -232,6 +249,7 @@ pub fn execute_import(
                     height: image.height.map(|h| h as i32),
                     file_size: Some(image.size as i64),
                     has_exif: image.has_exif,
+                    thumbnail_path: stored_thumbnail,
                 };
                 
                 if let Err(e) = db.insert_image(&new_image) {

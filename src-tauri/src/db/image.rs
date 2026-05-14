@@ -13,6 +13,7 @@ pub struct Image {
     pub height: Option<i32>,
     pub file_size: Option<i64>,
     pub has_exif: bool,
+    pub thumbnail_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,6 +26,7 @@ pub struct NewImage {
     pub height: Option<i32>,
     pub file_size: Option<i64>,
     pub has_exif: bool,
+    pub thumbnail_path: Option<String>,
 }
 
 impl super::Database {
@@ -33,8 +35,8 @@ impl super::Database {
         let imported_at = Utc::now().to_rfc3339();
 
         conn.execute(
-            "INSERT OR REPLACE INTO images (id, filename, file_path, taken_at, imported_at, width, height, file_size, has_exif)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            "INSERT OR REPLACE INTO images (id, filename, file_path, taken_at, imported_at, width, height, file_size, has_exif, thumbnail_path)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
                 image.id,
                 image.filename,
@@ -45,6 +47,7 @@ impl super::Database {
                 image.height,
                 image.file_size,
                 image.has_exif as i32,
+                image.thumbnail_path,
             ],
         )?;
 
@@ -53,9 +56,9 @@ impl super::Database {
 
     pub fn get_image(&self, id: &str) -> Result<Option<Image>, super::AppError> {
         let conn = self.connection();
-        
+
         let mut stmt = conn.prepare(
-            "SELECT id, filename, file_path, taken_at, imported_at, width, height, file_size, has_exif
+            "SELECT id, filename, file_path, taken_at, imported_at, width, height, file_size, has_exif, thumbnail_path
              FROM images WHERE id = ?1"
         )?;
 
@@ -70,6 +73,7 @@ impl super::Database {
                 height: row.get(6)?,
                 file_size: row.get(7)?,
                 has_exif: row.get::<_, i32>(8)? != 0,
+                thumbnail_path: row.get(9)?,
             })
         }).optional()?;
 
@@ -78,9 +82,9 @@ impl super::Database {
 
     pub fn get_all_images(&self) -> Result<Vec<Image>, super::AppError> {
         let conn = self.connection();
-        
+
         let mut stmt = conn.prepare(
-            "SELECT id, filename, file_path, taken_at, imported_at, width, height, file_size, has_exif
+            "SELECT id, filename, file_path, taken_at, imported_at, width, height, file_size, has_exif, thumbnail_path
              FROM images ORDER BY taken_at DESC, imported_at DESC"
         )?;
 
@@ -95,6 +99,7 @@ impl super::Database {
                 height: row.get(6)?,
                 file_size: row.get(7)?,
                 has_exif: row.get::<_, i32>(8)? != 0,
+                thumbnail_path: row.get(9)?,
             })
         })?.collect::<Result<Vec<_>, _>>()?;
 
@@ -103,17 +108,17 @@ impl super::Database {
 
     pub fn get_images_by_date(&self, year: i32, month: Option<i32>) -> Result<Vec<Image>, super::AppError> {
         let conn = self.connection();
-        
+
         let query = match month {
             Some(_) => {
-                "SELECT id, filename, file_path, taken_at, imported_at, width, height, file_size, has_exif
-                 FROM images 
+                "SELECT id, filename, file_path, taken_at, imported_at, width, height, file_size, has_exif, thumbnail_path
+                 FROM images
                  WHERE strftime('%Y', taken_at) = ?1 AND strftime('%m', taken_at) = ?2
                  ORDER BY taken_at DESC"
             },
             None => {
-                "SELECT id, filename, file_path, taken_at, imported_at, width, height, file_size, has_exif
-                 FROM images 
+                "SELECT id, filename, file_path, taken_at, imported_at, width, height, file_size, has_exif, thumbnail_path
+                 FROM images
                  WHERE strftime('%Y', taken_at) = ?1
                  ORDER BY taken_at DESC"
             }
@@ -133,6 +138,7 @@ impl super::Database {
                     height: row.get(6)?,
                     file_size: row.get(7)?,
                     has_exif: row.get::<_, i32>(8)? != 0,
+                    thumbnail_path: row.get(9)?,
                 })
             })?.collect::<Result<Vec<_>, _>>()?
         } else {
@@ -147,6 +153,7 @@ impl super::Database {
                     height: row.get(6)?,
                     file_size: row.get(7)?,
                     has_exif: row.get::<_, i32>(8)? != 0,
+                    thumbnail_path: row.get(9)?,
                 })
             })?.collect::<Result<Vec<_>, _>>()?
         };

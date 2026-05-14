@@ -40,7 +40,8 @@ impl Database {
                 width INTEGER,
                 height INTEGER,
                 file_size INTEGER,
-                has_exif INTEGER DEFAULT 0
+                has_exif INTEGER DEFAULT 0,
+                thumbnail_path TEXT
             );
 
             CREATE TABLE IF NOT EXISTS groups (
@@ -61,6 +62,9 @@ impl Database {
             CREATE INDEX IF NOT EXISTS idx_image_groups_group_id ON image_groups(group_id);
             "
         )?;
+
+        // Migration for existing DBs that predate thumbnail_path column
+        let _ = conn.execute("ALTER TABLE images ADD COLUMN thumbnail_path TEXT", []);
 
         Ok(())
     }

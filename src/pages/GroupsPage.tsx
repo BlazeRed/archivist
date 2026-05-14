@@ -237,18 +237,18 @@ export function GroupsPage() {
             ) : (
               <div className="grid grid-cols-4 gap-3">
                 {groupImages.map(img => {
-                  const url = archivePath
-                    ? convertFileSrc(`${archivePath}/${img.file_path}`)
+                  const thumbnailUrl = archivePath && img.thumbnail_path
+                    ? convertFileSrc(`${archivePath}/${img.thumbnail_path}`)
                     : '';
                   return (
                     <div
                       key={img.id}
                       className="group relative bg-card rounded-lg overflow-hidden border border-border"
                     >
-                      {url && (
+                      {thumbnailUrl && (
                         <div className="aspect-square bg-[#001A36] overflow-hidden">
                           <img
-                            src={url}
+                            src={thumbnailUrl}
                             alt={img.filename}
                             className="w-full h-full object-cover"
                             loading="lazy"

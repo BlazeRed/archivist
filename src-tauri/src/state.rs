@@ -1,18 +1,39 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use crate::db::Database;
 
 pub struct AppState {
-    pub db: Arc<Database>,
-    pub archive_path: std::sync::Mutex<Option<String>>,
+    db: Mutex<Arc<Database>>,
+    pub archive_path: Mutex<Option<String>>,
 }
 
 impl AppState {
     pub fn new(db_path: std::path::PathBuf) -> Result<Self, crate::error::AppError> {
         let db = Database::new(&db_path)?;
         Ok(Self {
-            db: Arc::new(db),
-            archive_path: std::sync::Mutex::new(None),
+            db: Mutex::new(Arc::new(db)),
+            archive_path: Mutex::new(None),
         })
+    }
+
+    pub fn db(&self) -> Arc<Database> {
+        Arc::clone(&self.db.lock().unwrap())
+    }
+
+    pub fn reinit_db(&self, archive_path: &str) -> Result<(), crate::error::AppError> {
+        let thumbnails_dir = std::path::PathBuf::from(archive_path)
+            .join(".archivist")
+            .join("thumbnails");
+        std::fs::create_dir_all(&thumbnails_dir)
+            .map_err(|e| crate::error::AppError::FileWrite {
+                path: thumbnails_dir.to_string_lossy().to_string(),
+                message: e.to_string(),
+            })?;
+        let db_path = std::path::PathBuf::from(archive_path)
+            .join(".archivist")
+            .join("archivist.db");
+        let new_db = Database::new(&db_path)?;
+        *self.db.lock().unwrap() = Arc::new(new_db);
+        Ok(())
     }
 
     pub fn set_archive_path(&self, path: String) {

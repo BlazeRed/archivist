@@ -96,8 +96,9 @@ const ThumbnailCell = memo(function ThumbnailCell({
   onToggleSelect: (id: string) => void;
 }) {
   const { px } = SIZES[sizeKey];
-  const imageUrl = archivePath
-    ? convertFileSrc(`${archivePath}/${image.file_path}`)
+  const root = archivePath.replace(/\/+$/, '');
+  const thumbnailUrl = root && image.thumbnail_path
+    ? convertFileSrc(`${root}/${image.thumbnail_path}`)
     : '';
 
   return (
@@ -110,9 +111,9 @@ const ThumbnailCell = memo(function ThumbnailCell({
           : 'border-[rgba(0,45,88,0.15)] hover:ring-2 hover:ring-[#0084C5]'
       }`}
     >
-      {imageUrl && (
+      {thumbnailUrl && (
         <img
-          src={imageUrl}
+          src={thumbnailUrl}
           alt={image.filename}
           className="w-full h-full object-cover"
           loading="lazy"

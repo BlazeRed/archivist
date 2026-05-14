@@ -35,6 +35,10 @@ fn scan_archive_directory(
         let path = entry.path();
         
         if path.is_dir() {
+            let dir_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if dir_name == ".archivist" {
+                continue;
+            }
             scan_archive_directory(&path, archive_root, db, count)?;
         } else if is_image_file(&path) {
             if let Ok(image_id) = compute_image_id(&path) {
@@ -59,6 +63,7 @@ fn scan_archive_directory(
                         height: height.map(|h| h as i32),
                         file_size,
                         has_exif: false,
+                        thumbnail_path: None,
                     };
 
                     db.insert_image(&new_image)?;

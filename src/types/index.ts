@@ -8,6 +8,7 @@ export interface Image {
   height: number | null;
   file_size: number | null;
   has_exif: boolean;
+  thumbnail_path: string | null;
 }
 
 export interface Group {
