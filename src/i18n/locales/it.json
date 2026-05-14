@@ -49,7 +49,9 @@
     "source": "Sorgente",
     "archive": "Archivio",
     "errors": "{{count}} errore/i",
-    "conflicts": "{{count}} conflitto/i da rivedere"
+    "conflicts": "{{count}} conflitto/i da rivedere",
+    "deleteSource": "Elimina immagini sorgente",
+    "keepSource": "Mantieni"
   },
   "timeline": {
     "title": "Cronologia",
@@ -84,7 +86,9 @@
     "selectedPhotosInfo": "{{count}} foto selezionate — verranno aggiunte al nuovo gruppo",
     "addPhotosTitle": "Aggiungi foto",
     "addPhotosConfirm": "Aggiungi {{count}} foto",
-    "allPhotosAdded": "Tutte le foto sono già in questo gruppo"
+    "allPhotosAdded": "Tutte le foto sono già in questo gruppo",
+    "exportSuccess": "{{count}} foto esportate in {{path}}",
+    "exportError": "Esportazione fallita"
   },
   "settings": {
     "title": "Impostazioni",
@@ -97,6 +101,7 @@
     "archiveManagement": "Gestione archivio",
     "rescanArchive": "Riscansiona archivio",
     "rescanFound": "Trovate {{count}} nuove immagini",
+    "rescanRemoved": "Rimossi {{count}} elementi non trovati",
     "rescanError": "Errore: {{error}}",
     "advancedSettings": "Impostazioni avanzate",
     "blockSize": "Dimensione blocco",

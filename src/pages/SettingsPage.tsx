@@ -50,8 +50,12 @@ export function SettingsPage() {
     setRescanResult(null);
 
     try {
-      const count = await invoke<number>('rescan_archive');
-      setRescanResult(t('settings.rescanFound', { count }));
+      const result = await invoke<{ added: number; removed: number }>('rescan_archive');
+      let msg = t('settings.rescanFound', { count: result.added });
+      if (result.removed > 0) {
+        msg += ` · ${t('settings.rescanRemoved', { count: result.removed })}`;
+      }
+      setRescanResult(msg);
       fetchImages();
     } catch (e) {
       setRescanResult(t('settings.rescanError', { error: String(e) }));

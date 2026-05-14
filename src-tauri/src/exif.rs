@@ -23,6 +23,7 @@ pub fn extract_date(path: &Path) -> ExifResult {
             let date_fields = [
                 exif.get_field(exif::Tag::DateTimeOriginal, exif::In::PRIMARY),
                 exif.get_field(exif::Tag::DateTime, exif::In::PRIMARY),
+                exif.get_field(exif::Tag::DateTimeDigitized, exif::In::PRIMARY),
             ];
 
             for field in date_fields.iter().flatten() {
@@ -31,6 +32,14 @@ pub fn extract_date(path: &Path) -> ExifResult {
                     if let Ok(dt) = parse_exif_datetime(s) {
                         return ExifResult::FromExif(dt);
                     }
+                }
+            }
+            // EXIF parsed but no date fields — fall back to mtime
+            let metadata = std::fs::metadata(path).ok();
+            if let Some(m) = metadata {
+                if let Ok(mtime) = m.modified() {
+                    let datetime: DateTime<Utc> = mtime.into();
+                    return ExifResult::FromFileMtime(datetime);
                 }
             }
             ExifResult::Missing

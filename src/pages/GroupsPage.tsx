@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
+import { toast } from 'sonner';
 import { useGroupStore } from '../stores/dataStore';
 import { useGroupUIStore } from '../stores/groupUIStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
@@ -70,8 +71,10 @@ export function GroupsPage() {
     const dest = await open({ directory: true });
     if (dest) {
       try {
-        await invoke<ExportResult>('export_group', { groupId, destPath: dest });
+        const result = await invoke<ExportResult>('export_group', { groupId, destPath: dest });
+        toast.success(t('groups.exportSuccess', { count: result.copied, path: result.dest_path }));
       } catch (e) {
+        toast.error(t('groups.exportError'));
         console.error('Export failed:', e);
       }
     }

@@ -58,6 +58,7 @@ pub struct ImportResult {
     pub imported: usize,
     pub skipped: usize,
     pub errors: Vec<String>,
+    pub imported_sources: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -152,15 +153,30 @@ pub fn analyze_image(scanned: &ScannedImage) -> Result<AnalyzedImage, AppError> 
     })
 }
 
-pub fn create_import_plan(images: Vec<AnalyzedImage>) -> ImportPlan {
+pub fn create_import_plan(images: Vec<AnalyzedImage>, db: &crate::db::Database) -> Result<ImportPlan, AppError> {
     let total_size: u64 = images.iter().map(|i| i.size).sum();
-    let conflicts_count = images.iter().filter(|i| i.conflict.is_some()).count();
-    
-    ImportPlan {
-        images,
+
+    let mut resolved = Vec::with_capacity(images.len());
+    for mut img in images {
+        if db.image_exists(&img.hash)? {
+            if let Some(existing) = db.get_image(&img.hash)? {
+                img.conflict = Some(ConflictInfo {
+                    existing_id: existing.id.clone(),
+                    existing_path: existing.file_path.clone(),
+                    existing_date: existing.taken_at.clone(),
+                });
+            }
+        }
+        resolved.push(img);
+    }
+
+    let conflicts_count = resolved.iter().filter(|i| i.conflict.is_some()).count();
+
+    Ok(ImportPlan {
+        images: resolved,
         total_size,
         conflicts_count,
-    }
+    })
 }
 
 pub fn execute_import(
@@ -172,11 +188,13 @@ pub fn execute_import(
     let mut imported = 0;
     let mut skipped = 0;
     let mut errors = Vec::new();
+    let mut imported_sources: Vec<String> = Vec::new();
     
     let resolution_map: std::collections::HashMap<String, &ImportResolution> = 
         resolutions.iter().map(|r| (r.hash.clone(), r)).collect();
     
     for image in plan.images {
+        let source_path = image.path.clone();
         let resolution = resolution_map.get(&image.hash);
         
         let should_skip = match resolution {
@@ -256,6 +274,7 @@ pub fn execute_import(
                     errors.push(format!("Failed to insert into database: {}", e));
                 } else {
                     imported += 1;
+                    imported_sources.push(source_path);
                 }
             },
             Err(e) => {
@@ -268,6 +287,7 @@ pub fn execute_import(
         imported,
         skipped,
         errors,
+        imported_sources,
     })
 }
 

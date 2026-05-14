@@ -82,8 +82,9 @@ fn analyze_image(scanned: commands::ScannedImage) -> Result<commands::AnalyzedIm
 }
 
 #[tauri::command]
-fn create_import_plan(images: Vec<commands::AnalyzedImage>) -> commands::ImportPlan {
-    commands::create_import_plan(images)
+fn create_import_plan(state: tauri::State<'_, Arc<AppState>>, images: Vec<commands::AnalyzedImage>) -> Result<commands::ImportPlan, error::AppError> {
+    let db = state.db();
+    commands::create_import_plan(images, &db)
 }
 
 #[tauri::command]
@@ -113,12 +114,23 @@ fn export_group(
 #[tauri::command]
 fn rescan_archive(
     state: tauri::State<'_, Arc<AppState>>,
-) -> Result<usize, error::AppError> {
+) -> Result<commands::RescanResult, error::AppError> {
     let archive_path = state.get_archive_path().ok_or_else(|| error::AppError::ArchiveNotFound {
         path: "No archive path set".to_string(),
     })?;
     let db = state.db();
     commands::rescan_archive(&archive_path, &db)
+}
+
+#[tauri::command]
+fn delete_files(paths: Vec<String>) -> usize {
+    let mut count = 0;
+    for path in paths {
+        if std::fs::remove_file(&path).is_ok() {
+            count += 1;
+        }
+    }
+    count
 }
 
 #[tauri::command]
@@ -179,6 +191,7 @@ pub fn run() {
             execute_import,
             export_group,
             rescan_archive,
+            delete_files,
             save_config,
             load_config,
             path_exists,

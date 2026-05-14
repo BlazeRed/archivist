@@ -49,7 +49,9 @@
     "source": "Source",
     "archive": "Archive",
     "errors": "{{count}} error(s)",
-    "conflicts": "{{count}} conflict(s) to review"
+    "conflicts": "{{count}} conflict(s) to review",
+    "deleteSource": "Delete source images",
+    "keepSource": "Keep"
   },
   "timeline": {
     "title": "Timeline",
@@ -84,7 +86,9 @@
     "selectedPhotosInfo": "{{count}} photos selected — they will be added to the new group",
     "addPhotosTitle": "Add Photos",
     "addPhotosConfirm": "Add {{count}} photos",
-    "allPhotosAdded": "All photos are already in this group"
+    "allPhotosAdded": "All photos are already in this group",
+    "exportSuccess": "{{count}} photos exported to {{path}}",
+    "exportError": "Export failed"
   },
   "settings": {
     "title": "Settings",
@@ -97,6 +101,7 @@
     "archiveManagement": "Archive Management",
     "rescanArchive": "Rescan archive",
     "rescanFound": "Found {{count}} new images",
+    "rescanRemoved": "Removed {{count}} stale entries",
     "rescanError": "Error: {{error}}",
     "advancedSettings": "Advanced Settings",
     "blockSize": "Block size",

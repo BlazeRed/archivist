@@ -1,30 +1,47 @@
 use std::path::Path;
 use std::fs;
 use image::GenericImageView;
+use serde::Serialize;
 use crate::error::AppError;
 use crate::db::Database;
 
-pub fn rescan_archive(archive_path: &str, db: &Database) -> Result<usize, AppError> {
+#[derive(Debug, Serialize)]
+pub struct RescanResult {
+    pub added: usize,
+    pub removed: usize,
+}
+
+pub fn rescan_archive(archive_path: &str, db: &Database) -> Result<RescanResult, AppError> {
     let root = Path::new(archive_path);
-    
+
     if !root.exists() {
         return Err(AppError::ArchiveNotFound {
             path: archive_path.to_string(),
         });
     }
 
-    let mut count = 0;
-    
-    scan_archive_directory(root, archive_path, db, &mut count)?;
-    
-    Ok(count)
+    let mut added = 0;
+    scan_archive_directory(root, archive_path, db, &mut added)?;
+
+    // Prune pass — remove DB entries for files no longer on disk
+    let all_paths = db.get_all_image_paths()?;
+    let mut removed = 0;
+    for (id, rel_path) in all_paths {
+        let abs = Path::new(archive_path).join(&rel_path);
+        if !abs.exists() {
+            db.delete_image(&id)?;
+            removed += 1;
+        }
+    }
+
+    Ok(RescanResult { added, removed })
 }
 
 fn scan_archive_directory(
     dir: &Path,
     archive_root: &str,
     db: &Database,
-    count: &mut usize,
+    added: &mut usize,
 ) -> Result<(), AppError> {
     let entries = fs::read_dir(dir).map_err(|e| AppError::FileRead {
         path: dir.to_string_lossy().to_string(),
@@ -39,7 +56,7 @@ fn scan_archive_directory(
             if dir_name == ".archivist" {
                 continue;
             }
-            scan_archive_directory(&path, archive_root, db, count)?;
+            scan_archive_directory(&path, archive_root, db, added)?;
         } else if is_image_file(&path) {
             if let Ok(image_id) = compute_image_id(&path) {
                 if !db.image_exists(&image_id)? {
@@ -67,7 +84,7 @@ fn scan_archive_directory(
                     };
 
                     db.insert_image(&new_image)?;
-                    *count += 1;
+                    *added += 1;
                 }
             }
         }

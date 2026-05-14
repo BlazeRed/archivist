@@ -40,6 +40,7 @@ export interface ImportResult {
   imported: number;
   skipped: number;
   errors: string[];
+  imported_sources: string[];
 }
 
 export type ImportPhase = 'idle' | 'scanning' | 'analyzing' | 'review' | 'importing' | 'complete' | 'error';

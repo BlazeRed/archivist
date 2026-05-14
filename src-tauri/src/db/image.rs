@@ -182,4 +182,13 @@ impl super::Database {
         )?;
         Ok(count > 0)
     }
+
+    pub fn get_all_image_paths(&self) -> Result<Vec<(String, String)>, super::AppError> {
+        let conn = self.connection();
+        let mut stmt = conn.prepare("SELECT id, file_path FROM images")?;
+        let rows = stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?.collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
 }

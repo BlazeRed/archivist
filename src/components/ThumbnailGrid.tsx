@@ -130,11 +130,11 @@ const ThumbnailCell = memo(function ThumbnailCell({
         </div>
       )}
 
-      {/* No date badge */}
-      {!image.taken_at && (
+      {/* No EXIF badge */}
+      {!image.has_exif && (
         <div
           className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#E6A817]"
-          title="No date"
+          title="No EXIF"
         />
       )}
 

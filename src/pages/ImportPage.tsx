@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { open } from '@tauri-apps/plugin-dialog';
+import { invoke } from '@tauri-apps/api/core';
 import { useImportStore } from '../stores/importStore';
 import { ConflictReview } from '../components/ConflictReview';
 import { ProgressBar } from '../components/ProgressBar';
@@ -73,6 +74,7 @@ function FolderRow({
 export function ImportPage() {
   const { t } = useTranslation();
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [cleanupDismissed, setCleanupDismissed] = useState(false);
 
   const {
     phase,
@@ -108,11 +110,21 @@ export function ImportPage() {
   const handleReset = () => {
     reset();
     setStep(1);
+    setCleanupDismissed(false);
+  };
+
+  const handleDeleteSources = async () => {
+    if (result?.imported_sources) {
+      await invoke('delete_files', { paths: result.imported_sources });
+    }
+    setCleanupDismissed(true);
   };
 
   const isAnalyzing = phase === 'scanning' || phase === 'analyzing';
 
   if (phase === 'complete') {
+    const canCleanup = result !== null && result.errors.length === 0 && result.imported > 0 && (result.imported_sources?.length ?? 0) > 0;
+    const showCleanupBanner = canCleanup && !cleanupDismissed;
     return (
       <div className="p-6 max-w-2xl mx-auto">
         <div className="bg-card p-8 rounded-xl text-center">
@@ -141,6 +153,21 @@ export function ImportPage() {
           </div>
           {result && result.errors.length > 0 && (
             <p className="text-sm text-destructive mb-4">{t('import.errors', { count: result.errors.length })}</p>
+          )}
+          {showCleanupBanner && (
+            <div className="mb-4 p-4 bg-muted rounded-xl text-left">
+              <p className="text-sm font-medium text-foreground mb-3">
+                {t('import.sourceCleanup', { count: result!.imported_sources.length })}
+              </p>
+              <div className="flex gap-2">
+                <Button variant="destructive" size="sm" onClick={handleDeleteSources}>
+                  {t('import.deleteSource')}
+                </Button>
+                <Button variant="outline" size="sm" autoFocus onClick={() => setCleanupDismissed(true)}>
+                  {t('import.keepSource')}
+                </Button>
+              </div>
+            </div>
           )}
           <Button onClick={handleReset}>{t('common.confirm')}</Button>
         </div>
