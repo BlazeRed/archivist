@@ -19,21 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
-
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
+import { MONTH_NAMES } from "@/lib/months";
 
 function groupByMonth(images: Image[]) {
   const map = new Map<string, Image[]>();
@@ -68,14 +54,12 @@ function groupByMonth(images: Image[]) {
 
 interface Props {
   groupId: number;
-  existingImageIds: Set<string>;
   onClose: () => void;
   onAdded: () => void;
 }
 
 export function AddPhotosModal({
   groupId,
-  existingImageIds,
   onClose,
   onAdded,
 }: Props) {
@@ -91,10 +75,16 @@ export function AddPhotosModal({
   const archivePath = config.archive_path.replace(/\/+$/, "");
 
   useEffect(() => {
-    invoke<Image[]>("get_all_images").then((imgs) => {
-      setAllImages(imgs.filter((img) => !existingImageIds.has(img.id)));
-    });
-  }, [existingImageIds]);
+    async function load() {
+      const [existingIds, imgs] = await Promise.all([
+        invoke<string[]>("get_images_in_group", { groupId }),
+        invoke<Image[]>("get_all_images"),
+      ]);
+      const existingSet = new Set(existingIds);
+      setAllImages(imgs.filter((img) => !existingSet.has(img.id)));
+    }
+    load();
+  }, [groupId]);
 
   // oldest → newest for slider (left → right)
   const years = useMemo(() => {
@@ -260,8 +250,8 @@ export function AddPhotosModal({
                   </div>
                   <div className="flex flex-wrap gap-2 px-6 py-3">
                     {group.images.map((img) => {
-                      const url = archivePath
-                        ? convertFileSrc(`${archivePath}/${img.file_path}`)
+                      const thumbnailUrl = archivePath && img.thumbnail_path
+                        ? convertFileSrc(`${archivePath}/${img.thumbnail_path}`)
                         : "";
                       const isSelected = selectedIds.has(img.id);
                       return (
@@ -275,14 +265,23 @@ export function AddPhotosModal({
                           }`}
                           style={{ width: 150, height: 150 }}
                         >
-                          <div className="w-full h-full bg-card">
-                            {url && (
+                          <div className="w-full h-full bg-card flex flex-col items-center justify-center">
+                            {thumbnailUrl ? (
                               <img
-                                src={url}
+                                src={thumbnailUrl}
                                 alt={img.filename}
                                 className="w-full h-full object-cover"
                                 loading="lazy"
                               />
+                            ) : (
+                              <div className="flex flex-col items-center justify-center gap-1 text-muted-foreground">
+                                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                  <line x1="3" y1="3" x2="21" y2="21"/>
+                                  <circle cx="8.5" cy="8.5" r="1.5"/>
+                                </svg>
+                                <p className="text-[9px] text-center px-1 leading-tight">{t('common.noThumbnail')}</p>
+                              </div>
                             )}
                           </div>
 

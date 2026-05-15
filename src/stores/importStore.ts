@@ -40,6 +40,13 @@ export interface ImportResult {
   imported: number;
   skipped: number;
   errors: string[];
+  imported_sources: string[];
+}
+
+export interface ImportSingleResult {
+  status: string;
+  error: string | null;
+  source_path: string | null;
 }
 
 export type ImportPhase = 'idle' | 'scanning' | 'analyzing' | 'review' | 'importing' | 'complete' | 'error';
@@ -60,6 +67,7 @@ interface ImportState {
   startScan: () => Promise<void>;
   startAnalyze: () => Promise<void>;
   setResolution: (hash: string, action: ImportAction) => void;
+  setAllResolutions: (action: ImportAction) => void;
   startImport: () => Promise<void>;
   reset: () => void;
 }
@@ -127,16 +135,16 @@ export const useImportStore = create<ImportState>((set, get) => ({
     }
 
     const plan = await invoke<ImportPlan>('create_import_plan', { images: analyzed });
-    
-    const resolutions: ImportResolution[] = [];
-    const conflictRes: ImportResolution[] = analyzed
+
+    // plan.images has conflict fields populated by the backend — use them as source of truth
+    const conflictRes: ImportResolution[] = plan.images
       .filter(img => img.conflict)
-      .map(img => ({ hash: img.hash, action: 'KeepBoth' as ImportAction }));
-    
-    set({ 
-      analyzedImages: analyzed, 
+      .map(img => ({ hash: img.hash, action: 'Skip' as ImportAction }));
+
+    set({
+      analyzedImages: plan.images,
       importPlan: plan,
-      resolutions: [...resolutions, ...conflictRes],
+      resolutions: conflictRes,
       phase: 'review'
     });
   },
@@ -145,14 +153,15 @@ export const useImportStore = create<ImportState>((set, get) => ({
     const { resolutions } = get();
     const existing = resolutions.find(r => r.hash === hash);
     if (existing) {
-      set({ 
-        resolutions: resolutions.map(r => 
-          r.hash === hash ? { ...r, action } : r
-        ) 
-      });
+      set({ resolutions: resolutions.map(r => r.hash === hash ? { ...r, action } : r) });
     } else {
       set({ resolutions: [...resolutions, { hash, action }] });
     }
+  },
+
+  setAllResolutions: (action) => {
+    const { resolutions } = get();
+    set({ resolutions: resolutions.map(r => ({ ...r, action })) });
   },
 
   startImport: async () => {
@@ -161,33 +170,58 @@ export const useImportStore = create<ImportState>((set, get) => ({
 
     set({ phase: 'importing', progress: { current: 0, total: importPlan.images.length, currentFile: '' } });
 
-    try {
-      const result = await invoke<ImportResult>('execute_import', {
-        plan: importPlan,
-        resolutions,
-        archivePath
+    let imported = 0;
+    let skipped = 0;
+    const errors: string[] = [];
+    const imported_sources: string[] = [];
+
+    for (let i = 0; i < importPlan.images.length; i++) {
+      const image = importPlan.images[i];
+      const resolution = resolutions.find(r => r.hash === image.hash) ?? null;
+
+      set({
+        progress: { current: i + 1, total: importPlan.images.length, currentFile: image.filename }
       });
-      
-      set({ 
-        result, 
-        phase: 'complete',
-        progress: { current: result.imported, total: importPlan.images.length, currentFile: '' }
-      });
-    } catch (e) {
-      set({ error: String(e), phase: 'error' });
+
+      try {
+        const res = await invoke<ImportSingleResult>('import_single_image', {
+          image,
+          resolution,
+          archivePath,
+        });
+        if (res.status === 'imported') {
+          imported++;
+          if (res.source_path) imported_sources.push(res.source_path);
+        } else if (res.status === 'skipped') {
+          skipped++;
+        } else if (res.error) {
+          errors.push(res.error);
+        }
+      } catch (e) {
+        errors.push(String(e));
+      }
     }
+
+    set({
+      result: { imported, skipped, errors, imported_sources },
+      phase: 'complete',
+      progress: { current: imported, total: importPlan.images.length, currentFile: '' },
+    });
   },
 
-  reset: () => set({
-    phase: 'idle',
-    sourcePath: '',
-    archivePath: '',
-    scannedImages: [],
-    analyzedImages: [],
-    importPlan: null,
-    resolutions: [],
-    progress: { current: 0, total: 0, currentFile: '' },
-    result: null,
-    error: null,
-  }),
+  reset: () => {
+    invoke('cleanup_temp_thumbnails').catch(() => {});
+    set({
+      phase: 'idle',
+      sourcePath: '',
+      archivePath: '',
+      scannedImages: [],
+      analyzedImages: [],
+      importPlan: null,
+      resolutions: [],
+      progress: { current: 0, total: 0, currentFile: '' },
+      result: null,
+      error: null,
+    });
+  },
 }));

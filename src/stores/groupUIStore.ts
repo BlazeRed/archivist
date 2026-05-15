@@ -5,9 +5,7 @@ interface GroupUIState {
   isSelectionMode: boolean;
   toggleSelection: (imageId: string) => void;
   clearSelection: () => void;
-  selectAll: (imageIds: string[]) => void;
   setSelectionMode: (enabled: boolean) => void;
-  isSelected: (imageId: string) => boolean;
   getSelectedCount: () => number;
 }
 
@@ -29,10 +27,6 @@ export const useGroupUIStore = create<GroupUIState>((set, get) => ({
     set({ selectedImageIds: new Set(), isSelectionMode: false });
   },
 
-  selectAll: (imageIds) => {
-    set({ selectedImageIds: new Set(imageIds), isSelectionMode: true });
-  },
-
   setSelectionMode: (enabled) => {
     if (!enabled) {
       set({ isSelectionMode: false, selectedImageIds: new Set() });
@@ -41,7 +35,5 @@ export const useGroupUIStore = create<GroupUIState>((set, get) => ({
     }
   },
 
-  isSelected: (imageId) => get().selectedImageIds.has(imageId),
-  
   getSelectedCount: () => get().selectedImageIds.size,
 }));

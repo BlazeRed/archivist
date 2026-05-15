@@ -22,6 +22,9 @@ pub enum AppError {
 
     #[error("Group not found: {id}")]
     GroupNotFound { id: i64 },
+
+    #[error("Internal error: {message}")]
+    Internal { message: String },
 }
 
 impl serde::Serialize for AppError {

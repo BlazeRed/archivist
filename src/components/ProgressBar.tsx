@@ -13,7 +13,7 @@ export function ProgressBar({ current, total, currentFile, phase }: ProgressBarP
   const percentage = total > 0 ? (current / total) * 100 : 0;
 
   return (
-    <div className="w-full max-w-md">
+    <div className="w-full">
       <div className="flex justify-between text-sm mb-2">
         <span className="text-foreground">
           {phase === 'analyzing' && t('import.analyzingProgress').replace('{{current}}', String(current)).replace('{{total}}', String(total))}

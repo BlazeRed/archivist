@@ -7,7 +7,8 @@
     "timeline": "Cronologia",
     "groups": "Gruppi",
     "import": "Importa",
-    "settings": "Impostazioni"
+    "settings": "Impostazioni",
+    "rescan": "Riscansiona archivio"
   },
   "common": {
     "cancel": "Annulla",
@@ -19,11 +20,14 @@
     "close": "Chiudi",
     "loading": "Caricamento...",
     "browse": "Sfoglia",
-    "change": "Cambia"
+    "change": "Cambia",
+    "noThumbnail": "Anteprima non disponibile",
+    "dateFromFile": "Data dal file (non da fotocamera)",
+    "noDate": "Nessuna data disponibile"
   },
   "import": {
     "title": "Importa",
-    "selectSource": "Seleziona cartella sorgente",
+    "selectSource": "Seleziona sorgente",
     "selectDestination": "Seleziona cartella archivio",
     "analyzing": "Analizzo le immagini...",
     "analyzingProgress": "Analizzo {{current}} di {{total}}",
@@ -35,8 +39,10 @@
     "sourceCleanup": "Eliminare le {{count}} foto sorgente?",
     "noDate": "Senza data",
     "missingDate": "Data mancante — inserita in Senza data",
-    "step1Title": "Seleziona cartella sorgente",
-    "step1Desc": "Scegli la cartella contenente le foto da importare",
+    "selectFolder": "Seleziona cartella",
+    "selectFile": "Seleziona file",
+    "step1Title": "Seleziona sorgente",
+    "step1Desc": "Scegli una cartella o una singola immagine da importare",
     "step2Title": "Seleziona cartella archivio",
     "step2Desc": "Scegli dove archiviare le tue foto",
     "step3Title": "Analizza foto",
@@ -48,7 +54,15 @@
     "source": "Sorgente",
     "archive": "Archivio",
     "errors": "{{count}} errore/i",
-    "conflicts": "{{count}} conflitto/i da rivedere"
+    "conflicts": "{{count}} conflitto/i da rivedere",
+    "deleteSource": "Elimina immagini sorgente",
+    "keepSource": "Mantieni",
+    "navWarningTitle": "Importazione in corso",
+    "navWarningBody": "Uscire ora può interrompere l'importazione. Alcuni file potrebbero essere incompleti o mancanti dall'archivio.",
+    "navWarningLeave": "Esci comunque",
+    "dragOrClick": "Trascina una cartella o un file qui",
+    "dragOrClickSub": "oppure usa i pulsanti qui sotto",
+    "dropHere": "Rilascia per importare"
   },
   "timeline": {
     "title": "Cronologia",
@@ -83,7 +97,9 @@
     "selectedPhotosInfo": "{{count}} foto selezionate — verranno aggiunte al nuovo gruppo",
     "addPhotosTitle": "Aggiungi foto",
     "addPhotosConfirm": "Aggiungi {{count}} foto",
-    "allPhotosAdded": "Tutte le foto sono già in questo gruppo"
+    "allPhotosAdded": "Tutte le foto sono già in questo gruppo",
+    "exportSuccess": "{{count}} foto esportate in {{path}}",
+    "exportError": "Esportazione fallita"
   },
   "settings": {
     "title": "Impostazioni",
@@ -96,6 +112,10 @@
     "archiveManagement": "Gestione archivio",
     "rescanArchive": "Riscansiona archivio",
     "rescanFound": "Trovate {{count}} nuove immagini",
+    "rescanRemoved": "Rimossi {{count}} elementi non trovati",
+    "rescanRepaired": "Date corrette per {{count}} immagini",
+    "rescanMoved": "Spostate {{count}} immagini fuori posto",
+    "rescanThumbnailed": "Generate {{count}} miniature mancanti",
     "rescanError": "Errore: {{error}}",
     "advancedSettings": "Impostazioni avanzate",
     "blockSize": "Dimensione blocco",
@@ -116,13 +136,20 @@
     "noExif": "Senza EXIF",
     "addToGroup": "Aggiungi al gruppo…",
     "removeFromGroup": "Rimuovi dal gruppo",
-    "noGroups": "—"
+    "noGroups": "—",
+    "showInFolder": "Mostra nella cartella"
   },
   "conflicts": {
     "title": "Rivedi conflitti",
     "keepExisting": "Mantieni esistente",
     "replace": "Sostituisci con nuovo",
-    "keepBoth": "Mantieni entrambi"
+    "keepBoth": "Mantieni entrambi",
+    "applyToAll": "Applica a tutti:",
+    "noConflicts": "Nessun conflitto — {{count}} foto pronte per l'importazione.",
+    "conflictsFound": "{{count}} conflitto/i — scegli come gestire ciascuno:",
+    "existingPath": "Copia archiviata:",
+    "incoming": "Nuovo",
+    "inArchive": "In archivio"
   },
   "status": {
     "success": "Successo",

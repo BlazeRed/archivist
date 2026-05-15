@@ -20,16 +20,18 @@ function App() {
         const saved = await invoke<Record<string, unknown> | null>('load_config');
         if (!saved) return;
 
+        const { archive_path, ...rest } = saved;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setConfig(saved as any);
+        setConfig(rest as any);
         if (typeof saved.language === 'string') {
           i18n.changeLanguage(saved.language);
         }
 
-        if (typeof saved.archive_path === 'string' && saved.archive_path) {
-          const exists = await invoke<boolean>('path_exists', { path: saved.archive_path });
+        if (typeof archive_path === 'string' && archive_path) {
+          const exists = await invoke<boolean>('path_exists', { path: archive_path });
           if (exists) {
-            await invoke('init_archive', { archivePath: saved.archive_path });
+            await invoke('init_archive', { archivePath: archive_path });
+            setConfig({ archive_path });
           } else {
             setConfig({ archive_path: '' });
           }

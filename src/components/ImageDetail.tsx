@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { convertFileSrc } from '@tauri-apps/api/core';
+import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import type { GroupWithCount } from '../types';
@@ -27,20 +28,26 @@ export function ImageDetail() {
 
   const [imageGroups, setImageGroups] = useState<number[]>([]);
   const [addingGroupId, setAddingGroupId] = useState<number | ''>('');
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imgSrc, setImgSrc] = useState('');
+
+  const archivePath = config.archive_path.replace(/\/+$/, '');
 
   useEffect(() => {
-    if (!selectedImage) { setImageGroups([]); return; }
+    if (!selectedImage) { setImageGroups([]); setImgSrc(''); return; }
+    setImageLoaded(false);
+    setImgSrc('');
     invoke<number[]>('get_groups_for_image', { imageId: selectedImage.id })
       .then(setImageGroups)
       .catch(() => setImageGroups([]));
-  }, [selectedImage]);
+    const url = archivePath
+      ? convertFileSrc(`${archivePath}/${selectedImage.file_path}`)
+      : '';
+    const id = requestAnimationFrame(() => setImgSrc(url));
+    return () => cancelAnimationFrame(id);
+  }, [selectedImage, archivePath]);
 
   if (!selectedImage) return null;
-
-  const archivePath = config.archive_path.replace(/\/+$/, '');
-  const imageUrl = archivePath
-    ? convertFileSrc(`${archivePath}/${selectedImage.file_path}`)
-    : '';
 
   const handleAddToGroup = async () => {
     if (!addingGroupId || !selectedImage) return;
@@ -51,6 +58,11 @@ export function ImageDetail() {
     } catch (e) {
       console.error('Failed to add to group:', e);
     }
+  };
+
+  const handleShowInFolder = async () => {
+    if (!archivePath || !selectedImage) return;
+    await revealItemInDir(`${archivePath}/${selectedImage.file_path}`);
   };
 
   const handleRemoveFromGroup = async (groupId: number) => {
@@ -76,14 +88,20 @@ export function ImageDetail() {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Image */}
-        <div className="flex-1 bg-[#001A36] flex items-center justify-center p-4 min-w-0">
-          {imageUrl && (
-            <img
-              src={imageUrl}
-              alt={selectedImage.filename}
-              className="max-w-full max-h-[80vh] object-contain"
-            />
+        <div className="flex-1 bg-[#001A36] flex items-center justify-center p-4 min-w-0 relative">
+          {(!imgSrc || !imageLoaded) && (
+            <svg className="animate-spin size-8 text-white/40" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
           )}
+          <img
+            src={imgSrc}
+            alt={selectedImage.filename}
+            decoding="async"
+            onLoad={() => setImageLoaded(true)}
+            className={`max-w-full max-h-[80vh] object-contain transition-opacity duration-200 ${imageLoaded ? 'opacity-100' : 'opacity-0 absolute'}`}
+          />
         </div>
 
         {/* Details panel */}
@@ -144,6 +162,17 @@ export function ImageDetail() {
                 {selectedImage.id.substring(0, 16)}…
               </p>
             </div>
+
+            <button
+              onClick={handleShowInFolder}
+              className="mt-1 w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-[rgba(0,45,88,0.18)] text-[rgba(0,45,88,0.65)] hover:text-[#0084C5] hover:border-[#0084C5] transition-colors text-xs font-medium"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+                  d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+              </svg>
+              {t('detail.showInFolder')}
+            </button>
           </div>
 
           {/* Groups section */}

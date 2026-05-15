@@ -34,8 +34,9 @@ Tauri v2 desktop app. Two runtimes communicate via `invoke()`:
 **Frontend** (`src/`) — React 19 + TypeScript + Tailwind v4 + shadcn/ui + Zustand v5 + react-router-dom v7
 
 **Backend** (`src-tauri/src/`) — Rust. All Tauri commands defined in `lib.rs` and delegated to:
-- `commands/import.rs` — scan → analyze → plan → execute pipeline
-- `commands/export.rs` — group export + archive rescan
+- `commands/import.rs` — scan → analyze → plan → execute pipeline; also `import_single_image` for misplaced-file rescan
+- `commands/export.rs` — group export
+- `commands/rescan.rs` — archive rescan logic
 - `db/image.rs`, `db/group.rs` — SQLite CRUD via rusqlite
 - `exif.rs` — EXIF date extraction with filesystem-date fallback
 - `hasher.rs` — SHA256 used as image primary key
@@ -95,7 +96,11 @@ All registered in `lib.rs` via `tauri::generate_handler![]`:
 | `create_import_plan(images)` | Build plan with conflict detection |
 | `execute_import(plan, resolutions, archive_path)` | Run import |
 | `export_group(group_id, dest_path)` | Copy group images to folder |
-| `rescan_archive(archive_path)` | Re-index existing archive files |
+| `rescan_archive()` | Re-index archive files; archive path read from AppState |
+| `import_single_image(image, resolution?, archive_path)` | Import one image (used by rescan for misplaced files) |
+| `generate_temp_thumbnail(source_path)` | Generate thumbnail for preview before import |
+| `cleanup_temp_thumbnails()` | Delete temp thumbnails from previous session |
+| `delete_files(paths)` | Delete source files after import |
 | `save_config(config)` | Persist app config JSON |
 | `load_config()` | Load app config JSON |
 | `path_exists(path)` | Check if path exists on disk |
@@ -106,11 +111,11 @@ Key components in `src/components/`:
 
 | Component | Purpose |
 |-----------|---------|
-| `Topbar.tsx` | Nav bar — logo, page links, mode toggle, language |
+| `Topbar.tsx` | Nav bar — logo, page links, rescan icon button, language toggle |
 | `FilterPanel.tsx` | Year-range slider + month select for timeline |
 | `ThumbnailGrid.tsx` | Virtualized image grid with sticky month headers |
 | `AddPhotosModal.tsx` | Full-screen group photo picker (same layout as timeline) |
-| `ImageDetail.tsx` | Full image view modal |
+| `ImageDetail.tsx` | Full image view modal with metadata panel and Show in Folder button |
 | `ProgressBar.tsx` | Import progress indicator |
 | `ConflictReview.tsx` | Duplicate conflict resolution UI |
 | `Toast.tsx` / `ui/sonner.tsx` | Toast notification display |

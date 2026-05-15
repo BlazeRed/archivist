@@ -6,11 +6,7 @@ import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { useGroupUIStore } from '../stores/groupUIStore';
 import type { Image } from '../types';
-
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
+import { MONTH_NAMES } from '../lib/months';
 
 const SIZES = {
   small:  { px: 120, cols: 6, gap: 8,  rowH: 134 },
@@ -95,9 +91,11 @@ const ThumbnailCell = memo(function ThumbnailCell({
   onImageClick: (img: Image) => void;
   onToggleSelect: (id: string) => void;
 }) {
+  const { t } = useTranslation();
   const { px } = SIZES[sizeKey];
-  const imageUrl = archivePath
-    ? convertFileSrc(`${archivePath}/${image.file_path}`)
+  const root = archivePath.replace(/\/+$/, '');
+  const thumbnailUrl = root && image.thumbnail_path
+    ? convertFileSrc(`${root}/${image.thumbnail_path}`)
     : '';
 
   return (
@@ -110,20 +108,35 @@ const ThumbnailCell = memo(function ThumbnailCell({
           : 'border-[rgba(0,45,88,0.15)] hover:ring-2 hover:ring-[#0084C5]'
       }`}
     >
-      {imageUrl && (
+      {thumbnailUrl ? (
         <img
-          src={imageUrl}
+          src={thumbnailUrl}
           alt={image.filename}
           className="w-full h-full object-cover"
           loading="lazy"
         />
+      ) : (
+        <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-[rgba(0,45,88,0.4)]">
+          <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <line x1="3" y1="3" x2="21" y2="21"/>
+            <circle cx="8.5" cy="8.5" r="1.5"/>
+          </svg>
+          <p className="text-[8px] text-center px-1 leading-tight">{t('common.noThumbnail')}</p>
+        </div>
       )}
 
-      {/* No date badge */}
-      {!image.taken_at && (
+      {/* Date source badge */}
+      {!image.has_exif && image.taken_at && (
         <div
           className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#E6A817]"
-          title="No date"
+          title={t('common.dateFromFile')}
+        />
+      )}
+      {!image.has_exif && !image.taken_at && (
+        <div
+          className="absolute top-1 right-1 w-2 h-2 rounded-full bg-muted-foreground/60"
+          title={t('common.noDate')}
         />
       )}
 

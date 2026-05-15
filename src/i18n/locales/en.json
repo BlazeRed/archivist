@@ -7,7 +7,8 @@
     "timeline": "Timeline",
     "groups": "Groups",
     "import": "Import",
-    "settings": "Settings"
+    "settings": "Settings",
+    "rescan": "Rescan archive"
   },
   "common": {
     "cancel": "Cancel",
@@ -19,11 +20,14 @@
     "close": "Close",
     "loading": "Loading...",
     "browse": "Browse",
-    "change": "Change"
+    "change": "Change",
+    "noThumbnail": "No thumbnail available",
+    "dateFromFile": "Date from file modification time",
+    "noDate": "No date available"
   },
   "import": {
     "title": "Import",
-    "selectSource": "Select source folder",
+    "selectSource": "Select Source",
     "selectDestination": "Select archive folder",
     "analyzing": "Analyzing images...",
     "analyzingProgress": "Analyzing {{current}} of {{total}}",
@@ -35,8 +39,10 @@
     "sourceCleanup": "Delete the {{count}} source images?",
     "noDate": "No Date",
     "missingDate": "Missing date — placed in No Date",
-    "step1Title": "Select Source Folder",
-    "step1Desc": "Choose the folder containing the photos you want to import",
+    "selectFolder": "Select Folder",
+    "selectFile": "Select File",
+    "step1Title": "Select Source",
+    "step1Desc": "Choose a folder or a single image file to import",
     "step2Title": "Select Archive Folder",
     "step2Desc": "Choose where to store your archived photos",
     "step3Title": "Analyze Photos",
@@ -48,7 +54,15 @@
     "source": "Source",
     "archive": "Archive",
     "errors": "{{count}} error(s)",
-    "conflicts": "{{count}} conflict(s) to review"
+    "conflicts": "{{count}} conflict(s) to review",
+    "deleteSource": "Delete source images",
+    "keepSource": "Keep",
+    "navWarningTitle": "Import in progress",
+    "navWarningBody": "Leaving now may interrupt the import. Some files could be incomplete or missing from the archive.",
+    "navWarningLeave": "Leave anyway",
+    "dragOrClick": "Drag a folder or file here",
+    "dragOrClickSub": "or use the buttons below",
+    "dropHere": "Drop to import"
   },
   "timeline": {
     "title": "Timeline",
@@ -83,7 +97,9 @@
     "selectedPhotosInfo": "{{count}} photos selected — they will be added to the new group",
     "addPhotosTitle": "Add Photos",
     "addPhotosConfirm": "Add {{count}} photos",
-    "allPhotosAdded": "All photos are already in this group"
+    "allPhotosAdded": "All photos are already in this group",
+    "exportSuccess": "{{count}} photos exported to {{path}}",
+    "exportError": "Export failed"
   },
   "settings": {
     "title": "Settings",
@@ -96,6 +112,10 @@
     "archiveManagement": "Archive Management",
     "rescanArchive": "Rescan archive",
     "rescanFound": "Found {{count}} new images",
+    "rescanRemoved": "Removed {{count}} stale entries",
+    "rescanRepaired": "Fixed dates for {{count}} images",
+    "rescanMoved": "Relocated {{count}} misplaced images",
+    "rescanThumbnailed": "Generated {{count}} missing thumbnails",
     "rescanError": "Error: {{error}}",
     "advancedSettings": "Advanced Settings",
     "blockSize": "Block size",
@@ -116,13 +136,20 @@
     "noExif": "No EXIF",
     "addToGroup": "Add to group…",
     "removeFromGroup": "Remove from group",
-    "noGroups": "—"
+    "noGroups": "—",
+    "showInFolder": "Show in Folder"
   },
   "conflicts": {
     "title": "Review Conflicts",
     "keepExisting": "Keep existing",
     "replace": "Replace with new",
-    "keepBoth": "Keep both"
+    "keepBoth": "Keep both",
+    "applyToAll": "Apply to all:",
+    "noConflicts": "No conflicts — all {{count}} photos ready to import.",
+    "conflictsFound": "{{count}} conflict(s) — choose how to handle each:",
+    "existingPath": "Archived copy:",
+    "incoming": "New",
+    "inArchive": "In archive"
   },
   "status": {
     "success": "Success",
