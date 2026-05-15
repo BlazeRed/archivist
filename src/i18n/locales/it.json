@@ -7,7 +7,8 @@
     "timeline": "Cronologia",
     "groups": "Gruppi",
     "import": "Importa",
-    "settings": "Impostazioni"
+    "settings": "Impostazioni",
+    "rescan": "Riscansiona archivio"
   },
   "common": {
     "cancel": "Annulla",

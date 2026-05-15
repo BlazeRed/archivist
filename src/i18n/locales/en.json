@@ -7,7 +7,8 @@
     "timeline": "Timeline",
     "groups": "Groups",
     "import": "Import",
-    "settings": "Settings"
+    "settings": "Settings",
+    "rescan": "Rescan archive"
   },
   "common": {
     "cancel": "Cancel",
