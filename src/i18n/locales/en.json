@@ -58,7 +58,10 @@
     "keepSource": "Keep",
     "navWarningTitle": "Import in progress",
     "navWarningBody": "Leaving now may interrupt the import. Some files could be incomplete or missing from the archive.",
-    "navWarningLeave": "Leave anyway"
+    "navWarningLeave": "Leave anyway",
+    "dragOrClick": "Drag a folder or file here",
+    "dragOrClickSub": "or use the buttons below",
+    "dropHere": "Drop to import"
   },
   "timeline": {
     "title": "Timeline",

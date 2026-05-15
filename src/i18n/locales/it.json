@@ -58,7 +58,10 @@
     "keepSource": "Mantieni",
     "navWarningTitle": "Importazione in corso",
     "navWarningBody": "Uscire ora può interrompere l'importazione. Alcuni file potrebbero essere incompleti o mancanti dall'archivio.",
-    "navWarningLeave": "Esci comunque"
+    "navWarningLeave": "Esci comunque",
+    "dragOrClick": "Trascina una cartella o un file qui",
+    "dragOrClickSub": "oppure usa i pulsanti qui sotto",
+    "dropHere": "Rilascia per importare"
   },
   "timeline": {
     "title": "Cronologia",

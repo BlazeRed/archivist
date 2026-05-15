@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { useImportStore } from '../stores/importStore';
 import { ConflictReview } from '../components/ConflictReview';
 import { ProgressBar } from '../components/ProgressBar';
@@ -30,44 +31,72 @@ function StepIndicator({ current }: { current: number }) {
   );
 }
 
-function FolderRow({
-  label,
-  path,
-  onSelect,
-  onChangeTrigger,
-  changeLabelKey,
-  selectLabelKey,
+function DropZone({
+  isDragging,
+  onSelectFolder,
+  onSelectFile,
+  dragLabel,
+  dropLabel,
+  subLabel,
+  folderLabel,
+  fileLabel,
 }: {
-  label: string;
-  path: string;
-  onSelect: () => void;
-  onChangeTrigger?: () => void;
-  changeLabelKey?: string;
-  selectLabelKey: string;
+  isDragging: boolean;
+  onSelectFolder: () => void;
+  onSelectFile?: () => void;
+  dragLabel: string;
+  dropLabel: string;
+  subLabel: string;
+  folderLabel: string;
+  fileLabel?: string;
 }) {
-  const { t } = useTranslation();
-  if (path) {
-    return (
-      <div className="p-3 bg-muted rounded-lg flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs text-muted-foreground mb-0.5">{label}</p>
-          <p className="text-sm text-foreground truncate font-mono">{path}</p>
-        </div>
-        {onChangeTrigger && (
-          <Button variant="link" size="xs" onClick={onChangeTrigger} className="shrink-0 p-0 h-auto">
-            {t(changeLabelKey ?? 'common.change')}
-          </Button>
+  return (
+    <div
+      className={cn(
+        'w-full border-2 border-dashed rounded-xl transition-colors',
+        isDragging
+          ? 'border-primary bg-primary/5'
+          : 'border-border hover:border-primary/50'
+      )}
+    >
+      <div className="py-8 flex flex-col items-center gap-2 text-muted-foreground pointer-events-none select-none">
+        <svg className="w-8 h-8 opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path strokeLinecap="round" strokeLinejoin="round"
+            d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+        </svg>
+        <p className="text-sm font-medium">
+          {isDragging ? dropLabel : dragLabel}
+        </p>
+        {!isDragging && (
+          <p className="text-xs opacity-60">{subLabel}</p>
         )}
       </div>
-    );
-  }
-  return (
-    <button
-      onClick={onSelect}
-      className="w-full py-8 border-2 border-dashed border-border rounded-xl text-muted-foreground hover:border-primary hover:text-primary transition-colors text-sm font-medium"
-    >
-      {t(selectLabelKey)}
-    </button>
+
+      {!isDragging && (
+        <div className={cn('flex gap-2 px-4 pb-4', !onSelectFile && 'justify-center')}>
+          <button
+            onClick={onSelectFolder}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-muted hover:bg-muted/80 rounded-lg text-xs font-medium text-foreground transition-colors"
+          >
+            <svg className="w-3.5 h-3.5 text-muted-foreground" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+            </svg>
+            {folderLabel}
+          </button>
+          {onSelectFile && fileLabel && (
+            <button
+              onClick={onSelectFile}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-muted hover:bg-muted/80 rounded-lg text-xs font-medium text-foreground transition-colors"
+            >
+              <svg className="w-3.5 h-3.5 text-muted-foreground" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd"/>
+              </svg>
+              {fileLabel}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -75,8 +104,9 @@ export function ImportPage() {
   const { t } = useTranslation();
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [cleanupDismissed, setCleanupDismissed] = useState(false);
-  const [showSourceMenu, setShowSourceMenu] = useState(false);
-  const sourceMenuRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const stepRef = useRef<number>(step);
+  stepRef.current = step;
 
   const {
     phase,
@@ -118,15 +148,38 @@ export function ImportPage() {
   };
 
   useEffect(() => {
-    if (!showSourceMenu) return;
-    const handler = (e: MouseEvent) => {
-      if (sourceMenuRef.current && !sourceMenuRef.current.contains(e.target as Node)) {
-        setShowSourceMenu(false);
+    const appWindow = getCurrentWebviewWindow();
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+
+    appWindow.onDragDropEvent((event) => {
+      const type = event.payload.type;
+      if (type === 'enter' || type === 'over') {
+        if (stepRef.current === 1 || stepRef.current === 2) setIsDragging(true);
+      } else if (type === 'leave') {
+        setIsDragging(false);
+      } else if (type === 'drop') {
+        setIsDragging(false);
+        const paths = (event.payload as { type: 'drop'; paths: string[]; position: unknown }).paths;
+        if (paths.length > 0) {
+          if (stepRef.current === 1) setSourcePath(paths[0]);
+          else if (stepRef.current === 2) setArchivePath(paths[0]);
+        }
       }
+    }).then(fn => {
+      if (cancelled) fn();
+      else unlisten = fn;
+    });
+
+    return () => {
+      cancelled = true;
+      unlisten?.();
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [showSourceMenu]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (step !== 1 && step !== 2) setIsDragging(false);
+  }, [step]);
 
   const handleReset = () => {
     reset();
@@ -216,53 +269,34 @@ export function ImportPage() {
 
       <StepIndicator current={step} />
 
-      {/* Step 1 – Select source folder */}
+      {/* Step 1 – Select source */}
       {step === 1 && (
         <div className="bg-card p-6 rounded-xl">
           <h3 className="text-base font-semibold text-foreground mb-1">{t('import.step1Title')}</h3>
           <p className="text-sm text-muted-foreground mb-5">{t('import.step1Desc')}</p>
 
-          <div className="mb-5" ref={sourceMenuRef}>
+          <div className="mb-5">
             {sourcePath ? (
               <div className="p-3 bg-muted rounded-lg flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-xs text-muted-foreground mb-0.5">{t('import.source')}</p>
                   <p className="text-sm text-foreground truncate font-mono">{sourcePath}</p>
                 </div>
-                <Button variant="link" size="xs" onClick={() => setShowSourceMenu(m => !m)} className="shrink-0 p-0 h-auto">
+                <Button variant="link" size="xs" onClick={() => setSourcePath('')} className="shrink-0 p-0 h-auto">
                   {t('common.change')}
                 </Button>
               </div>
             ) : (
-              <button
-                onClick={() => setShowSourceMenu(m => !m)}
-                className="w-full py-8 border-2 border-dashed border-border rounded-xl text-muted-foreground hover:border-primary hover:text-primary transition-colors text-sm font-medium"
-              >
-                {t('import.selectSource')}
-              </button>
-            )}
-
-            {showSourceMenu && (
-              <div className="mt-1 bg-card border border-border rounded-lg shadow-md overflow-hidden">
-                <button
-                  onClick={() => { setShowSourceMenu(false); handleSelectSource(); }}
-                  className="w-full px-4 py-2.5 text-sm text-left text-foreground hover:bg-muted flex items-center gap-2"
-                >
-                  <svg className="w-4 h-4 text-muted-foreground flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
-                  </svg>
-                  {t('import.selectFolder')}
-                </button>
-                <button
-                  onClick={() => { setShowSourceMenu(false); handleSelectSourceFile(); }}
-                  className="w-full px-4 py-2.5 text-sm text-left text-foreground hover:bg-muted flex items-center gap-2 border-t border-border"
-                >
-                  <svg className="w-4 h-4 text-muted-foreground flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd"/>
-                  </svg>
-                  {t('import.selectFile')}
-                </button>
-              </div>
+              <DropZone
+                isDragging={isDragging}
+                onSelectFolder={handleSelectSource}
+                onSelectFile={handleSelectSourceFile}
+                dragLabel={t('import.dragOrClick')}
+                dropLabel={t('import.dropHere')}
+                subLabel={t('import.dragOrClickSub')}
+                folderLabel={t('import.selectFolder')}
+                fileLabel={t('import.selectFile')}
+              />
             )}
           </div>
 
@@ -285,13 +319,27 @@ export function ImportPage() {
               <p className="text-xs text-muted-foreground mb-0.5">{t('import.source')}</p>
               <p className="text-sm text-foreground truncate font-mono">{sourcePath}</p>
             </div>
-            <FolderRow
-              label={t('import.archive')}
-              path={archivePath}
-              onSelect={handleSelectArchive}
-              onChangeTrigger={handleSelectArchive}
-              selectLabelKey="import.selectDestination"
-            />
+
+            {archivePath ? (
+              <div className="p-3 bg-muted rounded-lg flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground mb-0.5">{t('import.archive')}</p>
+                  <p className="text-sm text-foreground truncate font-mono">{archivePath}</p>
+                </div>
+                <Button variant="link" size="xs" onClick={() => setArchivePath('')} className="shrink-0 p-0 h-auto">
+                  {t('common.change')}
+                </Button>
+              </div>
+            ) : (
+              <DropZone
+                isDragging={isDragging}
+                onSelectFolder={handleSelectArchive}
+                dragLabel={t('import.selectDestination')}
+                dropLabel={t('import.dropHere')}
+                subLabel={t('import.dragOrClickSub')}
+                folderLabel={t('import.selectFolder')}
+              />
+            )}
           </div>
 
           <div className="flex justify-between items-center">
