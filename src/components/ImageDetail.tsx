@@ -27,20 +27,26 @@ export function ImageDetail() {
 
   const [imageGroups, setImageGroups] = useState<number[]>([]);
   const [addingGroupId, setAddingGroupId] = useState<number | ''>('');
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imgSrc, setImgSrc] = useState('');
+
+  const archivePath = config.archive_path.replace(/\/+$/, '');
 
   useEffect(() => {
-    if (!selectedImage) { setImageGroups([]); return; }
+    if (!selectedImage) { setImageGroups([]); setImgSrc(''); return; }
+    setImageLoaded(false);
+    setImgSrc('');
     invoke<number[]>('get_groups_for_image', { imageId: selectedImage.id })
       .then(setImageGroups)
       .catch(() => setImageGroups([]));
-  }, [selectedImage]);
+    const url = archivePath
+      ? convertFileSrc(`${archivePath}/${selectedImage.file_path}`)
+      : '';
+    const id = requestAnimationFrame(() => setImgSrc(url));
+    return () => cancelAnimationFrame(id);
+  }, [selectedImage, archivePath]);
 
   if (!selectedImage) return null;
-
-  const archivePath = config.archive_path.replace(/\/+$/, '');
-  const imageUrl = archivePath
-    ? convertFileSrc(`${archivePath}/${selectedImage.file_path}`)
-    : '';
 
   const handleAddToGroup = async () => {
     if (!addingGroupId || !selectedImage) return;
@@ -76,14 +82,20 @@ export function ImageDetail() {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Image */}
-        <div className="flex-1 bg-[#001A36] flex items-center justify-center p-4 min-w-0">
-          {imageUrl && (
-            <img
-              src={imageUrl}
-              alt={selectedImage.filename}
-              className="max-w-full max-h-[80vh] object-contain"
-            />
+        <div className="flex-1 bg-[#001A36] flex items-center justify-center p-4 min-w-0 relative">
+          {(!imgSrc || !imageLoaded) && (
+            <svg className="animate-spin size-8 text-white/40" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
           )}
+          <img
+            src={imgSrc}
+            alt={selectedImage.filename}
+            decoding="async"
+            onLoad={() => setImageLoaded(true)}
+            className={`max-w-full max-h-[80vh] object-contain transition-opacity duration-200 ${imageLoaded ? 'opacity-100' : 'opacity-0 absolute'}`}
+          />
         </div>
 
         {/* Details panel */}
