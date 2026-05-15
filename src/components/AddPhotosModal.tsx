@@ -68,14 +68,12 @@ function groupByMonth(images: Image[]) {
 
 interface Props {
   groupId: number;
-  existingImageIds: Set<string>;
   onClose: () => void;
   onAdded: () => void;
 }
 
 export function AddPhotosModal({
   groupId,
-  existingImageIds,
   onClose,
   onAdded,
 }: Props) {
@@ -91,10 +89,16 @@ export function AddPhotosModal({
   const archivePath = config.archive_path.replace(/\/+$/, "");
 
   useEffect(() => {
-    invoke<Image[]>("get_all_images").then((imgs) => {
-      setAllImages(imgs.filter((img) => !existingImageIds.has(img.id)));
-    });
-  }, [existingImageIds]);
+    async function load() {
+      const [existingIds, imgs] = await Promise.all([
+        invoke<string[]>("get_images_in_group", { groupId }),
+        invoke<Image[]>("get_all_images"),
+      ]);
+      const existingSet = new Set(existingIds);
+      setAllImages(imgs.filter((img) => !existingSet.has(img.id)));
+    }
+    load();
+  }, [groupId]);
 
   // oldest → newest for slider (left → right)
   const years = useMemo(() => {

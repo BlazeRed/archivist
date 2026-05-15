@@ -20,11 +20,13 @@
     "loading": "Loading...",
     "browse": "Browse",
     "change": "Change",
-    "noThumbnail": "No thumbnail available"
+    "noThumbnail": "No thumbnail available",
+    "dateFromFile": "Date from file modification time",
+    "noDate": "No date available"
   },
   "import": {
     "title": "Import",
-    "selectSource": "Select source folder",
+    "selectSource": "Select Source",
     "selectDestination": "Select archive folder",
     "analyzing": "Analyzing images...",
     "analyzingProgress": "Analyzing {{current}} of {{total}}",
@@ -36,8 +38,10 @@
     "sourceCleanup": "Delete the {{count}} source images?",
     "noDate": "No Date",
     "missingDate": "Missing date — placed in No Date",
-    "step1Title": "Select Source Folder",
-    "step1Desc": "Choose the folder containing the photos you want to import",
+    "selectFolder": "Select Folder",
+    "selectFile": "Select File",
+    "step1Title": "Select Source",
+    "step1Desc": "Choose a folder or a single image file to import",
     "step2Title": "Select Archive Folder",
     "step2Desc": "Choose where to store your archived photos",
     "step3Title": "Analyze Photos",
@@ -51,7 +55,10 @@
     "errors": "{{count}} error(s)",
     "conflicts": "{{count}} conflict(s) to review",
     "deleteSource": "Delete source images",
-    "keepSource": "Keep"
+    "keepSource": "Keep",
+    "navWarningTitle": "Import in progress",
+    "navWarningBody": "Leaving now may interrupt the import. Some files could be incomplete or missing from the archive.",
+    "navWarningLeave": "Leave anyway"
   },
   "timeline": {
     "title": "Timeline",
@@ -102,6 +109,8 @@
     "rescanArchive": "Rescan archive",
     "rescanFound": "Found {{count}} new images",
     "rescanRemoved": "Removed {{count}} stale entries",
+    "rescanRepaired": "Fixed dates for {{count}} images",
+    "rescanMoved": "Relocated {{count}} misplaced images",
     "rescanError": "Error: {{error}}",
     "advancedSettings": "Advanced Settings",
     "blockSize": "Block size",

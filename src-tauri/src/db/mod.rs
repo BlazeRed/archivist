@@ -58,6 +58,11 @@ impl Database {
                 FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS idx_images_taken_at ON images(taken_at);
             CREATE INDEX IF NOT EXISTS idx_image_groups_group_id ON image_groups(group_id);
             "
@@ -66,6 +71,25 @@ impl Database {
         // Migration for existing DBs that predate thumbnail_path column
         let _ = conn.execute("ALTER TABLE images ADD COLUMN thumbnail_path TEXT", []);
 
+        Ok(())
+    }
+
+    pub fn get_setting(&self, key: &str) -> Result<Option<String>, AppError> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT value FROM settings WHERE key = ?1")?;
+        match stmt.query_row([key], |row| row.get(0)) {
+            Ok(v) => Ok(Some(v)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(AppError::Database(e)),
+        }
+    }
+
+    pub fn set_setting(&self, key: &str, value: &str) -> Result<(), AppError> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
+            [key, value],
+        )?;
         Ok(())
     }
 

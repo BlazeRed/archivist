@@ -87,11 +87,30 @@ pub fn scan_source(source_path: &str) -> Result<Vec<ScannedImage>, AppError> {
     }
 
     let mut images = Vec::new();
-    
-    scan_directory(path, &mut images)?;
-    
+
+    if path.is_file() {
+        if is_supported_image(path) {
+            let metadata = std::fs::metadata(path).map_err(|e| AppError::FileRead {
+                path: source_path.to_string(),
+                message: e.to_string(),
+            })?;
+            images.push(ScannedImage {
+                path: path.to_string_lossy().to_string(),
+                filename: path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default(),
+                size: metadata.len(),
+            });
+        } else {
+            return Err(AppError::FileRead {
+                path: source_path.to_string(),
+                message: "Unsupported image format".to_string(),
+            });
+        }
+    } else {
+        scan_directory(path, &mut images)?;
+    }
+
     images.sort_by(|a, b| a.filename.cmp(&b.filename));
-    
+
     Ok(images)
 }
 
@@ -310,7 +329,7 @@ pub fn execute_import(
     })
 }
 
-fn destination_path(archive_root: &str, taken_at: &Option<String>) -> String {
+pub fn destination_path(archive_root: &str, taken_at: &Option<String>) -> String {
     if let Some(ref dt) = taken_at {
         if let Ok(parsed) = chrono::DateTime::parse_from_rfc3339(dt) {
             let year = parsed.format("%Y").to_string();

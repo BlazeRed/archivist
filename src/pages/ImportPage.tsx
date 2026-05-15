@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
@@ -75,6 +75,8 @@ export function ImportPage() {
   const { t } = useTranslation();
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [cleanupDismissed, setCleanupDismissed] = useState(false);
+  const [showSourceMenu, setShowSourceMenu] = useState(false);
+  const sourceMenuRef = useRef<HTMLDivElement>(null);
 
   const {
     phase,
@@ -97,6 +99,14 @@ export function ImportPage() {
     if (sel) setSourcePath(sel as string);
   };
 
+  const handleSelectSourceFile = async () => {
+    const sel = await open({
+      multiple: false,
+      filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'heic', 'heif', 'webp', 'tiff', 'tif', 'bmp', 'gif', 'avif'] }],
+    });
+    if (sel) setSourcePath(sel as string);
+  };
+
   const handleSelectArchive = async () => {
     const sel = await open({ directory: true });
     if (sel) setArchivePath(sel as string);
@@ -106,6 +116,17 @@ export function ImportPage() {
     await startScan();
     await startAnalyze();
   };
+
+  useEffect(() => {
+    if (!showSourceMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (sourceMenuRef.current && !sourceMenuRef.current.contains(e.target as Node)) {
+        setShowSourceMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showSourceMenu]);
 
   const handleReset = () => {
     reset();
@@ -201,14 +222,48 @@ export function ImportPage() {
           <h3 className="text-base font-semibold text-foreground mb-1">{t('import.step1Title')}</h3>
           <p className="text-sm text-muted-foreground mb-5">{t('import.step1Desc')}</p>
 
-          <div className="mb-5">
-            <FolderRow
-              label={t('import.source')}
-              path={sourcePath}
-              onSelect={handleSelectSource}
-              onChangeTrigger={handleSelectSource}
-              selectLabelKey="import.selectSource"
-            />
+          <div className="mb-5" ref={sourceMenuRef}>
+            {sourcePath ? (
+              <div className="p-3 bg-muted rounded-lg flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground mb-0.5">{t('import.source')}</p>
+                  <p className="text-sm text-foreground truncate font-mono">{sourcePath}</p>
+                </div>
+                <Button variant="link" size="xs" onClick={() => setShowSourceMenu(m => !m)} className="shrink-0 p-0 h-auto">
+                  {t('common.change')}
+                </Button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowSourceMenu(m => !m)}
+                className="w-full py-8 border-2 border-dashed border-border rounded-xl text-muted-foreground hover:border-primary hover:text-primary transition-colors text-sm font-medium"
+              >
+                {t('import.selectSource')}
+              </button>
+            )}
+
+            {showSourceMenu && (
+              <div className="mt-1 bg-card border border-border rounded-lg shadow-md overflow-hidden">
+                <button
+                  onClick={() => { setShowSourceMenu(false); handleSelectSource(); }}
+                  className="w-full px-4 py-2.5 text-sm text-left text-foreground hover:bg-muted flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4 text-muted-foreground flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                  </svg>
+                  {t('import.selectFolder')}
+                </button>
+                <button
+                  onClick={() => { setShowSourceMenu(false); handleSelectSourceFile(); }}
+                  className="w-full px-4 py-2.5 text-sm text-left text-foreground hover:bg-muted flex items-center gap-2 border-t border-border"
+                >
+                  <svg className="w-4 h-4 text-muted-foreground flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd"/>
+                  </svg>
+                  {t('import.selectFile')}
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end">
@@ -263,18 +318,25 @@ export function ImportPage() {
             </div>
           </div>
 
-          {phase === 'idle' && (
+          {(phase === 'idle' || isAnalyzing) && (
             <div className="flex justify-between items-center">
-              <Button variant="outline" onClick={() => setStep(2)}>← {t('common.back')}</Button>
-              <Button onClick={handleStartAnalysis}>{t('import.startAnalysis')}</Button>
+              <Button variant="outline" onClick={() => setStep(2)} disabled={isAnalyzing}>← {t('common.back')}</Button>
+              <Button onClick={handleStartAnalysis} disabled={isAnalyzing} className="gap-2">
+                {isAnalyzing && (
+                  <svg className="animate-spin size-4" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                  </svg>
+                )}
+                {isAnalyzing
+                  ? (phase === 'scanning' ? t('import.scanningFolder') : t('import.analyzing'))
+                  : t('import.startAnalysis')}
+              </Button>
             </div>
           )}
 
           {isAnalyzing && (
-            <div className="mt-2">
-              <p className="text-sm font-medium text-foreground mb-3">
-                {phase === 'scanning' ? t('import.scanningFolder') : t('import.analyzing')}
-              </p>
+            <div className="mt-3">
               <ProgressBar
                 current={progress.current}
                 total={progress.total}

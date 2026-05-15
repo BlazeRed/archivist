@@ -10,9 +10,18 @@ use std::sync::Arc;
 use state::AppState;
 
 #[tauri::command]
-fn init_archive(state: tauri::State<'_, Arc<AppState>>, archive_path: String) -> Result<(), error::AppError> {
+async fn init_archive(
+    state: tauri::State<'_, Arc<AppState>>,
+    archive_path: String,
+) -> Result<(), error::AppError> {
     state.reinit_db(&archive_path)?;
-    state.set_archive_path(archive_path);
+    state.set_archive_path(archive_path.clone());
+    let db = state.db();
+    tauri::async_runtime::spawn_blocking(move || {
+        commands::run_migrations(&archive_path, &*db)
+    })
+    .await
+    .map_err(|e| error::AppError::Internal { message: e.to_string() })??;
     Ok(())
 }
 
@@ -72,46 +81,65 @@ fn update_group(state: tauri::State<'_, Arc<AppState>>, id: i64, name: String) -
 }
 
 #[tauri::command]
-fn scan_source(source_path: String) -> Result<Vec<commands::ScannedImage>, error::AppError> {
-    commands::scan_source(&source_path)
+async fn scan_source(source_path: String) -> Result<Vec<commands::ScannedImage>, error::AppError> {
+    tauri::async_runtime::spawn_blocking(move || commands::scan_source(&source_path))
+        .await
+        .map_err(|e| error::AppError::Internal { message: e.to_string() })?
 }
 
 #[tauri::command]
-fn analyze_image(scanned: commands::ScannedImage) -> Result<commands::AnalyzedImage, error::AppError> {
-    commands::analyze_image(&scanned)
+async fn analyze_image(scanned: commands::ScannedImage) -> Result<commands::AnalyzedImage, error::AppError> {
+    tauri::async_runtime::spawn_blocking(move || commands::analyze_image(&scanned))
+        .await
+        .map_err(|e| error::AppError::Internal { message: e.to_string() })?
 }
 
 #[tauri::command]
-fn create_import_plan(state: tauri::State<'_, Arc<AppState>>, images: Vec<commands::AnalyzedImage>) -> Result<commands::ImportPlan, error::AppError> {
+async fn create_import_plan(
+    state: tauri::State<'_, Arc<AppState>>,
+    images: Vec<commands::AnalyzedImage>,
+) -> Result<commands::ImportPlan, error::AppError> {
     let db = state.db();
-    commands::create_import_plan(images, &db)
+    tauri::async_runtime::spawn_blocking(move || commands::create_import_plan(images, &*db))
+        .await
+        .map_err(|e| error::AppError::Internal { message: e.to_string() })?
 }
 
 #[tauri::command]
-fn execute_import(
+async fn execute_import(
     state: tauri::State<'_, Arc<AppState>>,
     plan: commands::ImportPlan,
     resolutions: Vec<commands::ImportResolution>,
     archive_path: String,
 ) -> Result<commands::ImportResult, error::AppError> {
     let db = state.db();
-    commands::execute_import(plan, resolutions, &archive_path, &db)
+    tauri::async_runtime::spawn_blocking(move || {
+        commands::execute_import(plan, resolutions, &archive_path, &*db)
+    })
+    .await
+    .map_err(|e| error::AppError::Internal { message: e.to_string() })?
 }
 
 #[tauri::command]
-fn import_single_image(
+async fn import_single_image(
     state: tauri::State<'_, Arc<AppState>>,
     image: commands::AnalyzedImage,
     resolution: Option<commands::ImportResolution>,
     archive_path: String,
 ) -> Result<commands::ImportSingleResult, error::AppError> {
     let db = state.db();
-    commands::import_single_image(image, resolution, &archive_path, &db)
+    tauri::async_runtime::spawn_blocking(move || {
+        commands::import_single_image(image, resolution, &archive_path, &*db)
+    })
+    .await
+    .map_err(|e| error::AppError::Internal { message: e.to_string() })?
 }
 
 #[tauri::command]
-fn generate_temp_thumbnail(source_path: String) -> Result<String, error::AppError> {
-    commands::generate_temp_thumbnail(&source_path)
+async fn generate_temp_thumbnail(source_path: String) -> Result<String, error::AppError> {
+    tauri::async_runtime::spawn_blocking(move || commands::generate_temp_thumbnail(&source_path))
+        .await
+        .map_err(|e| error::AppError::Internal { message: e.to_string() })?
 }
 
 #[tauri::command]
@@ -120,7 +148,7 @@ fn cleanup_temp_thumbnails() -> Result<(), error::AppError> {
 }
 
 #[tauri::command]
-fn export_group(
+async fn export_group(
     state: tauri::State<'_, Arc<AppState>>,
     group_id: i64,
     dest_path: String,
@@ -129,18 +157,26 @@ fn export_group(
         path: "No archive path set".to_string(),
     })?;
     let db = state.db();
-    commands::export_group(&db, group_id, &dest_path, &archive_path)
+    tauri::async_runtime::spawn_blocking(move || {
+        commands::export_group(&db, group_id, &dest_path, &archive_path)
+    })
+    .await
+    .map_err(|e| error::AppError::Internal { message: e.to_string() })?
 }
 
 #[tauri::command]
-fn rescan_archive(
+async fn rescan_archive(
     state: tauri::State<'_, Arc<AppState>>,
 ) -> Result<commands::RescanResult, error::AppError> {
     let archive_path = state.get_archive_path().ok_or_else(|| error::AppError::ArchiveNotFound {
         path: "No archive path set".to_string(),
     })?;
     let db = state.db();
-    commands::rescan_archive(&archive_path, &db)
+    tauri::async_runtime::spawn_blocking(move || {
+        commands::rescan_archive(&archive_path, &*db)
+    })
+    .await
+    .map_err(|e| error::AppError::Internal { message: e.to_string() })?
 }
 
 #[tauri::command]

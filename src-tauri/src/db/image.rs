@@ -191,4 +191,32 @@ impl super::Database {
         })?.collect::<Result<Vec<_>, _>>()?;
         Ok(rows)
     }
+
+    pub fn get_images_without_exif(&self) -> Result<Vec<(String, String)>, super::AppError> {
+        let conn = self.connection();
+        let mut stmt = conn.prepare("SELECT id, file_path FROM images WHERE has_exif = 0")?;
+        let rows = stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?.collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    pub fn update_image_path(&self, id: &str, new_path: &str) -> Result<(), super::AppError> {
+        let conn = self.connection();
+        conn.execute(
+            "UPDATE images SET file_path = ?1 WHERE id = ?2",
+            [new_path, id],
+        )?;
+        Ok(())
+    }
+
+    pub fn update_image_date(&self, id: &str, taken_at: Option<chrono::DateTime<Utc>>, has_exif: bool) -> Result<(), super::AppError> {
+        let conn = self.connection();
+        let taken_at_str = taken_at.map(|dt| dt.to_rfc3339());
+        conn.execute(
+            "UPDATE images SET taken_at = ?1, has_exif = ?2 WHERE id = ?3",
+            params![taken_at_str, has_exif as i32, id],
+        )?;
+        Ok(())
+    }
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
@@ -45,23 +46,23 @@ export function SettingsPage() {
 
   const handleRescan = async () => {
     if (!config.archive_path) return;
-
-    setRescanLoading(true);
-    setRescanResult(null);
-
+    flushSync(() => {
+      setRescanLoading(true);
+      setRescanResult(null);
+    });
     try {
-      const result = await invoke<{ added: number; removed: number }>('rescan_archive');
+      const result = await invoke<{ added: number; removed: number; repaired: number; moved: number }>('rescan_archive');
       let msg = t('settings.rescanFound', { count: result.added });
-      if (result.removed > 0) {
-        msg += ` · ${t('settings.rescanRemoved', { count: result.removed })}`;
-      }
+      if (result.removed > 0) msg += ` · ${t('settings.rescanRemoved', { count: result.removed })}`;
+      if (result.repaired > 0) msg += ` · ${t('settings.rescanRepaired', { count: result.repaired })}`;
+      if (result.moved > 0) msg += ` · ${t('settings.rescanMoved', { count: result.moved })}`;
       setRescanResult(msg);
       fetchImages();
     } catch (e) {
       setRescanResult(t('settings.rescanError', { error: String(e) }));
+    } finally {
+      setRescanLoading(false);
     }
-
-    setRescanLoading(false);
   };
 
   return (
@@ -133,7 +134,14 @@ export function SettingsPage() {
               onClick={handleRescan}
               disabled={rescanLoading || !config.archive_path}
               variant="secondary"
+              className="gap-2"
             >
+              {rescanLoading && (
+                <svg className="animate-spin size-4" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
+              )}
               {rescanLoading ? t('common.loading') : t('settings.rescanArchive')}
             </Button>
 

@@ -20,11 +20,13 @@
     "loading": "Caricamento...",
     "browse": "Sfoglia",
     "change": "Cambia",
-    "noThumbnail": "Anteprima non disponibile"
+    "noThumbnail": "Anteprima non disponibile",
+    "dateFromFile": "Data dal file (non da fotocamera)",
+    "noDate": "Nessuna data disponibile"
   },
   "import": {
     "title": "Importa",
-    "selectSource": "Seleziona cartella sorgente",
+    "selectSource": "Seleziona sorgente",
     "selectDestination": "Seleziona cartella archivio",
     "analyzing": "Analizzo le immagini...",
     "analyzingProgress": "Analizzo {{current}} di {{total}}",
@@ -36,8 +38,10 @@
     "sourceCleanup": "Eliminare le {{count}} foto sorgente?",
     "noDate": "Senza data",
     "missingDate": "Data mancante — inserita in Senza data",
-    "step1Title": "Seleziona cartella sorgente",
-    "step1Desc": "Scegli la cartella contenente le foto da importare",
+    "selectFolder": "Seleziona cartella",
+    "selectFile": "Seleziona file",
+    "step1Title": "Seleziona sorgente",
+    "step1Desc": "Scegli una cartella o una singola immagine da importare",
     "step2Title": "Seleziona cartella archivio",
     "step2Desc": "Scegli dove archiviare le tue foto",
     "step3Title": "Analizza foto",
@@ -51,7 +55,10 @@
     "errors": "{{count}} errore/i",
     "conflicts": "{{count}} conflitto/i da rivedere",
     "deleteSource": "Elimina immagini sorgente",
-    "keepSource": "Mantieni"
+    "keepSource": "Mantieni",
+    "navWarningTitle": "Importazione in corso",
+    "navWarningBody": "Uscire ora può interrompere l'importazione. Alcuni file potrebbero essere incompleti o mancanti dall'archivio.",
+    "navWarningLeave": "Esci comunque"
   },
   "timeline": {
     "title": "Cronologia",
@@ -102,6 +109,8 @@
     "rescanArchive": "Riscansiona archivio",
     "rescanFound": "Trovate {{count}} nuove immagini",
     "rescanRemoved": "Rimossi {{count}} elementi non trovati",
+    "rescanRepaired": "Date corrette per {{count}} immagini",
+    "rescanMoved": "Spostate {{count}} immagini fuori posto",
     "rescanError": "Errore: {{error}}",
     "advancedSettings": "Impostazioni avanzate",
     "blockSize": "Dimensione blocco",

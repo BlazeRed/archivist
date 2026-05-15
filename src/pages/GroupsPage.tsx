@@ -32,6 +32,7 @@ export function GroupsPage() {
   const [showAddPhotos, setShowAddPhotos] = useState(false);
   const [editingGroupId, setEditingGroupId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState('');
+  const [exportingGroupId, setExportingGroupId] = useState<number | null>(null);
 
   const { selectedImageIds, isSelectionMode, clearSelection, getSelectedCount } = useGroupUIStore();
 
@@ -70,12 +71,15 @@ export function GroupsPage() {
   const handleExportGroup = async (groupId: number) => {
     const dest = await open({ directory: true });
     if (dest) {
+      setExportingGroupId(groupId);
       try {
         const result = await invoke<ExportResult>('export_group', { groupId, destPath: dest });
         toast.success(t('groups.exportSuccess', { count: result.copied, path: result.dest_path }));
       } catch (e) {
         toast.error(t('groups.exportError'));
         console.error('Export failed:', e);
+      } finally {
+        setExportingGroupId(null);
       }
     }
   };
@@ -226,7 +230,19 @@ export function GroupsPage() {
                 <Button size="sm" onClick={() => setShowAddPhotos(true)}>
                   {t('groups.addPhotosTitle')}
                 </Button>
-                <Button size="sm" variant="secondary" onClick={() => handleExportGroup(selectedGroupId)}>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => handleExportGroup(selectedGroupId)}
+                  disabled={exportingGroupId === selectedGroupId}
+                  className="flex items-center gap-1.5"
+                >
+                  {exportingGroupId === selectedGroupId && (
+                    <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                    </svg>
+                  )}
                   {t('groups.export')}
                 </Button>
                 <Button size="sm" variant="destructive" onClick={() => handleDeleteGroup(selectedGroupId)}>
@@ -332,7 +348,6 @@ export function GroupsPage() {
       {showAddPhotos && selectedGroupId !== null && (
         <AddPhotosModal
           groupId={selectedGroupId}
-          existingImageIds={new Set(groupImages.map(img => img.id))}
           onClose={() => setShowAddPhotos(false)}
           onAdded={handlePhotosAdded}
         />
