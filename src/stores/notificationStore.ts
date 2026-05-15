@@ -13,8 +13,6 @@ export interface Notification {
 
 interface NotificationState {
   addNotification: (type: NotificationType, title: string, message: string) => void;
-  removeNotification: (id: string) => void;
-  clearAll: () => void;
 }
 
 export const useNotificationStore = create<NotificationState>(() => ({
@@ -25,6 +23,4 @@ export const useNotificationStore = create<NotificationState>(() => ({
     else if (type === 'error') toast.error(title, { description: desc });
     else toast.info(title, { description: desc });
   },
-  removeNotification: () => {},
-  clearAll: () => {},
 }));

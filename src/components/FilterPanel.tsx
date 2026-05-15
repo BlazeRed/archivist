@@ -6,11 +6,7 @@ import { Slider } from '@/components/ui/slider';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-
-const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
+import { MONTH_NAMES } from '@/lib/months';
 
 export function FilterPanel() {
   const { t } = useTranslation();
@@ -88,7 +84,7 @@ export function FilterPanel() {
           </SelectTrigger>
           <SelectContent>
             {availableMonths.map(m => (
-              <SelectItem key={m} value={m.toString()}>{MONTHS[m - 1]}</SelectItem>
+              <SelectItem key={m} value={m.toString()}>{MONTH_NAMES[m - 1]}</SelectItem>
             ))}
           </SelectContent>
         </Select>

@@ -7,7 +7,6 @@ interface ImageStore {
   loading: boolean;
   error: string | null;
   fetchImages: () => Promise<void>;
-  fetchImagesByDate: (year: number, month?: number) => Promise<void>;
   clearImages: () => void;
 }
 
@@ -20,16 +19,6 @@ export const useImageStore = create<ImageStore>((set) => ({
     set({ loading: true, error: null });
     try {
       const images = await invoke<Image[]>('get_all_images');
-      set({ images, loading: false });
-    } catch (e) {
-      set({ error: String(e), loading: false });
-    }
-  },
-
-  fetchImagesByDate: async (year: number, month?: number) => {
-    set({ loading: true, error: null });
-    try {
-      const images = await invoke<Image[]>('get_images_by_date', { year, month });
       set({ images, loading: false });
     } catch (e) {
       set({ error: String(e), loading: false });

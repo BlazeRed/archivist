@@ -68,13 +68,6 @@ pub struct ImportSingleResult {
     pub source_path: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProgressEvent {
-    pub current: usize,
-    pub total: usize,
-    pub current_file: String,
-    pub phase: String,
-}
 
 pub fn scan_source(source_path: &str) -> Result<Vec<ScannedImage>, AppError> {
     let path = Path::new(source_path);
