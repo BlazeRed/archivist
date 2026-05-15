@@ -27,10 +27,14 @@ pub fn extract_date(path: &Path) -> ExifResult {
             ];
 
             for field in date_fields.iter().flatten() {
-                if let Some(s) = field.display_value().to_string().strip_prefix("\"") {
-                    let s = s.strip_suffix("\"").unwrap_or(s);
-                    if let Ok(dt) = parse_exif_datetime(s) {
-                        return ExifResult::FromExif(dt);
+                if let exif::Value::Ascii(ref ascii) = field.value {
+                    for bytes in ascii.iter() {
+                        if let Ok(s) = std::str::from_utf8(bytes) {
+                            let s = s.trim_end_matches('\0').trim();
+                            if let Ok(dt) = parse_exif_datetime(s) {
+                                return ExifResult::FromExif(dt);
+                            }
+                        }
                     }
                 }
             }

@@ -1,5 +1,7 @@
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { convertFileSrc } from '@tauri-apps/api/core';
+import { invoke } from '@tauri-apps/api/core';
 import { useImportStore, ImportAction, AnalyzedImage } from '../stores/importStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { ProgressBar } from './ProgressBar';
@@ -37,11 +39,15 @@ function ActionPill({
   );
 }
 
-function PreviewThumb({ src, label, filename }: { src: string; label: string; filename: string }) {
+function PreviewThumb({ src, label, filename }: { src: string | null; label: string; filename: string }) {
   return (
     <div className="flex flex-col items-center gap-1 w-[90px] shrink-0">
       <div className="w-[90px] h-[90px] rounded-md overflow-hidden bg-card border border-border">
-        {src ? (
+        {src === null ? (
+          <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+            <div className="w-5 h-5 rounded-full border-2 border-muted border-t-primary animate-spin" />
+          </div>
+        ) : src ? (
           <img src={src} alt={filename} className="w-full h-full object-cover" loading="lazy" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground">
@@ -63,14 +69,16 @@ function ConflictRow({
   archivePath,
   selected,
   onSelect,
+  incomingThumbUrl,
 }: {
   img: AnalyzedImage;
   archivePath: string;
   selected: ImportAction;
   onSelect: (action: ImportAction) => void;
+  incomingThumbUrl: string | null;
 }) {
   const { t } = useTranslation();
-  const incomingUrl = img.path ? convertFileSrc(img.path) : '';
+  const incomingUrl = incomingThumbUrl;
   const existingUrl = img.conflict?.existing_id
     ? convertFileSrc(`${archivePath}/.archivist/thumbnails/${img.conflict.existing_id}.jpg`)
     : '';
@@ -118,6 +126,25 @@ export function ConflictReview({ onImport, onBack }: { onImport: () => void; onB
   const { importPlan, analyzedImages, resolutions, setResolution, setAllResolutions, phase, progress } =
     useImportStore();
   const archivePath = useAppConfigStore((s) => s.config.archive_path).replace(/\/+$/, '');
+
+  // null = loading, '' = failed, url = ready
+  const [tempThumbs, setTempThumbs] = useState<Record<string, string | null>>({});
+
+  useEffect(() => {
+    const conflictImgs = analyzedImages.filter((img) => img.conflict);
+    if (conflictImgs.length === 0) return;
+
+    const initial: Record<string, string | null> = {};
+    conflictImgs.forEach((img) => { initial[img.path] = null; });
+    setTempThumbs(initial);
+
+    conflictImgs.forEach((img) => {
+      invoke<string>('generate_temp_thumbnail', { sourcePath: img.path })
+        .then((p) => setTempThumbs((prev) => ({ ...prev, [img.path]: convertFileSrc(p) })))
+        .catch(() => setTempThumbs((prev) => ({ ...prev, [img.path]: '' })));
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analyzedImages.length]);
 
   if (!importPlan) return null;
 
@@ -189,6 +216,7 @@ export function ConflictReview({ onImport, onBack }: { onImport: () => void; onB
                 archivePath={archivePath}
                 selected={getAction(img.hash)}
                 onSelect={(action) => setResolution(img.hash, action)}
+                incomingThumbUrl={tempThumbs[img.path] ?? null}
               />
             ))}
           </div>

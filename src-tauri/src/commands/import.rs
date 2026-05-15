@@ -62,6 +62,13 @@ pub struct ImportResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportSingleResult {
+    pub status: String,
+    pub error: Option<String>,
+    pub source_path: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProgressEvent {
     pub current: usize,
     pub total: usize,
@@ -322,6 +329,152 @@ const MONTHS: &[&str] = &[
 fn month_label(month: u32) -> String {
     let month_name = MONTHS.get((month - 1) as usize).unwrap_or(&"Unknown");
     format!("{:02} - {}", month, month_name)
+}
+
+pub fn import_single_image(
+    image: AnalyzedImage,
+    resolution: Option<ImportResolution>,
+    archive_path: &str,
+    db: &crate::db::Database,
+) -> Result<ImportSingleResult, AppError> {
+    let source_path = image.path.clone();
+
+    let should_skip = match &resolution {
+        Some(r) => matches!(r.action, ImportAction::Skip),
+        None => image.conflict.is_some(),
+    };
+
+    if should_skip {
+        return Ok(ImportSingleResult { status: "skipped".to_string(), error: None, source_path: None });
+    }
+
+    let dest_dir = destination_path(archive_path, &image.taken_at);
+
+    let final_filename = match &resolution {
+        Some(res) => match res.action {
+            ImportAction::KeepBoth => generate_unique_filename(&dest_dir, &image.filename),
+            ImportAction::Replace => image.filename.clone(),
+            ImportAction::Skip => return Ok(ImportSingleResult { status: "skipped".to_string(), error: None, source_path: None }),
+        },
+        None => image.filename.clone(),
+    };
+
+    let is_keep_both = resolution.as_ref().map_or(false, |r| matches!(r.action, ImportAction::KeepBoth));
+    let dest_path = PathBuf::from(&dest_dir).join(&final_filename);
+
+    if let Err(e) = std::fs::create_dir_all(&dest_dir) {
+        return Ok(ImportSingleResult {
+            status: "error".to_string(),
+            error: Some(format!("Failed to create directory {}: {}", dest_dir, e)),
+            source_path: None,
+        });
+    }
+
+    match std::fs::copy(&image.path, &dest_path) {
+        Ok(_) => {
+            let thumbnail_abs = PathBuf::from(archive_path)
+                .join(".archivist/thumbnails")
+                .join(format!("{}.jpg", &image.hash));
+            let thumbnail_rel = format!(".archivist/thumbnails/{}.jpg", &image.hash);
+            let stored_thumbnail = if thumbnail_abs.exists() {
+                Some(thumbnail_rel.clone())
+            } else {
+                match crate::thumbnail::generate_thumbnail(
+                    &dest_path,
+                    &thumbnail_abs,
+                    &crate::thumbnail::ThumbnailSize::medium(),
+                ) {
+                    Ok(_) => Some(thumbnail_rel),
+                    Err(_) => None,
+                }
+            };
+
+            let relative_path = format!("{}/{}",
+                Path::new(&dest_dir).strip_prefix(archive_path)
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_else(|_| dest_dir.clone()),
+                &final_filename
+            );
+
+            let entry_id = if is_keep_both {
+                let stem = Path::new(&final_filename)
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or(final_filename.as_str());
+                format!("{}_{}", image.hash, stem)
+            } else {
+                image.hash.clone()
+            };
+
+            let new_image = NewImage {
+                id: entry_id,
+                filename: final_filename,
+                file_path: relative_path,
+                taken_at: image.taken_at,
+                width: image.width.map(|w| w as i32),
+                height: image.height.map(|h| h as i32),
+                file_size: Some(image.size as i64),
+                has_exif: image.has_exif,
+                thumbnail_path: stored_thumbnail,
+            };
+
+            match db.insert_image(&new_image) {
+                Ok(_) => Ok(ImportSingleResult {
+                    status: "imported".to_string(),
+                    error: None,
+                    source_path: Some(source_path),
+                }),
+                Err(e) => Ok(ImportSingleResult {
+                    status: "error".to_string(),
+                    error: Some(format!("Failed to insert into database: {}", e)),
+                    source_path: None,
+                }),
+            }
+        },
+        Err(e) => Ok(ImportSingleResult {
+            status: "error".to_string(),
+            error: Some(format!("Failed to copy {}: {}", image.filename, e)),
+            source_path: None,
+        }),
+    }
+}
+
+pub fn generate_temp_thumbnail(source_path: &str) -> Result<String, AppError> {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
+    let mut h = DefaultHasher::new();
+    source_path.hash(&mut h);
+    let key = h.finish();
+
+    let tmp_dir = std::env::temp_dir().join("archivist-previews");
+    std::fs::create_dir_all(&tmp_dir).map_err(|e| AppError::FileWrite {
+        path: tmp_dir.to_string_lossy().to_string(),
+        message: e.to_string(),
+    })?;
+
+    let thumb_path = tmp_dir.join(format!("{}.jpg", key));
+
+    if !thumb_path.exists() {
+        crate::thumbnail::generate_thumbnail(
+            Path::new(source_path),
+            &thumb_path,
+            &crate::thumbnail::ThumbnailSize::small(),
+        )?;
+    }
+
+    Ok(thumb_path.to_string_lossy().to_string())
+}
+
+pub fn cleanup_temp_thumbnails() -> Result<(), AppError> {
+    let tmp_dir = std::env::temp_dir().join("archivist-previews");
+    if tmp_dir.exists() {
+        std::fs::remove_dir_all(&tmp_dir).map_err(|e| AppError::FileWrite {
+            path: tmp_dir.to_string_lossy().to_string(),
+            message: e.to_string(),
+        })?;
+    }
+    Ok(())
 }
 
 fn generate_unique_filename(dir: &str, original: &str) -> String {

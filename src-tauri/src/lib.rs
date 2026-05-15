@@ -99,6 +99,27 @@ fn execute_import(
 }
 
 #[tauri::command]
+fn import_single_image(
+    state: tauri::State<'_, Arc<AppState>>,
+    image: commands::AnalyzedImage,
+    resolution: Option<commands::ImportResolution>,
+    archive_path: String,
+) -> Result<commands::ImportSingleResult, error::AppError> {
+    let db = state.db();
+    commands::import_single_image(image, resolution, &archive_path, &db)
+}
+
+#[tauri::command]
+fn generate_temp_thumbnail(source_path: String) -> Result<String, error::AppError> {
+    commands::generate_temp_thumbnail(&source_path)
+}
+
+#[tauri::command]
+fn cleanup_temp_thumbnails() -> Result<(), error::AppError> {
+    commands::cleanup_temp_thumbnails()
+}
+
+#[tauri::command]
 fn export_group(
     state: tauri::State<'_, Arc<AppState>>,
     group_id: i64,
@@ -189,6 +210,9 @@ pub fn run() {
             analyze_image,
             create_import_plan,
             execute_import,
+            import_single_image,
+            generate_temp_thumbnail,
+            cleanup_temp_thumbnails,
             export_group,
             rescan_archive,
             delete_files,
