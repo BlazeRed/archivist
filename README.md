@@ -2,15 +2,53 @@
 
 Photographic archive organizer built with Tauri v2 + React + TypeScript.
 
+Archivist helps you import, browse, and organize a local photo archive. Photos are stored in a structured folder layout on disk (`YYYY/MM - MonthName/`) and indexed in a SQLite database. All operations are local — no cloud, no accounts.
+
 ## Features
 
-- Import photos with automatic EXIF date detection and SHA-256 duplicate prevention
-- Timeline view with year-range slider and month filter for browsing by date
-- Group management: create, rename, and organize logical photo collections
-- Add photos to groups via a full-screen picker with the same timeline structure
-- Export groups to a destination folder
-- Archive rescan to pick up manually added files
-- Bilingual UI (English / Italian) — folder names always in English on disk
+### Import
+- Drag-and-drop or button-pick a source folder or individual file
+- EXIF date extraction (DateTimeOriginal, CreateDate, DateTime) with filesystem-date fallback for non-EXIF images
+- SHA-256-based duplicate detection — re-importing the same file is a no-op
+- Conflict review UI: keep existing, replace, or keep both side-by-side
+- Optional deletion of source files after import
+- Thumbnail generation at import time; thumbnails stored inside the archive
+
+### Timeline
+- Browse all archived photos in chronological order with sticky month headers
+- Year-range slider and month filter for narrowing the view
+- "No Date" filter for images with no date metadata
+- Filter by group membership
+- Click any photo to open a detail panel showing EXIF metadata, dimensions, file size, group membership, and a Show in Folder button that opens the OS file manager at the image location
+
+### Groups
+- Create named logical collections (no physical folders created)
+- Add photos from a full-screen picker that mirrors the timeline layout
+- Remove individual photos from a group
+- Export a group: copies all its photos to a chosen destination folder
+
+### Archive management
+- Rescan button in the navbar for quick re-indexing after external changes
+- Rescan detects new files, removes stale DB entries, fixes incorrect dates, relocates misplaced files, and generates any missing thumbnails
+- Close and re-open an archive without restarting the app
+
+### Other
+- Bilingual UI (English / Italian) — folder names on disk always in English regardless of language setting
+- Configurable thumbnail size (Small / Medium / Large)
+- Native OS tooltip on hover for icon controls
+
+## Archive layout on disk
+
+```
+{archive_root}/
+├── 2024/
+│   └── 06 - June/
+│       └── photo.jpg
+└── .archivist/
+    ├── archivist.db
+    └── thumbnails/
+        └── {sha256}.jpg
+```
 
 ## Development
 
