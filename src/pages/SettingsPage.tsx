@@ -51,11 +51,12 @@ export function SettingsPage() {
       setRescanResult(null);
     });
     try {
-      const result = await invoke<{ added: number; removed: number; repaired: number; moved: number }>('rescan_archive');
+      const result = await invoke<{ added: number; removed: number; repaired: number; moved: number; thumbnailed: number }>('rescan_archive');
       let msg = t('settings.rescanFound', { count: result.added });
       if (result.removed > 0) msg += ` · ${t('settings.rescanRemoved', { count: result.removed })}`;
       if (result.repaired > 0) msg += ` · ${t('settings.rescanRepaired', { count: result.repaired })}`;
       if (result.moved > 0) msg += ` · ${t('settings.rescanMoved', { count: result.moved })}`;
+      if (result.thumbnailed > 0) msg += ` · ${t('settings.rescanThumbnailed', { count: result.thumbnailed })}`;
       setRescanResult(msg);
       fetchImages();
     } catch (e) {

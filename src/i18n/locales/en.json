@@ -111,6 +111,7 @@
     "rescanRemoved": "Removed {{count}} stale entries",
     "rescanRepaired": "Fixed dates for {{count}} images",
     "rescanMoved": "Relocated {{count}} misplaced images",
+    "rescanThumbnailed": "Generated {{count}} missing thumbnails",
     "rescanError": "Error: {{error}}",
     "advancedSettings": "Advanced Settings",
     "blockSize": "Block size",

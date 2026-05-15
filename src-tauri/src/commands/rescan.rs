@@ -6,6 +6,7 @@ use crate::error::AppError;
 use crate::db::Database;
 use crate::exif::{self, ExifResult};
 use crate::commands::import::destination_path;
+use crate::thumbnail::{self, ThumbnailSize};
 
 #[derive(Debug, Serialize)]
 pub struct RescanResult {
@@ -13,6 +14,7 @@ pub struct RescanResult {
     pub removed: usize,
     pub repaired: usize,
     pub moved: usize,
+    pub thumbnailed: usize,
 }
 
 pub fn rescan_archive(archive_path: &str, db: &Database) -> Result<RescanResult, AppError> {
@@ -43,12 +45,47 @@ pub fn rescan_archive(archive_path: &str, db: &Database) -> Result<RescanResult,
     let (repaired, repair_moved) = repair_missing_exif_dates(archive_path, db)?;
     moved += repair_moved;
 
-    Ok(RescanResult { added, removed, repaired, moved })
+    // Thumbnail pass — generate thumbnails for images that lack one
+    let thumbnailed = repair_missing_thumbnails(archive_path, db)?;
+
+    Ok(RescanResult { added, removed, repaired, moved, thumbnailed })
 }
 
 pub fn run_migrations(archive_path: &str, db: &Database) -> Result<(), AppError> {
     repair_missing_exif_dates(archive_path, db)?;
     Ok(())
+}
+
+fn ensure_thumbnail(archive_root: &str, image_id: &str, image_path: &Path) -> Option<String> {
+    let rel = format!(".archivist/thumbnails/{}.jpg", image_id);
+    let thumb_abs = Path::new(archive_root)
+        .join(".archivist/thumbnails")
+        .join(format!("{}.jpg", image_id));
+
+    if thumb_abs.exists() {
+        return Some(rel);
+    }
+
+    let size = ThumbnailSize::medium();
+    match thumbnail::generate_thumbnail(image_path, &thumb_abs, &size) {
+        Ok(()) => Some(rel),
+        Err(_) => None,
+    }
+}
+
+fn repair_missing_thumbnails(archive_path: &str, db: &Database) -> Result<usize, AppError> {
+    let no_thumb = db.get_images_without_thumbnail()?;
+    let mut thumbnailed = 0;
+    for (id, rel_path) in no_thumb {
+        let abs = Path::new(archive_path).join(&rel_path);
+        if abs.exists() {
+            if let Some(thumb_rel) = ensure_thumbnail(archive_path, &id, &abs) {
+                db.update_thumbnail_path(&id, &thumb_rel)?;
+                thumbnailed += 1;
+            }
+        }
+    }
+    Ok(thumbnailed)
 }
 
 fn repair_missing_exif_dates(archive_path: &str, db: &Database) -> Result<(usize, usize), AppError> {
@@ -166,6 +203,7 @@ fn scan_archive_directory(
                         (path.clone(), rel)
                     };
 
+                    let thumbnail_path = ensure_thumbnail(archive_root, &image_id, &final_path);
                     let (width, height) = get_image_dimensions(&final_path).unwrap_or((None, None));
                     let file_size = fs::metadata(&final_path).ok().map(|m| m.len() as i64);
                     let final_filename = final_path.file_name()
@@ -181,7 +219,7 @@ fn scan_archive_directory(
                         height: height.map(|h| h as i32),
                         file_size,
                         has_exif,
-                        thumbnail_path: None,
+                        thumbnail_path,
                     };
 
                     db.insert_image(&new_image)?;

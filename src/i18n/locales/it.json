@@ -111,6 +111,7 @@
     "rescanRemoved": "Rimossi {{count}} elementi non trovati",
     "rescanRepaired": "Date corrette per {{count}} immagini",
     "rescanMoved": "Spostate {{count}} immagini fuori posto",
+    "rescanThumbnailed": "Generate {{count}} miniature mancanti",
     "rescanError": "Errore: {{error}}",
     "advancedSettings": "Impostazioni avanzate",
     "blockSize": "Dimensione blocco",

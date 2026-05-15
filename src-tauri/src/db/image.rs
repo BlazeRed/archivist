@@ -210,6 +210,26 @@ impl super::Database {
         Ok(())
     }
 
+    pub fn get_images_without_thumbnail(&self) -> Result<Vec<(String, String)>, super::AppError> {
+        let conn = self.connection();
+        let mut stmt = conn.prepare(
+            "SELECT id, file_path FROM images WHERE thumbnail_path IS NULL"
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?.collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    pub fn update_thumbnail_path(&self, id: &str, thumbnail_path: &str) -> Result<(), super::AppError> {
+        let conn = self.connection();
+        conn.execute(
+            "UPDATE images SET thumbnail_path = ?1 WHERE id = ?2",
+            [thumbnail_path, id],
+        )?;
+        Ok(())
+    }
+
     pub fn update_image_date(&self, id: &str, taken_at: Option<chrono::DateTime<Utc>>, has_exif: bool) -> Result<(), super::AppError> {
         let conn = self.connection();
         let taken_at_str = taken_at.map(|dt| dt.to_rfc3339());
