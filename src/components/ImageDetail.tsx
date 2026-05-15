@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { convertFileSrc } from '@tauri-apps/api/core';
+import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import type { GroupWithCount } from '../types';
@@ -57,6 +58,11 @@ export function ImageDetail() {
     } catch (e) {
       console.error('Failed to add to group:', e);
     }
+  };
+
+  const handleShowInFolder = async () => {
+    if (!archivePath || !selectedImage) return;
+    await revealItemInDir(`${archivePath}/${selectedImage.file_path}`);
   };
 
   const handleRemoveFromGroup = async (groupId: number) => {
@@ -156,6 +162,17 @@ export function ImageDetail() {
                 {selectedImage.id.substring(0, 16)}…
               </p>
             </div>
+
+            <button
+              onClick={handleShowInFolder}
+              className="mt-1 w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-[rgba(0,45,88,0.18)] text-[rgba(0,45,88,0.65)] hover:text-[#0084C5] hover:border-[#0084C5] transition-colors text-xs font-medium"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+                  d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+              </svg>
+              {t('detail.showInFolder')}
+            </button>
           </div>
 
           {/* Groups section */}

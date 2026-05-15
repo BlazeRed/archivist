@@ -135,7 +135,8 @@
     "noExif": "No EXIF",
     "addToGroup": "Add to group…",
     "removeFromGroup": "Remove from group",
-    "noGroups": "—"
+    "noGroups": "—",
+    "showInFolder": "Show in Folder"
   },
   "conflicts": {
     "title": "Review Conflicts",
