@@ -139,7 +139,7 @@ export const useImportStore = create<ImportState>((set, get) => ({
     // plan.images has conflict fields populated by the backend — use them as source of truth
     const conflictRes: ImportResolution[] = plan.images
       .filter(img => img.conflict)
-      .map(img => ({ hash: img.hash, action: 'KeepBoth' as ImportAction }));
+      .map(img => ({ hash: img.hash, action: 'Skip' as ImportAction }));
 
     set({
       analyzedImages: plan.images,

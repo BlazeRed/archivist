@@ -7,7 +7,7 @@ import { useAppConfigStore } from '../stores/appConfigStore';
 import { ProgressBar } from './ProgressBar';
 import { Button } from '@/components/ui/button';
 
-const ACTIONS: ImportAction[] = ['KeepBoth', 'Replace', 'Skip'];
+const ACTIONS: ImportAction[] = ['Skip', 'KeepBoth', 'Replace'];
 
 function actionLabel(action: ImportAction, t: (k: string) => string): string {
   if (action === 'KeepBoth') return t('conflicts.keepBoth');
@@ -151,7 +151,7 @@ export function ConflictReview({ onImport, onBack }: { onImport: () => void; onB
   const conflicts = analyzedImages.filter((img) => img.conflict);
 
   const getAction = (hash: string): ImportAction =>
-    resolutions.find((r) => r.hash === hash)?.action ?? 'KeepBoth';
+    resolutions.find((r) => r.hash === hash)?.action ?? 'Skip';
 
   const globalAction = (): ImportAction | null => {
     if (conflicts.length === 0) return null;
