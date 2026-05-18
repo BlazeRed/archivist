@@ -101,7 +101,9 @@
     "addPhotosConfirm": "Add {{count}} photos",
     "allPhotosAdded": "All photos are already in this group",
     "exportSuccess": "{{count}} photos exported to {{path}}",
-    "exportError": "Export failed"
+    "exportError": "Export failed",
+    "sortByDate": "Date taken",
+    "sortByRecent": "Recently added"
   },
   "settings": {
     "title": "Settings",

@@ -20,15 +20,17 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { useMonthNames } from "@/lib/months";
+import { cn } from "@/lib/utils";
 
-function groupByMonth(images: Image[], monthNames: string[]) {
+function groupByDate(images: Image[], sortField: 'taken_at' | 'imported_at', monthNames: string[]) {
   const map = new Map<string, Image[]>();
   for (const img of images) {
+    const dateStr = sortField === 'imported_at' ? img.imported_at : img.taken_at;
     let key: string;
-    if (!img.taken_at) {
+    if (!dateStr) {
       key = "__nodate__";
     } else {
-      const d = new Date(img.taken_at);
+      const d = new Date(dateStr);
       key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     }
     if (!map.has(key)) map.set(key, []);
@@ -39,17 +41,24 @@ function groupByMonth(images: Image[], monthNames: string[]) {
     if (b === "__nodate__") return -1;
     return b.localeCompare(a);
   });
-  return sortedKeys.map((key) => ({
-    key,
-    label:
-      key === "__nodate__"
-        ? "No Date"
-        : (() => {
-            const [y, m] = key.split("-").map(Number);
-            return `${y}  ›  ${monthNames[m - 1]}`;
-          })(),
-    images: map.get(key)!,
-  }));
+  return sortedKeys.map((key) => {
+    const imgs = map.get(key)!.sort((a, b) => {
+      const da = sortField === 'imported_at' ? a.imported_at : (a.taken_at ?? '');
+      const db2 = sortField === 'imported_at' ? b.imported_at : (b.taken_at ?? '');
+      return db2.localeCompare(da);
+    });
+    return {
+      key,
+      label:
+        key === "__nodate__"
+          ? "No Date"
+          : (() => {
+              const [y, m] = key.split("-").map(Number);
+              return `${y}  ›  ${monthNames[m - 1]}`;
+            })(),
+      images: imgs,
+    };
+  });
 }
 
 interface Props {
@@ -72,8 +81,10 @@ export function AddPhotosModal({
   const [yearTo, setYearTo] = useState<number | null>(null);
   const [filterMonth, setFilterMonth] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
+  const [sortBy, setSortBy] = useState<'taken_at' | 'imported_at'>('taken_at');
 
   const archivePath = config.archive_path.replace(/\/+$/, "");
+  const thumbPx = config.thumbnail_size === 'small' ? 120 : config.thumbnail_size === 'large' ? 280 : 180;
 
   useEffect(() => {
     async function load() {
@@ -129,7 +140,7 @@ export function AddPhotosModal({
     return result;
   }, [allImages, yearFrom, yearTo, filterMonth]);
 
-  const groups = useMemo(() => groupByMonth(filteredImages, monthNames), [filteredImages, monthNames]);
+  const groups = useMemo(() => groupByDate(filteredImages, sortBy, monthNames), [filteredImages, sortBy, monthNames]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -179,6 +190,21 @@ export function AddPhotosModal({
               <h3 className="text-sm font-semibold text-foreground">
                 {t("timeline.filter")}
               </h3>
+
+              <div className="flex rounded-md border border-border overflow-hidden text-xs">
+                <button
+                  className={cn('flex-1 px-2 py-1 transition-colors', sortBy === 'taken_at' ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted')}
+                  onClick={() => setSortBy('taken_at')}
+                >
+                  {t('groups.sortByDate')}
+                </button>
+                <button
+                  className={cn('flex-1 px-2 py-1 transition-colors border-l border-border', sortBy === 'imported_at' ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted')}
+                  onClick={() => setSortBy('imported_at')}
+                >
+                  {t('groups.sortByRecent')}
+                </button>
+              </div>
 
               {years.length > 0 && (
                 <div className="space-y-2">
@@ -264,7 +290,7 @@ export function AddPhotosModal({
                               ? "border-primary ring-2 ring-primary/30"
                               : "border-transparent hover:border-primary/40"
                           }`}
-                          style={{ width: 150, height: 150 }}
+                          style={{ width: thumbPx, height: thumbPx }}
                         >
                           <div className="w-full h-full bg-card flex flex-col items-center justify-center">
                             {thumbnailUrl ? (

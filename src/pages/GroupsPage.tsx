@@ -36,6 +36,8 @@ export function GroupsPage() {
 
   const { selectedImageIds, isSelectionMode, clearSelection, getSelectedCount } = useGroupUIStore();
 
+  const thumbPx = config.thumbnail_size === 'small' ? 120 : config.thumbnail_size === 'large' ? 280 : 180;
+
   useEffect(() => {
     fetchGroups();
   }, [fetchGroups]);
@@ -254,7 +256,7 @@ export function GroupsPage() {
             {groupImages.length === 0 ? (
               <p className="text-muted-foreground text-sm">{t('groups.noPhotos')}</p>
             ) : (
-              <div className="grid grid-cols-4 gap-3">
+              <div className="flex flex-wrap gap-3">
                 {groupImages.map(img => {
                   const thumbnailUrl = archivePath && img.thumbnail_path
                     ? convertFileSrc(`${archivePath}/${img.thumbnail_path}`)
@@ -262,6 +264,7 @@ export function GroupsPage() {
                   return (
                     <div
                       key={img.id}
+                      style={{ width: thumbPx }}
                       className="group relative bg-card rounded-lg overflow-hidden border border-border"
                     >
                       <div className="aspect-square bg-[#001A36] overflow-hidden">

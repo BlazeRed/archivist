@@ -101,7 +101,9 @@
     "addPhotosConfirm": "Aggiungi {{count}} foto",
     "allPhotosAdded": "Tutte le foto sono già in questo gruppo",
     "exportSuccess": "{{count}} foto esportate in {{path}}",
-    "exportError": "Esportazione fallita"
+    "exportError": "Esportazione fallita",
+    "sortByDate": "Data scatto",
+    "sortByRecent": "Aggiunte di recente"
   },
   "settings": {
     "title": "Impostazioni",
