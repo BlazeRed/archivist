@@ -6,7 +6,6 @@ use chrono::{DateTime, Utc, TimeZone};
 pub enum ExifResult {
     FromExif(DateTime<Utc>),
     FromFilename(DateTime<Utc>),
-    FromCreatedTime(DateTime<Utc>),
     FromFileMtime(DateTime<Utc>),
     Corrupted(String),
     Missing,
@@ -19,10 +18,9 @@ impl ExifResult {
 
     pub fn date_source_label(&self) -> Option<&'static str> {
         match self {
-            ExifResult::FromExif(_)        => Some("exif"),
-            ExifResult::FromFilename(_)    => Some("filename"),
-            ExifResult::FromCreatedTime(_) => Some("created"),
-            ExifResult::FromFileMtime(_)   => Some("mtime"),
+            ExifResult::FromExif(_)      => Some("exif"),
+            ExifResult::FromFilename(_)  => Some("filename"),
+            ExifResult::FromFileMtime(_) => Some("mtime"),
             ExifResult::Corrupted(_) | ExifResult::Missing => None,
         }
     }
@@ -31,7 +29,6 @@ impl ExifResult {
         match self {
             ExifResult::FromExif(dt)
             | ExifResult::FromFilename(dt)
-            | ExifResult::FromCreatedTime(dt)
             | ExifResult::FromFileMtime(dt) => Some(*dt),
             _ => None,
         }
@@ -65,10 +62,6 @@ pub fn extract_date(path: &Path) -> ExifResult {
 
     if let Some(dt) = try_filename_date(path) {
         return ExifResult::FromFilename(dt);
-    }
-
-    if let Some(dt) = try_created_time(path) {
-        return ExifResult::FromCreatedTime(dt);
     }
 
     mtime_fallback(path)
@@ -129,13 +122,21 @@ fn try_filename_date(path: &Path) -> Option<DateTime<Utc>> {
         return Some(Utc.from_utc_datetime(&nd));
     }
 
-    None
-}
+    // Compact date-only YYYYMMDD — catches IMG-20191220-WA0003, VID-20191220-*, etc.
+    static COMPACT_DATE: OnceLock<Regex> = OnceLock::new();
+    let compact_date_re = COMPACT_DATE.get_or_init(|| {
+        Regex::new(r"((?:19|20)\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])").unwrap()
+    });
 
-fn try_created_time(path: &Path) -> Option<DateTime<Utc>> {
-    let meta = std::fs::metadata(path).ok()?;
-    let created = meta.created().ok()?;
-    Some(created.into())
+    if let Some(caps) = compact_date_re.captures(name) {
+        let y: i32 = caps[1].parse().ok()?;
+        let mo: u32 = caps[2].parse().ok()?;
+        let d: u32 = caps[3].parse().ok()?;
+        let nd = NaiveDate::from_ymd_opt(y, mo, d)?.and_hms_opt(0, 0, 0)?;
+        return Some(Utc.from_utc_datetime(&nd));
+    }
+
+    None
 }
 
 fn try_png_ttext_exif(path: &Path) -> Option<DateTime<Utc>> {
@@ -294,8 +295,8 @@ mod tests {
 
         let result = extract_date(file.path());
         match result {
-            ExifResult::FromFileMtime(_) | ExifResult::FromCreatedTime(_) | ExifResult::Missing => {}
-            _ => panic!("Expected mtime/created/missing fallback, got {:?}", result),
+            ExifResult::FromFileMtime(_) | ExifResult::Missing => {}
+            _ => panic!("Expected mtime/missing fallback, got {:?}", result),
         }
     }
 
@@ -332,6 +333,14 @@ mod tests {
         let p = std::path::Path::new("2023-10-05.jpg");
         let dt = try_filename_date(p).unwrap();
         assert_eq!(dt.format("%Y-%m-%d %H:%M:%S").to_string(), "2023-10-05 00:00:00");
+    }
+
+    #[test]
+    fn test_filename_whatsapp_compact() {
+        // IMG-YYYYMMDD-WA#### — no time, compact date with dashes
+        let p = std::path::Path::new("IMG-20191220-WA0003.jpg");
+        let dt = try_filename_date(p).unwrap();
+        assert_eq!(dt.format("%Y-%m-%d").to_string(), "2019-12-20");
     }
 
     #[test]

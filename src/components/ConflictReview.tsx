@@ -1,13 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { convertFileSrc } from '@tauri-apps/api/core';
-import { invoke } from '@tauri-apps/api/core';
+import { List, RowComponentProps } from 'react-window';
 import { useImportStore, ImportAction, AnalyzedImage } from '../stores/importStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { ProgressBar } from './ProgressBar';
 import { Button } from '@/components/ui/button';
 
 const ACTIONS: ImportAction[] = ['Skip', 'KeepBoth', 'Replace'];
+const ROW_HEIGHT = 164;
+const MAX_LIST_HEIGHT = 420;
 
 function actionLabel(action: ImportAction, t: (k: string) => string): string {
   if (action === 'KeepBoth') return t('conflicts.keepBoth');
@@ -39,15 +41,11 @@ function ActionPill({
   );
 }
 
-function PreviewThumb({ src, label, filename }: { src: string | null; label: string; filename: string }) {
+function PreviewThumb({ src, label, filename }: { src: string; label: string; filename: string }) {
   return (
     <div className="flex flex-col items-center gap-1 w-[90px] shrink-0">
       <div className="w-[90px] h-[90px] rounded-md overflow-hidden bg-card border border-border">
-        {src === null ? (
-          <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-            <div className="w-5 h-5 rounded-full border-2 border-muted border-t-primary animate-spin" />
-          </div>
-        ) : src ? (
+        {src ? (
           <img src={src} alt={filename} className="w-full h-full object-cover" loading="lazy" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground">
@@ -64,7 +62,7 @@ function PreviewThumb({ src, label, filename }: { src: string | null; label: str
   );
 }
 
-function ConflictRow({
+function ConflictRowInner({
   img,
   archivePath,
   selected,
@@ -75,18 +73,17 @@ function ConflictRow({
   archivePath: string;
   selected: ImportAction;
   onSelect: (action: ImportAction) => void;
-  incomingThumbUrl: string | null;
+  incomingThumbUrl: string;
 }) {
   const { t } = useTranslation();
-  const incomingUrl = incomingThumbUrl;
   const existingUrl = img.conflict?.existing_id
     ? convertFileSrc(`${archivePath}/.archivist/thumbnails/${img.conflict.existing_id}.jpg`)
     : '';
 
   return (
-    <div className="p-3 bg-background rounded-lg border border-border">
+    <div className="p-3 bg-background rounded-lg border border-border h-full box-border">
       <div className="flex gap-3 mb-2.5">
-        <PreviewThumb src={incomingUrl} label={t('conflicts.incoming')} filename={img.filename} />
+        <PreviewThumb src={incomingThumbUrl} label={t('conflicts.incoming')} filename={img.filename} />
         <div className="flex items-center self-center text-muted-foreground">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="1.5">
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 8h10M9 4l4 4-4 4"/>
@@ -121,37 +118,51 @@ function ConflictRow({
   );
 }
 
+type RowData = {
+  conflicts: AnalyzedImage[];
+  archivePath: string;
+  conflictThumbs: Record<string, string>;
+  getAction: (hash: string) => ImportAction;
+  setResolution: (hash: string, action: ImportAction) => void;
+};
+
+function ConflictRowRenderer({
+  index,
+  style,
+  conflicts,
+  archivePath,
+  conflictThumbs,
+  getAction,
+  setResolution,
+}: RowComponentProps<RowData>) {
+  const img = conflicts[index];
+  return (
+    <div style={{ ...style, paddingBottom: 8 }}>
+      <ConflictRowInner
+        img={img}
+        archivePath={archivePath}
+        selected={getAction(img.hash)}
+        onSelect={(action) => setResolution(img.hash, action)}
+        incomingThumbUrl={conflictThumbs[img.path] ?? ''}
+      />
+    </div>
+  );
+}
+
 export function ConflictReview({ onImport, onBack }: { onImport: () => void; onBack: () => void }) {
   const { t } = useTranslation();
-  const { importPlan, analyzedImages, resolutions, setResolution, setAllResolutions, phase, progress } =
+  const { importPlan, analyzedImages, resolutions, setResolution, setAllResolutions, phase, progress, conflictThumbs } =
     useImportStore();
   const archivePath = useAppConfigStore((s) => s.config.archive_path).replace(/\/+$/, '');
-
-  // null = loading, '' = failed, url = ready
-  const [tempThumbs, setTempThumbs] = useState<Record<string, string | null>>({});
-
-  useEffect(() => {
-    const conflictImgs = analyzedImages.filter((img) => img.conflict);
-    if (conflictImgs.length === 0) return;
-
-    const initial: Record<string, string | null> = {};
-    conflictImgs.forEach((img) => { initial[img.path] = null; });
-    setTempThumbs(initial);
-
-    conflictImgs.forEach((img) => {
-      invoke<string>('generate_temp_thumbnail', { sourcePath: img.path })
-        .then((p) => setTempThumbs((prev) => ({ ...prev, [img.path]: convertFileSrc(p) })))
-        .catch(() => setTempThumbs((prev) => ({ ...prev, [img.path]: '' })));
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [analyzedImages.length]);
 
   if (!importPlan) return null;
 
   const conflicts = analyzedImages.filter((img) => img.conflict);
 
-  const getAction = (hash: string): ImportAction =>
-    resolutions.find((r) => r.hash === hash)?.action ?? 'Skip';
+  const getAction = useCallback(
+    (hash: string): ImportAction => resolutions.find((r) => r.hash === hash)?.action ?? 'Skip',
+    [resolutions]
+  );
 
   const globalAction = (): ImportAction | null => {
     if (conflicts.length === 0) return null;
@@ -164,8 +175,16 @@ export function ConflictReview({ onImport, onBack }: { onImport: () => void; onB
       ? `${(bytes / 1024).toFixed(1)} KB`
       : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 
+  const rowData = useMemo<RowData>(
+    () => ({ conflicts, archivePath, conflictThumbs, getAction, setResolution }),
+    [conflicts, archivePath, conflictThumbs, getAction, setResolution]
+  );
+
+  const rowHeight = useCallback(() => ROW_HEIGHT, []);
+
   const isImporting = phase === 'importing';
   const global = globalAction();
+  const listHeight = Math.min(conflicts.length * ROW_HEIGHT, MAX_LIST_HEIGHT);
 
   return (
     <div className="bg-card p-6 rounded-xl">
@@ -207,19 +226,14 @@ export function ConflictReview({ onImport, onBack }: { onImport: () => void; onB
             </div>
           </div>
 
-          {/* Per-conflict rows */}
-          <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
-            {conflicts.map((img) => (
-              <ConflictRow
-                key={img.hash}
-                img={img}
-                archivePath={archivePath}
-                selected={getAction(img.hash)}
-                onSelect={(action) => setResolution(img.hash, action)}
-                incomingThumbUrl={tempThumbs[img.path] ?? null}
-              />
-            ))}
-          </div>
+          {/* Virtualized conflict list */}
+          <List
+            rowComponent={ConflictRowRenderer}
+            rowCount={conflicts.length}
+            rowHeight={rowHeight}
+            rowProps={rowData}
+            style={{ height: listHeight }}
+          />
         </div>
       )}
 

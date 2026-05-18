@@ -159,6 +159,18 @@ fn cleanup_temp_thumbnails() -> Result<(), error::AppError> {
 }
 
 #[tauri::command]
+async fn generate_temp_thumbnails_batch(
+    source_paths: Vec<String>,
+    app: tauri::AppHandle,
+) -> Result<std::collections::HashMap<String, String>, error::AppError> {
+    tauri::async_runtime::spawn_blocking(move || {
+        commands::generate_temp_thumbnails_batch(source_paths, &app)
+    })
+    .await
+    .map_err(|e| error::AppError::Internal { message: e.to_string() })?
+}
+
+#[tauri::command]
 async fn export_group(
     state: tauri::State<'_, Arc<AppState>>,
     group_id: i64,
@@ -260,6 +272,7 @@ pub fn run() {
             execute_import,
             import_single_image,
             generate_temp_thumbnail,
+            generate_temp_thumbnails_batch,
             cleanup_temp_thumbnails,
             export_group,
             rescan_archive,

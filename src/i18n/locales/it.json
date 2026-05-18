@@ -24,7 +24,6 @@
     "noThumbnail": "Anteprima non disponibile",
     "dateFromFile": "Data dal file (non da fotocamera)",
     "dateFromFilename": "Data dal nome del file",
-    "dateFromCreatedTime": "Data dalla creazione del file",
     "noDate": "Nessuna data disponibile"
   },
   "import": {

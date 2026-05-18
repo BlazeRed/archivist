@@ -557,6 +557,32 @@ pub fn generate_temp_thumbnail(source_path: &str) -> Result<String, AppError> {
     Ok(thumb_path.to_string_lossy().to_string())
 }
 
+pub fn generate_temp_thumbnails_batch(
+    source_paths: Vec<String>,
+    app: &tauri::AppHandle,
+) -> Result<std::collections::HashMap<String, String>, AppError> {
+    use rayon::prelude::*;
+    use tauri::Emitter;
+
+    #[derive(Serialize, Clone)]
+    struct ThumbProgressPayload { current: usize, total: usize }
+
+    let total = source_paths.len();
+    let counter = AtomicUsize::new(0);
+
+    let pairs: Vec<(String, String)> = source_paths
+        .par_iter()
+        .filter_map(|path| {
+            let result = generate_temp_thumbnail(path).ok()?;
+            let n = counter.fetch_add(1, Ordering::SeqCst) + 1;
+            let _ = app.emit("thumb_progress", ThumbProgressPayload { current: n, total });
+            Some((path.clone(), result))
+        })
+        .collect();
+
+    Ok(pairs.into_iter().collect())
+}
+
 pub fn cleanup_temp_thumbnails() -> Result<(), AppError> {
     let tmp_dir = std::env::temp_dir().join("archivist-previews");
     if tmp_dir.exists() {

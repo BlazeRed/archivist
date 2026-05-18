@@ -130,9 +130,6 @@ const ThumbnailCell = memo(function ThumbnailCell({
       {image.date_source === 'filename' && (
         <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#0084C5]" title={t('common.dateFromFilename')} />
       )}
-      {image.date_source === 'created' && (
-        <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#2A9EAD]" title={t('common.dateFromCreatedTime')} />
-      )}
       {image.date_source === 'mtime' && (
         <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#E6A817]" title={t('common.dateFromFile')} />
       )}

@@ -138,12 +138,7 @@ export function ImageDetail() {
                     {t('common.dateFromFilename')}
                   </span>
                 )}
-                {selectedImage.taken_at && selectedImage.date_source === 'created' && (
-                  <span className="text-[10px] bg-[rgba(42,158,173,0.12)] text-[#2A9EAD] px-1.5 py-0.5 rounded-full">
-                    {t('common.dateFromCreatedTime')}
-                  </span>
-                )}
-                {selectedImage.taken_at && selectedImage.date_source === 'mtime' && (
+{selectedImage.taken_at && selectedImage.date_source === 'mtime' && (
                   <span className="text-[10px] bg-[rgba(230,168,23,0.15)] text-[#A87B0A] px-1.5 py-0.5 rounded-full">
                     {t('detail.noExif')}
                   </span>

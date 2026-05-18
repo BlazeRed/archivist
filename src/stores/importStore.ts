@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
+import { convertFileSrc } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
 export interface ScannedImage {
@@ -64,6 +65,7 @@ interface ImportState {
   progress: { current: number; total: number; currentFile: string };
   result: ImportResult | null;
   error: string | null;
+  conflictThumbs: Record<string, string>;
   setSourcePath: (path: string) => void;
   setArchivePath: (path: string) => void;
   startScan: () => Promise<void>;
@@ -87,6 +89,7 @@ export const useImportStore = create<ImportState>((set, get) => ({
   progress: { current: 0, total: 0, currentFile: '' },
   result: null,
   error: null,
+  conflictThumbs: {},
 
   setSourcePath: (path) => set({ sourcePath: path }),
   
@@ -135,10 +138,24 @@ export const useImportStore = create<ImportState>((set, get) => ({
         .filter(img => img.conflict)
         .map(img => ({ hash: img.hash, action: 'Skip' as ImportAction }));
 
+      const conflictPaths = plan.images.filter(img => img.conflict).map(img => img.path);
+      let conflictThumbs: Record<string, string> = {};
+      if (conflictPaths.length > 0) {
+        try {
+          const raw = await invoke<Record<string, string>>('generate_temp_thumbnails_batch', {
+            sourcePaths: conflictPaths,
+          });
+          conflictThumbs = Object.fromEntries(
+            Object.entries(raw).map(([k, v]) => [k, convertFileSrc(v)])
+          );
+        } catch { /* non-fatal: conflict screen shows broken-image icon */ }
+      }
+
       set({
         analyzedImages: plan.images,
         importPlan: plan,
         resolutions: conflictRes,
+        conflictThumbs,
         phase: 'review',
       });
     } catch (e) {
@@ -211,6 +228,7 @@ export const useImportStore = create<ImportState>((set, get) => ({
       progress: { current: 0, total: 0, currentFile: '' },
       result: null,
       error: null,
+      conflictThumbs: {},
     });
   },
 }));
