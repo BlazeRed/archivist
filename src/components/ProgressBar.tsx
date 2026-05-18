@@ -19,6 +19,7 @@ export function ProgressBar({ current, total, currentFile, phase }: ProgressBarP
           {phase === 'analyzing' && t('import.analyzingProgress').replace('{{current}}', String(current)).replace('{{total}}', String(total))}
           {phase === 'importing' && t('import.importProgress').replace('{{current}}', String(current)).replace('{{total}}', String(total))}
           {phase === 'scanning' && t('import.analyzing')}
+          {phase === 'thumbnailing' && t('import.thumbnailingProgress').replace('{{current}}', String(current)).replace('{{total}}', String(total))}
         </span>
         <span className="text-primary font-medium">{Math.round(percentage)}%</span>
       </div>

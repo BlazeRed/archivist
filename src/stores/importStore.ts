@@ -52,7 +52,7 @@ export interface ImportSingleResult {
   source_path: string | null;
 }
 
-export type ImportPhase = 'idle' | 'scanning' | 'analyzing' | 'review' | 'importing' | 'complete' | 'error';
+export type ImportPhase = 'idle' | 'scanning' | 'analyzing' | 'thumbnailing' | 'review' | 'importing' | 'complete' | 'error';
 
 interface ImportState {
   phase: ImportPhase;
@@ -140,7 +140,21 @@ export const useImportStore = create<ImportState>((set, get) => ({
 
       const conflictPaths = plan.images.filter(img => img.conflict).map(img => img.path);
       let conflictThumbs: Record<string, string> = {};
+
       if (conflictPaths.length > 0) {
+        set({ phase: 'thumbnailing', progress: { current: 0, total: conflictPaths.length, currentFile: '' } });
+
+        const unlistenThumb = await listen<{ current: number; total: number }>(
+          'thumb_progress',
+          (e) => set({
+            progress: {
+              current: Math.max(get().progress.current, e.payload.current),
+              total: e.payload.total,
+              currentFile: '',
+            },
+          })
+        );
+
         try {
           const raw = await invoke<Record<string, string>>('generate_temp_thumbnails_batch', {
             sourcePaths: conflictPaths,
@@ -149,6 +163,9 @@ export const useImportStore = create<ImportState>((set, get) => ({
             Object.entries(raw).map(([k, v]) => [k, convertFileSrc(v)])
           );
         } catch { /* non-fatal: conflict screen shows broken-image icon */ }
+        finally {
+          unlistenThumb();
+        }
       }
 
       set({

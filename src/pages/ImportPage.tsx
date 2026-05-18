@@ -194,7 +194,7 @@ export function ImportPage() {
     setCleanupDismissed(true);
   };
 
-  const isAnalyzing = phase === 'scanning' || phase === 'analyzing';
+  const isAnalyzing = phase === 'scanning' || phase === 'analyzing' || phase === 'thumbnailing';
 
   if (phase === 'complete') {
     const canCleanup = result !== null && result.errors.length === 0 && result.imported > 0 && (result.imported_sources?.length ?? 0) > 0;
