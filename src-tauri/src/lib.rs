@@ -171,6 +171,33 @@ async fn generate_temp_thumbnails_batch(
 }
 
 #[tauri::command]
+async fn pre_generate_all_thumbnails_batch(
+    analyzed: Vec<commands::AnalyzedImage>,
+    archive_path: String,
+    app: tauri::AppHandle,
+) -> Result<(), error::AppError> {
+    tauri::async_runtime::spawn_blocking(move || {
+        commands::pre_generate_all_thumbnails_batch(&analyzed, &archive_path, &app)
+    })
+    .await
+    .map_err(|e| error::AppError::Internal { message: e.to_string() })?
+}
+
+#[tauri::command]
+async fn cleanup_unimported_thumbnails(
+    state: tauri::State<'_, Arc<AppState>>,
+    hashes: Vec<String>,
+    archive_path: String,
+) -> Result<(), error::AppError> {
+    let db = state.db();
+    tauri::async_runtime::spawn_blocking(move || {
+        commands::cleanup_unimported_thumbnails(hashes, &archive_path, &*db)
+    })
+    .await
+    .map_err(|e| error::AppError::Internal { message: e.to_string() })?
+}
+
+#[tauri::command]
 async fn export_group(
     state: tauri::State<'_, Arc<AppState>>,
     group_id: i64,
@@ -273,7 +300,9 @@ pub fn run() {
             import_single_image,
             generate_temp_thumbnail,
             generate_temp_thumbnails_batch,
+            pre_generate_all_thumbnails_batch,
             cleanup_temp_thumbnails,
+            cleanup_unimported_thumbnails,
             export_group,
             rescan_archive,
             delete_files,

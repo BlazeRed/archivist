@@ -583,6 +583,64 @@ pub fn generate_temp_thumbnails_batch(
     Ok(pairs.into_iter().collect())
 }
 
+pub fn pre_generate_all_thumbnails_batch(
+    analyzed: &[AnalyzedImage],
+    archive_path: &str,
+    app: &tauri::AppHandle,
+) -> Result<(), AppError> {
+    use rayon::prelude::*;
+    use tauri::Emitter;
+
+    #[derive(Serialize, Clone)]
+    struct ThumbProgressPayload { current: usize, total: usize }
+
+    let thumb_dir = std::path::PathBuf::from(archive_path)
+        .join(".archivist")
+        .join("thumbnails");
+    std::fs::create_dir_all(&thumb_dir).map_err(|e| AppError::FileWrite {
+        path: thumb_dir.to_string_lossy().to_string(),
+        message: e.to_string(),
+    })?;
+
+    let total = analyzed.len();
+    let counter = AtomicUsize::new(0);
+
+    analyzed.par_iter().for_each(|img| {
+        let dest = thumb_dir.join(format!("{}.jpg", img.hash));
+        if !dest.exists() {
+            let _ = thumbnail::generate_thumbnail(
+                Path::new(&img.path),
+                &dest,
+                &thumbnail::ThumbnailSize::medium(),
+            );
+        }
+        let n = counter.fetch_add(1, Ordering::SeqCst) + 1;
+        let _ = app.emit("thumb_progress", ThumbProgressPayload { current: n, total });
+    });
+
+    Ok(())
+}
+
+pub fn cleanup_unimported_thumbnails(
+    hashes: Vec<String>,
+    archive_path: &str,
+    db: &crate::db::Database,
+) -> Result<(), AppError> {
+    let thumb_dir = std::path::PathBuf::from(archive_path)
+        .join(".archivist")
+        .join("thumbnails");
+
+    for hash in &hashes {
+        let path = thumb_dir.join(format!("{}.jpg", hash));
+        if path.exists() {
+            if let Ok(false) = db.image_exists(hash) {
+                let _ = std::fs::remove_file(&path);
+            }
+        }
+    }
+    Ok(())
+}
+
 pub fn cleanup_temp_thumbnails() -> Result<(), AppError> {
     let tmp_dir = std::env::temp_dir().join("archivist-previews");
     if tmp_dir.exists() {

@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
-import { convertFileSrc } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
 export interface ScannedImage {
@@ -66,7 +65,6 @@ interface ImportState {
   progress: { current: number; total: number; currentFile: string };
   result: ImportResult | null;
   error: string | null;
-  conflictThumbs: Record<string, string>;
   setStep: (step: 1 | 2 | 3 | 4) => void;
   setSourcePath: (path: string) => void;
   setArchivePath: (path: string) => void;
@@ -92,7 +90,6 @@ export const useImportStore = create<ImportState>((set, get) => ({
   progress: { current: 0, total: 0, currentFile: '' },
   result: null,
   error: null,
-  conflictThumbs: {},
 
   setStep: (step) => set({ step }),
 
@@ -143,41 +140,33 @@ export const useImportStore = create<ImportState>((set, get) => ({
         .filter(img => img.conflict)
         .map(img => ({ hash: img.hash, action: 'Skip' as ImportAction }));
 
-      const conflictPaths = plan.images.filter(img => img.conflict).map(img => img.path);
-      let conflictThumbs: Record<string, string> = {};
+      set({ phase: 'thumbnailing', progress: { current: 0, total: plan.images.length, currentFile: '' } });
 
-      if (conflictPaths.length > 0) {
-        set({ phase: 'thumbnailing', progress: { current: 0, total: conflictPaths.length, currentFile: '' } });
+      const unlistenThumb = await listen<{ current: number; total: number }>(
+        'thumb_progress',
+        (e) => set({
+          progress: {
+            current: Math.max(get().progress.current, e.payload.current),
+            total: e.payload.total,
+            currentFile: '',
+          },
+        })
+      );
 
-        const unlistenThumb = await listen<{ current: number; total: number }>(
-          'thumb_progress',
-          (e) => set({
-            progress: {
-              current: Math.max(get().progress.current, e.payload.current),
-              total: e.payload.total,
-              currentFile: '',
-            },
-          })
-        );
-
-        try {
-          const raw = await invoke<Record<string, string>>('generate_temp_thumbnails_batch', {
-            sourcePaths: conflictPaths,
-          });
-          conflictThumbs = Object.fromEntries(
-            Object.entries(raw).map(([k, v]) => [k, convertFileSrc(v)])
-          );
-        } catch { /* non-fatal: conflict screen shows broken-image icon */ }
-        finally {
-          unlistenThumb();
-        }
+      try {
+        await invoke('pre_generate_all_thumbnails_batch', {
+          analyzed: plan.images,
+          archivePath: get().archivePath,
+        });
+      } catch { /* non-fatal */ }
+      finally {
+        unlistenThumb();
       }
 
       set({
         analyzedImages: plan.images,
         importPlan: plan,
         resolutions: conflictRes,
-        conflictThumbs,
         phase: 'review',
       });
     } catch (e) {
@@ -239,6 +228,13 @@ export const useImportStore = create<ImportState>((set, get) => ({
 
   reset: () => {
     invoke('cleanup_temp_thumbnails').catch(() => {});
+    const { analyzedImages, archivePath } = get();
+    if (analyzedImages.length > 0 && archivePath) {
+      invoke('cleanup_unimported_thumbnails', {
+        hashes: analyzedImages.map(img => img.hash),
+        archivePath,
+      }).catch(() => {});
+    }
     set({
       phase: 'idle',
       step: 1,
@@ -251,7 +247,6 @@ export const useImportStore = create<ImportState>((set, get) => ({
       progress: { current: 0, total: 0, currentFile: '' },
       result: null,
       error: null,
-      conflictThumbs: {},
     });
   },
 }));

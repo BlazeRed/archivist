@@ -66,15 +66,14 @@ function ConflictRowInner({
   archivePath,
   selected,
   onSelect,
-  incomingThumbUrl,
 }: {
   img: AnalyzedImage;
   archivePath: string;
   selected: ImportAction;
   onSelect: (action: ImportAction) => void;
-  incomingThumbUrl: string;
 }) {
   const { t } = useTranslation();
+  const incomingUrl = convertFileSrc(`${archivePath}/.archivist/thumbnails/${img.hash}.jpg`);
   const existingUrl = img.conflict?.existing_id
     ? convertFileSrc(`${archivePath}/.archivist/thumbnails/${img.conflict.existing_id}.jpg`)
     : '';
@@ -82,7 +81,7 @@ function ConflictRowInner({
   return (
     <div className="px-3 pt-3 pb-4 bg-background rounded-lg border border-border">
       <div className="flex gap-3 mb-2.5">
-        <PreviewThumb src={incomingThumbUrl} label={t('conflicts.incoming')} filename={img.filename} />
+        <PreviewThumb src={incomingUrl} label={t('conflicts.incoming')} filename={img.filename} />
         <div className="flex items-center self-center text-muted-foreground">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="1.5">
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 8h10M9 4l4 4-4 4"/>
@@ -120,7 +119,6 @@ function ConflictRowInner({
 type RowData = {
   conflicts: AnalyzedImage[];
   archivePath: string;
-  conflictThumbs: Record<string, string>;
   getAction: (hash: string) => ImportAction;
   setResolution: (hash: string, action: ImportAction) => void;
 };
@@ -130,7 +128,6 @@ function ConflictRowRenderer({
   style,
   conflicts,
   archivePath,
-  conflictThumbs,
   getAction,
   setResolution,
 }: RowComponentProps<RowData>) {
@@ -142,7 +139,6 @@ function ConflictRowRenderer({
         archivePath={archivePath}
         selected={getAction(img.hash)}
         onSelect={(action) => setResolution(img.hash, action)}
-        incomingThumbUrl={conflictThumbs[img.path] ?? ''}
       />
     </div>
   );
@@ -150,7 +146,7 @@ function ConflictRowRenderer({
 
 export function ConflictReview({ onImport, onBack }: { onImport: () => void; onBack: () => void }) {
   const { t } = useTranslation();
-  const { importPlan, analyzedImages, resolutions, setResolution, setAllResolutions, phase, progress, conflictThumbs } =
+  const { importPlan, analyzedImages, resolutions, setResolution, setAllResolutions, phase, progress } =
     useImportStore();
   const archivePath = useAppConfigStore((s) => s.config.archive_path).replace(/\/+$/, '');
 
@@ -175,8 +171,8 @@ export function ConflictReview({ onImport, onBack }: { onImport: () => void; onB
       : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 
   const rowData = useMemo<RowData>(
-    () => ({ conflicts, archivePath, conflictThumbs, getAction, setResolution }),
-    [conflicts, archivePath, conflictThumbs, getAction, setResolution]
+    () => ({ conflicts, archivePath, getAction, setResolution }),
+    [conflicts, archivePath, getAction, setResolution]
   );
 
   const rowHeight = useCallback(() => ROW_HEIGHT, []);
