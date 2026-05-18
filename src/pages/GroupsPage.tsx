@@ -8,6 +8,8 @@ import { useGroupStore } from '../stores/dataStore';
 import { useGroupUIStore } from '../stores/groupUIStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { AddPhotosModal } from '../components/AddPhotosModal';
+import { ImageDetail } from '../components/ImageDetail';
+import { useTimelineStore } from '../stores/timelineStore';
 import type { Image } from '../types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,6 +37,7 @@ export function GroupsPage() {
   const [exportingGroupId, setExportingGroupId] = useState<number | null>(null);
 
   const { selectedImageIds, isSelectionMode, clearSelection, getSelectedCount } = useGroupUIStore();
+  const { selectImage } = useTimelineStore();
 
   const thumbPx = config.thumbnail_size === 'small' ? 120 : config.thumbnail_size === 'large' ? 280 : 180;
 
@@ -265,7 +268,8 @@ export function GroupsPage() {
                     <div
                       key={img.id}
                       style={{ width: thumbPx }}
-                      className="group relative bg-card rounded-lg overflow-hidden border border-border"
+                      onClick={() => selectImage(img)}
+                      className="group relative bg-card rounded-lg overflow-hidden border border-border cursor-pointer"
                     >
                       <div className="aspect-square bg-[#001A36] overflow-hidden">
                         {thumbnailUrl ? (
@@ -287,7 +291,7 @@ export function GroupsPage() {
                         )}
                       </div>
                       <button
-                        onClick={() => handleRemoveFromGroup(img.id)}
+                        onClick={(e) => { e.stopPropagation(); handleRemoveFromGroup(img.id); }}
                         title={t('detail.removeFromGroup')}
                         className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive"
                       >
@@ -355,6 +359,8 @@ export function GroupsPage() {
           onAdded={handlePhotosAdded}
         />
       )}
+
+      <ImageDetail />
 
       {/* Delete confirm modal */}
       <Dialog open={deletingGroupId !== null} onOpenChange={(open) => { if (!open) setDeletingGroupId(null); }}>
