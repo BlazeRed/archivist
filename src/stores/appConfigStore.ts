@@ -5,6 +5,7 @@ interface AppConfig {
   archive_path: string;
   language: 'en' | 'it';
   thumbnail_size: 'small' | 'medium' | 'large';
+  group_cover_size: 'small' | 'medium' | 'large';
 }
 
 interface AppConfigStore {
@@ -17,6 +18,7 @@ export const useAppConfigStore = create<AppConfigStore>((set) => ({
     archive_path: '',
     language: 'en',
     thumbnail_size: 'medium',
+    group_cover_size: 'medium',
   },
   setConfig: (newConfig) => set((state) => {
     const config = { ...state.config, ...newConfig };

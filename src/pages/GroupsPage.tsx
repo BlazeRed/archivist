@@ -41,6 +41,7 @@ export function GroupsPage() {
   const [exportingGroupId, setExportingGroupId] = useState<number | null>(null);
 
   const thumbPx = config.thumbnail_size === 'small' ? 120 : config.thumbnail_size === 'large' ? 280 : 180;
+  const coverPx = config.group_cover_size === 'small' ? 140 : config.group_cover_size === 'large' ? 220 : 176;
   const archivePath = config.archive_path ? config.archive_path.replace(/\/+$/, '') : '';
 
   useEffect(() => {
@@ -247,7 +248,8 @@ export function GroupsPage() {
                   <div
                     key={group.id}
                     onClick={() => editingGroupId !== group.id && handleOpenGroup(group.id)}
-                    className="group/card w-44 cursor-pointer rounded-xl overflow-hidden border border-border bg-card hover:shadow-lg transition-shadow"
+                    style={{ width: coverPx }}
+                    className="group/card cursor-pointer rounded-xl overflow-hidden border border-border bg-card hover:shadow-lg transition-shadow"
                   >
                     {/* Cover image */}
                     <div className="aspect-[4/3] bg-muted overflow-hidden relative">

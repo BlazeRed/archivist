@@ -123,6 +123,10 @@
     "rescanMoved": "Relocated {{count}} misplaced images",
     "rescanThumbnailed": "Generated {{count}} missing thumbnails",
     "rescanError": "Error: {{error}}",
+    "groupCoverSize": "Group cover size",
+    "coverSizeSmall": "Small (140px)",
+    "coverSizeMedium": "Medium (176px)",
+    "coverSizeLarge": "Large (220px)",
     "closeArchive": "Close archive",
     "closeArchiveDesc": "Disconnect from the current archive"
   },

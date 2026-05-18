@@ -123,6 +123,10 @@
     "rescanMoved": "Spostate {{count}} immagini fuori posto",
     "rescanThumbnailed": "Generate {{count}} miniature mancanti",
     "rescanError": "Errore: {{error}}",
+    "groupCoverSize": "Dimensione copertina gruppi",
+    "coverSizeSmall": "Piccolo (140px)",
+    "coverSizeMedium": "Medio (176px)",
+    "coverSizeLarge": "Grande (220px)",
     "closeArchive": "Chiudi archivio",
     "closeArchiveDesc": "Disconnettiti dall'archivio corrente"
   },

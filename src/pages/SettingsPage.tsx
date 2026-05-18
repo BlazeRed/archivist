@@ -134,6 +134,24 @@ export function SettingsPage() {
           </Select>
         </div>
 
+        {/* Group Cover Size */}
+        <div className="space-y-2">
+          <Label>{t('settings.groupCoverSize')}</Label>
+          <Select
+            value={config.group_cover_size}
+            onValueChange={(v) => setConfig({ group_cover_size: v as 'small' | 'medium' | 'large' })}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="small">{t('settings.coverSizeSmall')}</SelectItem>
+              <SelectItem value="medium">{t('settings.coverSizeMedium')}</SelectItem>
+              <SelectItem value="large">{t('settings.coverSizeLarge')}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         {/* Archive Management */}
         <div className="border-t border-border pt-6">
           <h3 className="text-sm font-medium text-foreground mb-4">{t('settings.archiveManagement')}</h3>
