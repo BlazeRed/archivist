@@ -103,7 +103,9 @@
     "exportSuccess": "{{count}} foto esportate in {{path}}",
     "exportError": "Esportazione fallita",
     "sortByDate": "Data scatto",
-    "sortByRecent": "Aggiunte di recente"
+    "sortByRecent": "Aggiunte di recente",
+    "setCover": "Imposta come copertina",
+    "noCover": "Nessuna foto"
   },
   "settings": {
     "title": "Impostazioni",

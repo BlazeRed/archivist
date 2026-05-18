@@ -81,6 +81,11 @@ fn update_group(state: tauri::State<'_, Arc<AppState>>, id: i64, name: String) -
 }
 
 #[tauri::command]
+fn set_group_cover(state: tauri::State<'_, Arc<AppState>>, group_id: i64, image_id: String) -> Result<(), error::AppError> {
+    state.db().set_group_cover(group_id, &image_id)
+}
+
+#[tauri::command]
 async fn scan_source(source_path: String) -> Result<Vec<commands::ScannedImage>, error::AppError> {
     tauri::async_runtime::spawn_blocking(move || commands::scan_source(&source_path))
         .await
@@ -292,6 +297,7 @@ pub fn run() {
             get_images_in_group,
             get_groups_for_image,
             update_group,
+            set_group_cover,
             scan_source,
             analyze_image,
             analyze_images,

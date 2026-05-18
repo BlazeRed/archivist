@@ -103,7 +103,9 @@
     "exportSuccess": "{{count}} photos exported to {{path}}",
     "exportError": "Export failed",
     "sortByDate": "Date taken",
-    "sortByRecent": "Recently added"
+    "sortByRecent": "Recently added",
+    "setCover": "Set as cover",
+    "noCover": "No photos yet"
   },
   "settings": {
     "title": "Settings",

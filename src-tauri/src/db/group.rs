@@ -15,6 +15,8 @@ pub struct GroupWithCount {
     pub name: String,
     pub created_at: String,
     pub image_count: i64,
+    pub cover_image_id: Option<String>,
+    pub cover_thumbnail_path: Option<String>,
 }
 
 impl super::Database {
@@ -50,7 +52,14 @@ impl super::Database {
         let conn = self.connection();
         
         let mut stmt = conn.prepare(
-            "SELECT g.id, g.name, g.created_at, COUNT(ig.image_id) as image_count
+            "SELECT g.id, g.name, g.created_at, COUNT(ig.image_id) as image_count,
+                    g.cover_image_id,
+                    COALESCE(
+                        (SELECT i.thumbnail_path FROM images i WHERE i.id = g.cover_image_id),
+                        (SELECT i.thumbnail_path FROM images i
+                         JOIN image_groups ig2 ON ig2.image_id = i.id
+                         WHERE ig2.group_id = g.id ORDER BY ig2.rowid ASC LIMIT 1)
+                    ) as cover_thumbnail_path
              FROM groups g
              LEFT JOIN image_groups ig ON g.id = ig.group_id
              GROUP BY g.id
@@ -63,6 +72,8 @@ impl super::Database {
                 name: row.get(1)?,
                 created_at: row.get(2)?,
                 image_count: row.get(3)?,
+                cover_image_id: row.get(4)?,
+                cover_thumbnail_path: row.get(5)?,
             })
         })?.collect::<Result<Vec<_>, _>>()?;
 
@@ -114,6 +125,15 @@ impl super::Database {
             .collect::<Result<Vec<String>, _>>()?;
 
         Ok(image_ids)
+    }
+
+    pub fn set_group_cover(&self, group_id: i64, image_id: &str) -> Result<(), super::AppError> {
+        let conn = self.connection();
+        conn.execute(
+            "UPDATE groups SET cover_image_id = ?1 WHERE id = ?2",
+            params![image_id, group_id],
+        )?;
+        Ok(())
     }
 
     pub fn get_groups_for_image(&self, image_id: &str) -> Result<Vec<i64>, super::AppError> {

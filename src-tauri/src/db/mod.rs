@@ -48,7 +48,8 @@ impl Database {
             CREATE TABLE IF NOT EXISTS groups (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                cover_image_id TEXT
             );
 
             CREATE TABLE IF NOT EXISTS image_groups (
@@ -70,6 +71,7 @@ impl Database {
         )?;
 
         // Migrations for existing DBs
+        let _ = conn.execute("ALTER TABLE groups ADD COLUMN cover_image_id TEXT", []);
         let _ = conn.execute("ALTER TABLE images ADD COLUMN thumbnail_path TEXT", []);
         let _ = conn.execute("ALTER TABLE images ADD COLUMN date_source TEXT", []);
         let _ = conn.execute(

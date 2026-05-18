@@ -16,8 +16,10 @@ export interface Group {
   id: number;
   name: string;
   created_at: string;
+  cover_image_id?: string | null;
 }
 
 export interface GroupWithCount extends Group {
   image_count: number;
+  cover_thumbnail_path?: string | null;
 }
