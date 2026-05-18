@@ -5,22 +5,28 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { useGroupUIStore } from '../stores/groupUIStore';
+import { useImportStore } from '../stores/importStore';
 import { FilterPanel } from '../components/FilterPanel';
 import { ThumbnailGrid } from '../components/ThumbnailGrid';
 import { ImageDetail } from '../components/ImageDetail';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export function TimelinePage() {
   const { t } = useTranslation();
   const { fetchImages, availableGroups, fetchGroups } = useTimelineStore();
   const { config, setConfig } = useAppConfigStore();
   const { isSelectionMode, selectedImageIds, clearSelection, getSelectedCount } = useGroupUIStore();
+  const phase = useImportStore((s) => s.phase);
+  const isImportActive = phase === 'scanning' || phase === 'analyzing' || phase === 'thumbnailing' || phase === 'importing';
 
   const [addToGroupId, setAddToGroupId] = useState<string>('');
   const [addingToGroup, setAddingToGroup] = useState(false);
+  const [showImportWarning, setShowImportWarning] = useState(false);
 
   const handleOpenArchive = async () => {
+    if (isImportActive) { setShowImportWarning(true); return; }
     const selected = await open({ directory: true });
     if (selected) {
       setConfig({ archive_path: selected as string });
@@ -61,6 +67,19 @@ export function TimelinePage() {
           <p className="text-muted-foreground text-sm mb-4">{t('timeline.archiveNotSet')}</p>
           <Button onClick={handleOpenArchive}>{t('timeline.openArchive')}</Button>
         </div>
+        <Dialog open={showImportWarning} onOpenChange={(open) => { if (!open) setShowImportWarning(false); }}>
+          <DialogContent className="w-96">
+            <DialogHeader>
+              <DialogTitle>{t('import.navWarningTitle')}</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">{t('import.navWarningBody')}</p>
+            <div className="flex justify-end">
+              <Button onClick={() => setShowImportWarning(false)} variant="outline" size="sm">
+                {t('common.cancel')}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }

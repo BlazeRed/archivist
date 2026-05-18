@@ -7,10 +7,12 @@ import { getVersion } from '@tauri-apps/api/app';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useImageStore, useGroupStore } from '../stores/dataStore';
+import { useImportStore } from '../stores/importStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export function SettingsPage() {
   const { t, i18n } = useTranslation();
@@ -18,15 +20,19 @@ export function SettingsPage() {
   const { fetchImages } = useTimelineStore();
   const clearImages = useImageStore((s) => s.clearImages);
   const clearGroups = useGroupStore((s) => s.clearGroups);
+  const phase = useImportStore((s) => s.phase);
+  const isImportActive = phase === 'scanning' || phase === 'analyzing' || phase === 'thumbnailing' || phase === 'importing';
   const [rescanLoading, setRescanLoading] = useState(false);
   const [rescanResult, setRescanResult] = useState<string | null>(null);
   const [appVersion, setAppVersion] = useState<string>('');
+  const [showImportWarning, setShowImportWarning] = useState(false);
 
   useEffect(() => {
     getVersion().then(setAppVersion).catch(() => {});
   }, []);
 
   const selectArchiveFolder = async () => {
+    if (isImportActive) { setShowImportWarning(true); return; }
     const selected = await open({ directory: true, title: 'Select archive folder' });
     if (selected) {
       setConfig({ archive_path: selected as string });
@@ -39,12 +45,14 @@ export function SettingsPage() {
   };
 
   const handleCloseArchive = () => {
+    if (isImportActive) { setShowImportWarning(true); return; }
     clearImages();
     clearGroups();
     setConfig({ archive_path: '' });
   };
 
   const handleRescan = async () => {
+    if (isImportActive) { setShowImportWarning(true); return; }
     if (!config.archive_path) return;
     flushSync(() => {
       setRescanLoading(true);
@@ -203,6 +211,20 @@ export function SettingsPage() {
           v{appVersion}
         </p>
       )}
+
+      <Dialog open={showImportWarning} onOpenChange={(open) => { if (!open) setShowImportWarning(false); }}>
+        <DialogContent className="w-96">
+          <DialogHeader>
+            <DialogTitle>{t('import.navWarningTitle')}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">{t('import.navWarningBody')}</p>
+          <div className="flex justify-end">
+            <Button onClick={() => setShowImportWarning(false)} variant="outline" size="sm">
+              {t('common.cancel')}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -102,14 +102,13 @@ function DropZone({
 
 export function ImportPage() {
   const { t } = useTranslation();
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [cleanupDismissed, setCleanupDismissed] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const stepRef = useRef<number>(step);
-  stepRef.current = step;
 
   const {
     phase,
+    step,
+    setStep,
     sourcePath,
     archivePath,
     importPlan,
@@ -123,6 +122,9 @@ export function ImportPage() {
     startImport,
     reset,
   } = useImportStore();
+
+  const stepRef = useRef<number>(step);
+  stepRef.current = step;
 
   const handleSelectSource = async () => {
     const sel = await open({ directory: true });
@@ -183,7 +185,6 @@ export function ImportPage() {
 
   const handleReset = () => {
     reset();
-    setStep(1);
     setCleanupDismissed(false);
   };
 

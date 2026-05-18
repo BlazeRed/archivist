@@ -56,6 +56,7 @@ export type ImportPhase = 'idle' | 'scanning' | 'analyzing' | 'thumbnailing' | '
 
 interface ImportState {
   phase: ImportPhase;
+  step: 1 | 2 | 3 | 4;
   sourcePath: string;
   archivePath: string;
   scannedImages: ScannedImage[];
@@ -66,6 +67,7 @@ interface ImportState {
   result: ImportResult | null;
   error: string | null;
   conflictThumbs: Record<string, string>;
+  setStep: (step: 1 | 2 | 3 | 4) => void;
   setSourcePath: (path: string) => void;
   setArchivePath: (path: string) => void;
   startScan: () => Promise<void>;
@@ -80,6 +82,7 @@ export type ImportAction = 'Skip' | 'Replace' | 'KeepBoth';
 
 export const useImportStore = create<ImportState>((set, get) => ({
   phase: 'idle',
+  step: 1,
   sourcePath: '',
   archivePath: '',
   scannedImages: [],
@@ -90,6 +93,8 @@ export const useImportStore = create<ImportState>((set, get) => ({
   result: null,
   error: null,
   conflictThumbs: {},
+
+  setStep: (step) => set({ step }),
 
   setSourcePath: (path) => set({ sourcePath: path }),
   
@@ -236,6 +241,7 @@ export const useImportStore = create<ImportState>((set, get) => ({
     invoke('cleanup_temp_thumbnails').catch(() => {});
     set({
       phase: 'idle',
+      step: 1,
       sourcePath: '',
       archivePath: '',
       scannedImages: [],

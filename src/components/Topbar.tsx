@@ -20,7 +20,7 @@ export function Topbar() {
   const [pendingPath, setPendingPath] = useState<string | null>(null);
   const [isRescanning, setIsRescanning] = useState(false);
 
-  const isImportActive = phase === 'scanning' || phase === 'analyzing' || phase === 'importing';
+  const isImportActive = phase === 'scanning' || phase === 'analyzing' || phase === 'thumbnailing' || phase === 'importing';
 
   useEffect(() => {
     if (!isImportActive) return;
@@ -51,13 +51,7 @@ export function Topbar() {
     }
   };
 
-  const handleNav = (to: string) => {
-    if (isImportActive) {
-      setPendingPath(to);
-    } else {
-      navigate(to);
-    }
-  };
+  const handleNav = (to: string) => navigate(to);
 
   return (
     <header className="h-[52px] bg-background border-b border-border flex items-center justify-between px-4">
@@ -88,11 +82,14 @@ export function Topbar() {
               key={to}
               onClick={() => handleNav(to)}
               className={cn(
-                'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+                'relative px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
                 isActive ? 'bg-primary/12 text-primary' : 'text-foreground hover:bg-foreground/8'
               )}
             >
               {label}
+              {to === '/import' && isImportActive && (
+                <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-primary animate-pulse" />
+              )}
             </button>
           );
         })}
@@ -122,7 +119,7 @@ export function Topbar() {
         </Button>
       </div>
 
-      <Dialog open={pendingPath !== null} onOpenChange={(open) => { if (!open) setPendingPath(null); }}>
+      <Dialog open={pendingPath === '__close__'} onOpenChange={(open) => { if (!open) setPendingPath(null); }}>
         <DialogContent className="w-96">
           <DialogHeader>
             <DialogTitle>{t('import.navWarningTitle')}</DialogTitle>
@@ -131,13 +128,8 @@ export function Topbar() {
           <div className="flex gap-3 justify-end">
             <Button
               onClick={async () => {
-                const target = pendingPath;
                 setPendingPath(null);
-                if (target === '__close__') {
-                  await getCurrentWindow().destroy();
-                } else if (target) {
-                  navigate(target);
-                }
+                await getCurrentWindow().destroy();
               }}
               variant="destructive"
               size="sm"
