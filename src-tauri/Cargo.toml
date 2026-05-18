@@ -27,6 +27,8 @@ tokio = { version = "1", features = ["fs", "sync"] }
 image = "0.25"
 nom-exif = "3"
 tempfile = "3"
+rayon = "1"
+regex = "1"
 
 [features]
 default = ["custom-protocol"]

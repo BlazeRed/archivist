@@ -95,6 +95,16 @@ async fn analyze_image(scanned: commands::ScannedImage) -> Result<commands::Anal
 }
 
 #[tauri::command]
+async fn analyze_images(
+    app: tauri::AppHandle,
+    scanned: Vec<commands::ScannedImage>,
+) -> Result<Vec<commands::AnalyzedImage>, error::AppError> {
+    tauri::async_runtime::spawn_blocking(move || commands::analyze_images_batch(scanned, &app))
+        .await
+        .map_err(|e| error::AppError::Internal { message: e.to_string() })?
+}
+
+#[tauri::command]
 async fn create_import_plan(
     state: tauri::State<'_, Arc<AppState>>,
     images: Vec<commands::AnalyzedImage>,
@@ -107,6 +117,7 @@ async fn create_import_plan(
 
 #[tauri::command]
 async fn execute_import(
+    app: tauri::AppHandle,
     state: tauri::State<'_, Arc<AppState>>,
     plan: commands::ImportPlan,
     resolutions: Vec<commands::ImportResolution>,
@@ -114,7 +125,7 @@ async fn execute_import(
 ) -> Result<commands::ImportResult, error::AppError> {
     let db = state.db();
     tauri::async_runtime::spawn_blocking(move || {
-        commands::execute_import(plan, resolutions, &archive_path, &*db)
+        commands::execute_import(plan, resolutions, &archive_path, &*db, &app)
     })
     .await
     .map_err(|e| error::AppError::Internal { message: e.to_string() })?
@@ -244,6 +255,7 @@ pub fn run() {
             update_group,
             scan_source,
             analyze_image,
+            analyze_images,
             create_import_plan,
             execute_import,
             import_single_image,

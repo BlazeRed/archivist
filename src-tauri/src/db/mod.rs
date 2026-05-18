@@ -41,6 +41,7 @@ impl Database {
                 height INTEGER,
                 file_size INTEGER,
                 has_exif INTEGER DEFAULT 0,
+                date_source TEXT,
                 thumbnail_path TEXT
             );
 
@@ -68,8 +69,17 @@ impl Database {
             "
         )?;
 
-        // Migration for existing DBs that predate thumbnail_path column
+        // Migrations for existing DBs
         let _ = conn.execute("ALTER TABLE images ADD COLUMN thumbnail_path TEXT", []);
+        let _ = conn.execute("ALTER TABLE images ADD COLUMN date_source TEXT", []);
+        let _ = conn.execute(
+            "UPDATE images SET date_source = CASE \
+             WHEN has_exif = 1 THEN 'exif' \
+             WHEN taken_at IS NOT NULL THEN 'mtime' \
+             ELSE NULL END \
+             WHERE date_source IS NULL",
+            [],
+        );
 
         Ok(())
     }

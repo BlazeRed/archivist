@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useState, memo } from 'react';
+import { useMemo, useCallback, useState, useRef, useEffect, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { List, RowComponentProps } from 'react-window';
 import { convertFileSrc } from '@tauri-apps/api/core';
@@ -127,17 +127,17 @@ const ThumbnailCell = memo(function ThumbnailCell({
       )}
 
       {/* Date source badge */}
-      {!image.has_exif && image.taken_at && (
-        <div
-          className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#E6A817]"
-          title={t('common.dateFromFile')}
-        />
+      {image.date_source === 'filename' && (
+        <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#0084C5]" title={t('common.dateFromFilename')} />
       )}
-      {!image.has_exif && !image.taken_at && (
-        <div
-          className="absolute top-1 right-1 w-2 h-2 rounded-full bg-muted-foreground/60"
-          title={t('common.noDate')}
-        />
+      {image.date_source === 'created' && (
+        <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#2A9EAD]" title={t('common.dateFromCreatedTime')} />
+      )}
+      {image.date_source === 'mtime' && (
+        <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#E6A817]" title={t('common.dateFromFile')} />
+      )}
+      {!image.date_source && !image.taken_at && (
+        <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-muted-foreground/60" title={t('common.noDate')} />
       )}
 
       {/* Selection checkbox */}
@@ -218,9 +218,27 @@ export function ThumbnailGrid() {
   const sizeKey = config.thumbnail_size as SizeKey;
   const size = SIZES[sizeKey];
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(entries => {
+      setContainerWidth(entries[0].contentRect.width);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const PADDING = 48; // px-6 both sides
+  const dynamicCols = containerWidth > 0
+    ? Math.max(1, Math.floor((containerWidth - PADDING) / (size.px + size.gap)))
+    : size.cols;
+
   const rows = useMemo(
-    () => buildRows(images, size.cols, t('timeline.noDateHeader')),
-    [images, size.cols, t]
+    () => buildRows(images, dynamicCols, t('timeline.noDateHeader')),
+    [images, dynamicCols, t]
   );
 
   const getRowHeight = useCallback(
@@ -281,7 +299,7 @@ export function ThumbnailGrid() {
   }
 
   return (
-    <div className="relative h-full">
+    <div ref={containerRef} className="relative h-full">
       {/* Sticky header overlay */}
       {stickyLabel && (
         <div className="absolute top-0 left-0 right-0 z-10 h-10 flex items-center px-6 bg-[#D2E8F7]/95 backdrop-blur-sm border-b border-[rgba(0,45,88,0.12)] pointer-events-none">

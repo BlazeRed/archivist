@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 
 export interface ScannedImage {
   path: string;
@@ -16,6 +17,7 @@ export interface AnalyzedImage {
   width: number | null;
   height: number | null;
   has_exif: boolean;
+  date_source: string | null;
   conflict: ConflictInfo | null;
 }
 
@@ -112,41 +114,38 @@ export const useImportStore = create<ImportState>((set, get) => ({
     const { scannedImages } = get();
     if (scannedImages.length === 0) return;
 
-    const analyzed: AnalyzedImage[] = [];
-    
     set({ progress: { current: 0, total: scannedImages.length, currentFile: '' } });
 
-    for (let i = 0; i < scannedImages.length; i++) {
-      const scanned = scannedImages[i];
-      set({ 
-        progress: { 
-          current: i + 1, 
-          total: scannedImages.length, 
-          currentFile: scanned.filename 
-        } 
+    const unlisten = await listen<{ current: number; total: number; filename: string }>(
+      'analyze_progress',
+      (e) => set({
+        progress: {
+          current: Math.max(get().progress.current, e.payload.current),
+          total: e.payload.total,
+          currentFile: e.payload.filename,
+        },
+      })
+    );
+
+    try {
+      const analyzed = await invoke<AnalyzedImage[]>('analyze_images', { scanned: scannedImages });
+      const plan = await invoke<ImportPlan>('create_import_plan', { images: analyzed });
+
+      const conflictRes: ImportResolution[] = plan.images
+        .filter(img => img.conflict)
+        .map(img => ({ hash: img.hash, action: 'Skip' as ImportAction }));
+
+      set({
+        analyzedImages: plan.images,
+        importPlan: plan,
+        resolutions: conflictRes,
+        phase: 'review',
       });
-
-      try {
-        const result = await invoke<AnalyzedImage>('analyze_image', { scanned });
-        analyzed.push(result);
-      } catch (e) {
-        console.error('Failed to analyze:', scanned.filename, e);
-      }
+    } catch (e) {
+      set({ error: String(e), phase: 'error' });
+    } finally {
+      unlisten();
     }
-
-    const plan = await invoke<ImportPlan>('create_import_plan', { images: analyzed });
-
-    // plan.images has conflict fields populated by the backend — use them as source of truth
-    const conflictRes: ImportResolution[] = plan.images
-      .filter(img => img.conflict)
-      .map(img => ({ hash: img.hash, action: 'Skip' as ImportAction }));
-
-    set({
-      analyzedImages: plan.images,
-      importPlan: plan,
-      resolutions: conflictRes,
-      phase: 'review'
-    });
   },
 
   setResolution: (hash, action) => {
@@ -170,43 +169,33 @@ export const useImportStore = create<ImportState>((set, get) => ({
 
     set({ phase: 'importing', progress: { current: 0, total: importPlan.images.length, currentFile: '' } });
 
-    let imported = 0;
-    let skipped = 0;
-    const errors: string[] = [];
-    const imported_sources: string[] = [];
+    const unlisten = await listen<{ current: number; total: number; filename: string }>(
+      'import_progress',
+      (e) => set({
+        progress: {
+          current: Math.max(get().progress.current, e.payload.current),
+          total: e.payload.total,
+          currentFile: e.payload.filename,
+        },
+      })
+    );
 
-    for (let i = 0; i < importPlan.images.length; i++) {
-      const image = importPlan.images[i];
-      const resolution = resolutions.find(r => r.hash === image.hash) ?? null;
-
-      set({
-        progress: { current: i + 1, total: importPlan.images.length, currentFile: image.filename }
+    try {
+      const result = await invoke<ImportResult>('execute_import', {
+        plan: importPlan,
+        resolutions,
+        archivePath,
       });
-
-      try {
-        const res = await invoke<ImportSingleResult>('import_single_image', {
-          image,
-          resolution,
-          archivePath,
-        });
-        if (res.status === 'imported') {
-          imported++;
-          if (res.source_path) imported_sources.push(res.source_path);
-        } else if (res.status === 'skipped') {
-          skipped++;
-        } else if (res.error) {
-          errors.push(res.error);
-        }
-      } catch (e) {
-        errors.push(String(e));
-      }
+      set({
+        result,
+        phase: 'complete',
+        progress: { current: result.imported, total: importPlan.images.length, currentFile: '' },
+      });
+    } catch (e) {
+      set({ error: String(e), phase: 'error' });
+    } finally {
+      unlisten();
     }
-
-    set({
-      result: { imported, skipped, errors, imported_sources },
-      phase: 'complete',
-      progress: { current: imported, total: importPlan.images.length, currentFile: '' },
-    });
   },
 
   reset: () => {

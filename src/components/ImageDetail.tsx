@@ -133,7 +133,17 @@ export function ImageDetail() {
                   ? formatDate(selectedImage.taken_at, t('detail.noDate'))
                   : <span className="text-[rgba(0,45,88,0.45)]">{t('detail.noDate')}</span>
                 }
-                {selectedImage.taken_at && !selectedImage.has_exif && (
+                {selectedImage.taken_at && selectedImage.date_source === 'filename' && (
+                  <span className="text-[10px] bg-[rgba(0,132,197,0.12)] text-[#0084C5] px-1.5 py-0.5 rounded-full">
+                    {t('common.dateFromFilename')}
+                  </span>
+                )}
+                {selectedImage.taken_at && selectedImage.date_source === 'created' && (
+                  <span className="text-[10px] bg-[rgba(42,158,173,0.12)] text-[#2A9EAD] px-1.5 py-0.5 rounded-full">
+                    {t('common.dateFromCreatedTime')}
+                  </span>
+                )}
+                {selectedImage.taken_at && selectedImage.date_source === 'mtime' && (
                   <span className="text-[10px] bg-[rgba(230,168,23,0.15)] text-[#A87B0A] px-1.5 py-0.5 rounded-full">
                     {t('detail.noExif')}
                   </span>

@@ -5,9 +5,37 @@ use chrono::{DateTime, Utc, TimeZone};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ExifResult {
     FromExif(DateTime<Utc>),
+    FromFilename(DateTime<Utc>),
+    FromCreatedTime(DateTime<Utc>),
     FromFileMtime(DateTime<Utc>),
     Corrupted(String),
     Missing,
+}
+
+impl ExifResult {
+    pub fn has_exif(&self) -> bool {
+        matches!(self, ExifResult::FromExif(_))
+    }
+
+    pub fn date_source_label(&self) -> Option<&'static str> {
+        match self {
+            ExifResult::FromExif(_)        => Some("exif"),
+            ExifResult::FromFilename(_)    => Some("filename"),
+            ExifResult::FromCreatedTime(_) => Some("created"),
+            ExifResult::FromFileMtime(_)   => Some("mtime"),
+            ExifResult::Corrupted(_) | ExifResult::Missing => None,
+        }
+    }
+
+    pub fn datetime(&self) -> Option<DateTime<Utc>> {
+        match self {
+            ExifResult::FromExif(dt)
+            | ExifResult::FromFilename(dt)
+            | ExifResult::FromCreatedTime(dt)
+            | ExifResult::FromFileMtime(dt) => Some(*dt),
+            _ => None,
+        }
+    }
 }
 
 pub fn extract_date(path: &Path) -> ExifResult {
@@ -35,7 +63,79 @@ pub fn extract_date(path: &Path) -> ExifResult {
         return ExifResult::FromExif(dt);
     }
 
+    if let Some(dt) = try_filename_date(path) {
+        return ExifResult::FromFilename(dt);
+    }
+
+    if let Some(dt) = try_created_time(path) {
+        return ExifResult::FromCreatedTime(dt);
+    }
+
     mtime_fallback(path)
+}
+
+fn try_filename_date(path: &Path) -> Option<DateTime<Utc>> {
+    use regex::Regex;
+    use chrono::NaiveDate;
+    use std::sync::OnceLock;
+
+    // YYYYMMDD followed by 1-char separator and HHMMSS (phone cameras, Pixel, etc.)
+    static COMPACT_DT: OnceLock<Regex> = OnceLock::new();
+    let compact_re = COMPACT_DT.get_or_init(|| {
+        Regex::new(r"((?:19|20)\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])[_\-T ]([01]\d|2[0-3])([0-5]\d)([0-5]\d)?").unwrap()
+    });
+
+    // YYYY-MM-DD followed by non-digit separator then HH:MM:SS (Screenshot_2023-10-05-14-30-20, WhatsApp, etc.)
+    static SEP_DT: OnceLock<Regex> = OnceLock::new();
+    let sep_dt_re = SEP_DT.get_or_init(|| {
+        Regex::new(r"((?:19|20)\d{2})[-_.](0[1-9]|1[0-2])[-_.](0[1-9]|[12]\d|3[01])[^0-9]{1,6}([01]\d|2[0-3])[-_:.]([0-5]\d)(?:[-_:.]([0-5]\d))?").unwrap()
+    });
+
+    // YYYY-MM-DD date only
+    static SEP_DATE: OnceLock<Regex> = OnceLock::new();
+    let sep_date_re = SEP_DATE.get_or_init(|| {
+        Regex::new(r"((?:19|20)\d{2})[-_.](0[1-9]|1[0-2])[-_.](0[1-9]|[12]\d|3[01])").unwrap()
+    });
+
+    let name = path.file_name()?.to_str()?;
+
+    if let Some(caps) = compact_re.captures(name) {
+        let y: i32 = caps[1].parse().ok()?;
+        let mo: u32 = caps[2].parse().ok()?;
+        let d: u32 = caps[3].parse().ok()?;
+        let h: u32 = caps[4].parse().ok()?;
+        let mi: u32 = caps[5].parse().ok()?;
+        let s: u32 = caps.get(6).and_then(|m| m.as_str().parse().ok()).unwrap_or(0);
+        let nd = NaiveDate::from_ymd_opt(y, mo, d)?.and_hms_opt(h, mi, s)?;
+        return Some(Utc.from_utc_datetime(&nd));
+    }
+
+    if let Some(caps) = sep_dt_re.captures(name) {
+        let y: i32 = caps[1].parse().ok()?;
+        let mo: u32 = caps[2].parse().ok()?;
+        let d: u32 = caps[3].parse().ok()?;
+        let h: u32 = caps[4].parse().ok()?;
+        let mi: u32 = caps[5].parse().ok()?;
+        let s: u32 = caps.get(6).and_then(|m| m.as_str().parse().ok()).unwrap_or(0);
+        let nd = NaiveDate::from_ymd_opt(y, mo, d)?.and_hms_opt(h, mi, s)?;
+        return Some(Utc.from_utc_datetime(&nd));
+    }
+
+    if let Some(caps) = sep_date_re.captures(name) {
+        let y: i32 = caps[1].parse().ok()?;
+        let mo: u32 = caps[2].parse().ok()?;
+        let d: u32 = caps[3].parse().ok()?;
+        let nd = NaiveDate::from_ymd_opt(y, mo, d)?.and_hms_opt(0, 0, 0)?;
+        return Some(Utc.from_utc_datetime(&nd));
+    }
+
+    None
+}
+
+fn try_created_time(path: &Path) -> Option<DateTime<Utc>> {
+    let meta = std::fs::metadata(path).ok()?;
+    let created = meta.created().ok()?;
+    Some(created.into())
 }
 
 fn try_png_ttext_exif(path: &Path) -> Option<DateTime<Utc>> {
@@ -194,9 +294,49 @@ mod tests {
 
         let result = extract_date(file.path());
         match result {
-            ExifResult::FromFileMtime(_) => {}
-            ExifResult::Missing => {}
-            _ => panic!("Expected FromFileMtime or Missing, got {:?}", result),
+            ExifResult::FromFileMtime(_) | ExifResult::FromCreatedTime(_) | ExifResult::Missing => {}
+            _ => panic!("Expected mtime/created/missing fallback, got {:?}", result),
         }
+    }
+
+    #[test]
+    fn test_filename_compact_android() {
+        let p = std::path::Path::new("IMG_20231005_143020.jpg");
+        let dt = try_filename_date(p).unwrap();
+        assert_eq!(dt.format("%Y-%m-%d %H:%M:%S").to_string(), "2023-10-05 14:30:20");
+    }
+
+    #[test]
+    fn test_filename_pixel() {
+        let p = std::path::Path::new("PXL_20231005_143020123.jpg");
+        let dt = try_filename_date(p).unwrap();
+        assert_eq!(dt.format("%Y-%m-%d %H:%M:%S").to_string(), "2023-10-05 14:30:20");
+    }
+
+    #[test]
+    fn test_filename_screenshot_sep() {
+        let p = std::path::Path::new("Screenshot_2023-10-05-14-30-20.png");
+        let dt = try_filename_date(p).unwrap();
+        assert_eq!(dt.format("%Y-%m-%d").to_string(), "2023-10-05");
+    }
+
+    #[test]
+    fn test_filename_whatsapp() {
+        let p = std::path::Path::new("WhatsApp Image 2023-10-05 at 14.30.20.jpg");
+        let dt = try_filename_date(p).unwrap();
+        assert_eq!(dt.format("%Y-%m-%d").to_string(), "2023-10-05");
+    }
+
+    #[test]
+    fn test_filename_date_only() {
+        let p = std::path::Path::new("2023-10-05.jpg");
+        let dt = try_filename_date(p).unwrap();
+        assert_eq!(dt.format("%Y-%m-%d %H:%M:%S").to_string(), "2023-10-05 00:00:00");
+    }
+
+    #[test]
+    fn test_filename_no_date() {
+        let p = std::path::Path::new("random_vacation_photo.jpg");
+        assert!(try_filename_date(p).is_none());
     }
 }

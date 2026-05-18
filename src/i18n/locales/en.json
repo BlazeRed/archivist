@@ -23,6 +23,8 @@
     "change": "Change",
     "noThumbnail": "No thumbnail available",
     "dateFromFile": "Date from file modification time",
+    "dateFromFilename": "Date from filename",
+    "dateFromCreatedTime": "Date from file creation time",
     "noDate": "No date available"
   },
   "import": {

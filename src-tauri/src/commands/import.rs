@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::{exif, hasher, thumbnail, error::AppError};
 use crate::db::image::NewImage;
 
 const SUPPORTED_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "gif", "webp", "tiff", "tif", "bmp", "heic", "heif"];
-const _BLOCK_SIZE: usize = 50;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScannedImage {
@@ -23,6 +23,7 @@ pub struct AnalyzedImage {
     pub width: Option<u32>,
     pub height: Option<u32>,
     pub has_exif: bool,
+    pub date_source: Option<String>,
     pub conflict: Option<ConflictInfo>,
 }
 
@@ -68,10 +69,16 @@ pub struct ImportSingleResult {
     pub source_path: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct ProgressPayload {
+    pub current: usize,
+    pub total: usize,
+    pub filename: String,
+}
 
 pub fn scan_source(source_path: &str) -> Result<Vec<ScannedImage>, AppError> {
     let path = Path::new(source_path);
-    
+
     if !path.exists() {
         return Err(AppError::FileRead {
             path: source_path.to_string(),
@@ -103,7 +110,6 @@ pub fn scan_source(source_path: &str) -> Result<Vec<ScannedImage>, AppError> {
     }
 
     images.sort_by(|a, b| a.filename.cmp(&b.filename));
-
     Ok(images)
 }
 
@@ -115,7 +121,6 @@ fn scan_directory(dir: &Path, images: &mut Vec<ScannedImage>) -> Result<(), AppE
 
     for entry in entries.flatten() {
         let path = entry.path();
-        
         if path.is_dir() {
             scan_directory(&path, images)?;
         } else if is_supported_image(&path) {
@@ -143,22 +148,19 @@ fn is_supported_image(path: &Path) -> bool {
 
 pub fn analyze_image(scanned: &ScannedImage) -> Result<AnalyzedImage, AppError> {
     let path = Path::new(&scanned.path);
-    
+
     let hash = hasher::compute_hash(path)?;
-    
+
     let (width, height) = match thumbnail::get_image_dimensions(path) {
         Ok((w, h)) => (Some(w), Some(h)),
         Err(_) => (None, None),
     };
-    
+
     let exif_result = exif::extract_date(path);
-    let (taken_at, has_exif) = match exif_result {
-        exif::ExifResult::FromExif(dt) => (Some(dt.to_rfc3339()), true),
-        exif::ExifResult::FromFileMtime(dt) => (Some(dt.to_rfc3339()), false),
-        exif::ExifResult::Corrupted(_) => (None, false),
-        exif::ExifResult::Missing => (None, false),
-    };
-    
+    let has_exif = exif_result.has_exif();
+    let date_source = exif_result.date_source_label().map(|s| s.to_string());
+    let taken_at = exif_result.datetime().map(|dt| dt.to_rfc3339());
+
     Ok(AnalyzedImage {
         path: scanned.path.clone(),
         filename: scanned.filename.clone(),
@@ -168,8 +170,37 @@ pub fn analyze_image(scanned: &ScannedImage) -> Result<AnalyzedImage, AppError> 
         width,
         height,
         has_exif,
+        date_source,
         conflict: None,
     })
+}
+
+pub fn analyze_images_batch(
+    scanned: Vec<ScannedImage>,
+    app: &tauri::AppHandle,
+) -> Result<Vec<AnalyzedImage>, AppError> {
+    use rayon::prelude::*;
+    use tauri::Emitter;
+
+    let total = scanned.len();
+    let counter = AtomicUsize::new(0);
+    let app = app.clone();
+
+    let results = scanned
+        .par_iter()
+        .filter_map(|s| {
+            let res = analyze_image(s).ok();
+            let n = counter.fetch_add(1, Ordering::SeqCst) + 1;
+            let _ = app.emit("analyze_progress", ProgressPayload {
+                current: n,
+                total,
+                filename: s.filename.clone(),
+            });
+            res
+        })
+        .collect();
+
+    Ok(results)
 }
 
 pub fn create_import_plan(images: Vec<AnalyzedImage>, db: &crate::db::Database) -> Result<ImportPlan, AppError> {
@@ -198,36 +229,48 @@ pub fn create_import_plan(images: Vec<AnalyzedImage>, db: &crate::db::Database) 
     })
 }
 
+struct PreparedImport {
+    source_path: String,
+    dest_path: PathBuf,
+    dest_dir: String,
+    final_filename: String,
+    image: AnalyzedImage,
+    entry_id: String,
+    thumbnail_abs: PathBuf,
+    thumbnail_rel: String,
+}
+
 pub fn execute_import(
     plan: ImportPlan,
     resolutions: Vec<ImportResolution>,
     archive_path: &str,
     db: &crate::db::Database,
+    app: &tauri::AppHandle,
 ) -> Result<ImportResult, AppError> {
-    let mut imported = 0;
-    let mut skipped = 0;
-    let mut errors = Vec::new();
-    let mut imported_sources: Vec<String> = Vec::new();
-    
-    let resolution_map: std::collections::HashMap<String, &ImportResolution> = 
+    use rayon::prelude::*;
+    use tauri::Emitter;
+
+    let resolution_map: std::collections::HashMap<String, &ImportResolution> =
         resolutions.iter().map(|r| (r.hash.clone(), r)).collect();
-    
-    for image in plan.images {
-        let source_path = image.path.clone();
+
+    // Phase 1 — serial: compute destinations and unique filenames (filesystem-order matters)
+    let mut skipped = 0usize;
+    let mut prepared: Vec<PreparedImport> = Vec::new();
+
+    for image in &plan.images {
         let resolution = resolution_map.get(&image.hash);
-        
+
         let should_skip = match resolution {
             Some(r) => matches!(r.action, ImportAction::Skip),
             None => image.conflict.is_some(),
         };
-        
         if should_skip {
             skipped += 1;
             continue;
         }
-        
+
         let dest_dir = destination_path(archive_path, &image.taken_at);
-        
+
         let final_filename = if let Some(res) = resolution {
             match res.action {
                 ImportAction::KeepBoth => generate_unique_filename(&dest_dir, &image.filename),
@@ -240,86 +283,121 @@ pub fn execute_import(
         } else {
             image.filename.clone()
         };
-        
-        let is_keep_both = resolution.map_or(false, |r| matches!(r.action, ImportAction::KeepBoth));
 
+        let is_keep_both = resolution.map_or(false, |r| matches!(r.action, ImportAction::KeepBoth));
         let dest_path = PathBuf::from(&dest_dir).join(&final_filename);
 
-        match std::fs::create_dir_all(&dest_dir) {
-            Ok(_) => {},
-            Err(e) => {
-                errors.push(format!("Failed to create directory {}: {}", dest_dir, e));
-                continue;
+        let thumbnail_abs = PathBuf::from(archive_path)
+            .join(".archivist/thumbnails")
+            .join(format!("{}.jpg", &image.hash));
+        let thumbnail_rel = format!(".archivist/thumbnails/{}.jpg", &image.hash);
+
+        let entry_id = if is_keep_both {
+            let stem = Path::new(&final_filename)
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or(final_filename.as_str());
+            format!("{}_{}", image.hash, stem)
+        } else {
+            image.hash.clone()
+        };
+
+        prepared.push(PreparedImport {
+            source_path: image.path.clone(),
+            dest_path,
+            dest_dir,
+            final_filename,
+            image: image.clone(),
+            entry_id,
+            thumbnail_abs,
+            thumbnail_rel,
+        });
+    }
+
+    // Phase 2 — parallel: file copy + thumbnail generation
+    let total = prepared.len();
+    let counter = AtomicUsize::new(0);
+    let app = app.clone();
+    let archive_path_str = archive_path.to_string();
+
+    let results: Vec<Result<(NewImage, String), String>> = prepared
+        .into_par_iter()
+        .map(|p| {
+            if let Err(e) = std::fs::create_dir_all(&p.dest_dir) {
+                return Err(format!("Failed to create directory {}: {}", p.dest_dir, e));
             }
-        }
-        
-        match std::fs::copy(&image.path, &dest_path) {
-            Ok(_) => {
-                let thumbnail_abs = PathBuf::from(archive_path)
-                    .join(".archivist/thumbnails")
-                    .join(format!("{}.jpg", &image.hash));
-                let thumbnail_rel = format!(".archivist/thumbnails/{}.jpg", &image.hash);
-                let stored_thumbnail = if thumbnail_abs.exists() {
-                    Some(thumbnail_rel.clone())
-                } else {
-                    match crate::thumbnail::generate_thumbnail(
-                        &dest_path,
-                        &thumbnail_abs,
-                        &crate::thumbnail::ThumbnailSize::medium(),
-                    ) {
-                        Ok(_) => Some(thumbnail_rel),
-                        Err(_) => None,
-                    }
-                };
 
-                let relative_path = format!("{}/{}",
-                    Path::new(&dest_dir).strip_prefix(archive_path)
-                        .map(|p| p.to_string_lossy().to_string())
-                        .unwrap_or_else(|_| dest_dir.clone()),
-                    &final_filename
-                );
+            match std::fs::copy(&p.source_path, &p.dest_path) {
+                Ok(_) => {
+                    let stored_thumbnail = if p.thumbnail_abs.exists() {
+                        Some(p.thumbnail_rel.clone())
+                    } else {
+                        match crate::thumbnail::generate_thumbnail(
+                            &p.dest_path,
+                            &p.thumbnail_abs,
+                            &crate::thumbnail::ThumbnailSize::medium(),
+                        ) {
+                            Ok(_) => Some(p.thumbnail_rel),
+                            Err(_) => None,
+                        }
+                    };
 
-                let entry_id = if is_keep_both {
-                    let stem = Path::new(&final_filename)
-                        .file_stem()
-                        .and_then(|s| s.to_str())
-                        .unwrap_or(final_filename.as_str());
-                    format!("{}_{}", image.hash, stem)
-                } else {
-                    image.hash.clone()
-                };
+                    let relative_path = format!(
+                        "{}/{}",
+                        Path::new(&p.dest_dir)
+                            .strip_prefix(&archive_path_str)
+                            .map(|x| x.to_string_lossy().to_string())
+                            .unwrap_or_else(|_| p.dest_dir.clone()),
+                        &p.final_filename
+                    );
 
-                let new_image = NewImage {
-                    id: entry_id,
-                    filename: final_filename,
-                    file_path: relative_path,
-                    taken_at: image.taken_at,
-                    width: image.width.map(|w| w as i32),
-                    height: image.height.map(|h| h as i32),
-                    file_size: Some(image.size as i64),
-                    has_exif: image.has_exif,
-                    thumbnail_path: stored_thumbnail,
-                };
-                
+                    let new_image = NewImage {
+                        id: p.entry_id,
+                        filename: p.final_filename.clone(),
+                        file_path: relative_path,
+                        taken_at: p.image.taken_at,
+                        width: p.image.width.map(|w| w as i32),
+                        height: p.image.height.map(|h| h as i32),
+                        file_size: Some(p.image.size as i64),
+                        has_exif: p.image.has_exif,
+                        date_source: p.image.date_source,
+                        thumbnail_path: stored_thumbnail,
+                    };
+
+                    let n = counter.fetch_add(1, Ordering::SeqCst) + 1;
+                    let _ = app.emit("import_progress", ProgressPayload {
+                        current: n,
+                        total,
+                        filename: p.final_filename.clone(),
+                    });
+
+                    Ok((new_image, p.source_path))
+                }
+                Err(e) => Err(format!("Failed to copy {}: {}", p.image.filename, e)),
+            }
+        })
+        .collect();
+
+    // Phase 3 — serial: DB inserts
+    let mut imported = 0usize;
+    let mut errors: Vec<String> = Vec::new();
+    let mut imported_sources: Vec<String> = Vec::new();
+
+    for r in results {
+        match r {
+            Ok((new_image, src)) => {
                 if let Err(e) = db.insert_image(&new_image) {
-                    errors.push(format!("Failed to insert into database: {}", e));
+                    errors.push(format!("DB insert error: {}", e));
                 } else {
                     imported += 1;
-                    imported_sources.push(source_path);
+                    imported_sources.push(src);
                 }
-            },
-            Err(e) => {
-                errors.push(format!("Failed to copy {}: {}", image.filename, e));
             }
+            Err(e) => errors.push(e),
         }
     }
-    
-    Ok(ImportResult {
-        imported,
-        skipped,
-        errors,
-        imported_sources,
-    })
+
+    Ok(ImportResult { imported, skipped, errors, imported_sources })
 }
 
 pub fn destination_path(archive_root: &str, taken_at: &Option<String>) -> String {
@@ -427,6 +505,7 @@ pub fn import_single_image(
                 height: image.height.map(|h| h as i32),
                 file_size: Some(image.size as i64),
                 has_exif: image.has_exif,
+                date_source: image.date_source,
                 thumbnail_path: stored_thumbnail,
             };
 
@@ -489,7 +568,7 @@ pub fn cleanup_temp_thumbnails() -> Result<(), AppError> {
     Ok(())
 }
 
-fn generate_unique_filename(dir: &str, original: &str) -> String {
+pub fn generate_unique_filename(dir: &str, original: &str) -> String {
     let path = Path::new(dir);
     let stem = Path::new(original)
         .file_stem()
@@ -499,14 +578,14 @@ fn generate_unique_filename(dir: &str, original: &str) -> String {
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("jpg");
-    
+
     let mut counter = 1;
     let mut filename = format!("{}_{}.{}", stem, counter, ext);
-    
+
     while path.join(&filename).exists() {
         counter += 1;
         filename = format!("{}_{}.{}", stem, counter, ext);
     }
-    
+
     filename
 }
