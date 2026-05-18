@@ -263,6 +263,21 @@ export function ImportPage() {
     );
   }
 
+  if (step === 4) {
+    return (
+      <div
+        className="flex flex-col overflow-hidden px-6 pt-4 pb-6 max-w-2xl mx-auto w-full"
+        style={{ height: 'calc(100vh - 52px)' }}
+      >
+        <h1 className="text-[22px] font-medium text-foreground mb-3 shrink-0">{t('import.title')}</h1>
+        <div className="shrink-0">
+          <StepIndicator current={4} />
+        </div>
+        <ConflictReview onImport={startImport} onBack={() => setStep(3)} />
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 max-w-2xl mx-auto">
       <h1 className="text-[22px] font-medium text-foreground mb-6">{t('import.title')}</h1>
@@ -415,10 +430,6 @@ export function ImportPage() {
         </div>
       )}
 
-      {/* Step 4 – Review conflicts & import */}
-      {step === 4 && (
-        <ConflictReview onImport={startImport} onBack={() => setStep(3)} />
-      )}
     </div>
   );
 }

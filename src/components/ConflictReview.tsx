@@ -8,8 +8,7 @@ import { ProgressBar } from './ProgressBar';
 import { Button } from '@/components/ui/button';
 
 const ACTIONS: ImportAction[] = ['Skip', 'KeepBoth', 'Replace'];
-const ROW_HEIGHT = 164;
-const MAX_LIST_HEIGHT = 420;
+const ROW_HEIGHT = 192;
 
 function actionLabel(action: ImportAction, t: (k: string) => string): string {
   if (action === 'KeepBoth') return t('conflicts.keepBoth');
@@ -81,7 +80,7 @@ function ConflictRowInner({
     : '';
 
   return (
-    <div className="p-3 bg-background rounded-lg border border-border h-full box-border">
+    <div className="px-3 pt-3 pb-4 bg-background rounded-lg border border-border">
       <div className="flex gap-3 mb-2.5">
         <PreviewThumb src={incomingThumbUrl} label={t('conflicts.incoming')} filename={img.filename} />
         <div className="flex items-center self-center text-muted-foreground">
@@ -184,13 +183,12 @@ export function ConflictReview({ onImport, onBack }: { onImport: () => void; onB
 
   const isImporting = phase === 'importing';
   const global = globalAction();
-  const listHeight = Math.min(conflicts.length * ROW_HEIGHT, MAX_LIST_HEIGHT);
 
   return (
-    <div className="bg-card p-6 rounded-xl">
-      <h3 className="text-base font-semibold text-foreground mb-1">{t('conflicts.title')}</h3>
+    <div className="bg-card p-6 rounded-xl flex flex-col flex-1 min-h-0">
+      <h3 className="text-base font-semibold text-foreground mb-1 shrink-0">{t('conflicts.title')}</h3>
 
-      <div className="flex items-center justify-between p-3 bg-muted rounded-lg mb-4">
+      <div className="flex items-center justify-between p-3 bg-muted rounded-lg mb-4 shrink-0">
         <span className="text-sm text-foreground">
           {importPlan.images.length} {t('timeline.photos')}
         </span>
@@ -198,19 +196,21 @@ export function ConflictReview({ onImport, onBack }: { onImport: () => void; onB
       </div>
 
       {conflicts.length === 0 ? (
-        <div className="mb-5 p-4 bg-accent/10 rounded-xl">
-          <p className="text-sm text-accent">
-            {t('conflicts.noConflicts', { count: importPlan.images.length })}
-          </p>
+        <div className="flex-1 mb-5 flex items-start">
+          <div className="p-4 bg-accent/10 rounded-xl w-full">
+            <p className="text-sm text-accent">
+              {t('conflicts.noConflicts', { count: importPlan.images.length })}
+            </p>
+          </div>
         </div>
       ) : (
-        <div className="mb-5">
-          <p className="text-sm text-[var(--color-warning)] mb-3">
+        <div className="flex flex-col flex-1 min-h-0 mb-5">
+          <p className="text-sm text-[var(--color-warning)] mb-3 shrink-0">
             {t('conflicts.conflictsFound', { count: conflicts.length })}
           </p>
 
           {/* Apply to all bar */}
-          <div className="flex items-center gap-2 mb-3 p-2 bg-muted rounded-lg">
+          <div className="flex items-center gap-2 mb-3 p-2 bg-muted rounded-lg shrink-0">
             <span className="text-xs text-muted-foreground shrink-0">
               {t('conflicts.applyToAll')}
             </span>
@@ -226,19 +226,21 @@ export function ConflictReview({ onImport, onBack }: { onImport: () => void; onB
             </div>
           </div>
 
-          {/* Virtualized conflict list */}
-          <List
-            rowComponent={ConflictRowRenderer}
-            rowCount={conflicts.length}
-            rowHeight={rowHeight}
-            rowProps={rowData}
-            style={{ height: listHeight }}
-          />
+          {/* Virtualized conflict list — fills remaining space */}
+          <div className="flex-1 min-h-0">
+            <List
+              rowComponent={ConflictRowRenderer}
+              rowCount={conflicts.length}
+              rowHeight={rowHeight}
+              rowProps={rowData}
+              style={{ height: '100%' }}
+            />
+          </div>
         </div>
       )}
 
       {isImporting && (
-        <div className="mb-4">
+        <div className="mb-4 shrink-0">
           <ProgressBar
             current={progress.current}
             total={progress.total}
@@ -248,7 +250,7 @@ export function ConflictReview({ onImport, onBack }: { onImport: () => void; onB
         </div>
       )}
 
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center shrink-0">
         <Button variant="outline" onClick={onBack} disabled={isImporting}>
           ← {t('common.back')}
         </Button>
