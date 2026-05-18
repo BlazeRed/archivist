@@ -16,15 +16,24 @@ export function FilterPanel() {
   const isFiltered = filter.noDate || filter.yearFrom !== null || filter.yearTo !== null || filter.month !== null || filter.groupId !== null;
   const clearFilter = () => setFilter({ yearFrom: null, yearTo: null, month: null, noDate: false, groupId: null });
 
+  const singleYear = !filter.noDate && availableYears.length === 1 ? availableYears[0] : null;
+  const monthYear = filter.yearFrom ?? singleYear;
+
   const availableMonths = useMemo(() => {
-    if (!filter.yearFrom || filter.yearFrom !== filter.yearTo) return [];
+    if (!monthYear) return [];
+    if (filter.yearFrom !== null && filter.yearFrom !== filter.yearTo) return [];
     const months = new Set(
       allImages
-        .filter(img => img.taken_at && new Date(img.taken_at).getFullYear() === filter.yearFrom)
+        .filter(img => img.taken_at && new Date(img.taken_at).getFullYear() === monthYear)
         .map(img => new Date(img.taken_at!).getMonth() + 1)
     );
     return [...months].sort((a, b) => a - b);
-  }, [allImages, filter.yearFrom, filter.yearTo]);
+  }, [allImages, monthYear, filter.yearFrom, filter.yearTo]);
+
+  const showMonthFilter = !filter.noDate && (
+    (filter.yearFrom !== null && filter.yearFrom === filter.yearTo) ||
+    availableYears.length === 1
+  );
 
   return (
     <div className="space-y-4">
@@ -48,7 +57,13 @@ export function FilterPanel() {
         </Label>
       </div>
 
-      {!filter.noDate && availableYears.length > 0 && (() => {
+      {!filter.noDate && availableYears.length === 1 && (
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">{availableYears[0]}</span>
+        </div>
+      )}
+
+      {!filter.noDate && availableYears.length > 1 && (() => {
         const years = [...availableYears].reverse(); // oldest → newest (left → right)
         const fromIdx = filter.yearFrom !== null ? years.indexOf(filter.yearFrom) : 0;
         const toIdx = filter.yearTo !== null ? years.indexOf(filter.yearTo) : years.length - 1;
@@ -75,15 +90,23 @@ export function FilterPanel() {
         );
       })()}
 
-      {!filter.noDate && filter.yearFrom !== null && filter.yearFrom === filter.yearTo && (
+      {showMonthFilter && (
         <Select
-          value={filter.month?.toString() ?? ''}
-          onValueChange={(v) => setFilter({ month: Number(v) })}
+          value={filter.month?.toString() ?? 'all'}
+          onValueChange={(v) => {
+            const month = v === 'all' ? null : Number(v);
+            if (singleYear !== null && month !== null) {
+              setFilter({ yearFrom: singleYear, yearTo: singleYear, month });
+            } else {
+              setFilter({ month });
+            }
+          }}
         >
           <SelectTrigger className="w-full">
             <SelectValue placeholder={t('timeline.allMonths')} />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="all">{t('timeline.allMonths')}</SelectItem>
             {availableMonths.map(m => (
               <SelectItem key={m} value={m.toString()}>{monthNames[m - 1]}</SelectItem>
             ))}
@@ -95,13 +118,14 @@ export function FilterPanel() {
         <div className="space-y-1">
           <p className="text-xs text-muted-foreground">{t('timeline.filterGroups')}</p>
           <Select
-            value={filter.groupId?.toString() ?? ''}
-            onValueChange={(v) => setFilter({ groupId: Number(v) })}
+            value={filter.groupId?.toString() ?? 'all'}
+            onValueChange={(v) => setFilter({ groupId: v === 'all' ? null : Number(v) })}
           >
             <SelectTrigger className="w-full">
               <SelectValue placeholder={t('timeline.allGroups')} />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="all">{t('timeline.allGroups')}</SelectItem>
               {availableGroups.map(g => (
                 <SelectItem key={g.id} value={g.id.toString()}>{g.name} ({g.image_count})</SelectItem>
               ))}
