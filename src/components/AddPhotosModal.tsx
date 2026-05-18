@@ -19,9 +19,9 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
-import { MONTH_NAMES } from "@/lib/months";
+import { useMonthNames } from "@/lib/months";
 
-function groupByMonth(images: Image[]) {
+function groupByMonth(images: Image[], monthNames: string[]) {
   const map = new Map<string, Image[]>();
   for (const img of images) {
     let key: string;
@@ -46,7 +46,7 @@ function groupByMonth(images: Image[]) {
         ? "No Date"
         : (() => {
             const [y, m] = key.split("-").map(Number);
-            return `${y}  ›  ${MONTH_NAMES[m - 1]}`;
+            return `${y}  ›  ${monthNames[m - 1]}`;
           })(),
     images: map.get(key)!,
   }));
@@ -64,6 +64,7 @@ export function AddPhotosModal({
   onAdded,
 }: Props) {
   const { t } = useTranslation();
+  const monthNames = useMonthNames();
   const { config } = useAppConfigStore();
   const [allImages, setAllImages] = useState<Image[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -128,7 +129,7 @@ export function AddPhotosModal({
     return result;
   }, [allImages, yearFrom, yearTo, filterMonth]);
 
-  const groups = useMemo(() => groupByMonth(filteredImages), [filteredImages]);
+  const groups = useMemo(() => groupByMonth(filteredImages, monthNames), [filteredImages, monthNames]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -219,7 +220,7 @@ export function AddPhotosModal({
                     <SelectContent>
                       {availableMonths.map((m) => (
                         <SelectItem key={m} value={m.toString()}>
-                          {MONTH_NAMES[m - 1]}
+                          {monthNames[m - 1]}
                         </SelectItem>
                       ))}
                     </SelectContent>

@@ -6,10 +6,11 @@ import { Slider } from '@/components/ui/slider';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { MONTH_NAMES } from '@/lib/months';
+import { useMonthNames } from '@/lib/months';
 
 export function FilterPanel() {
   const { t } = useTranslation();
+  const monthNames = useMonthNames();
   const { filter, setFilter, availableYears, availableGroups, images, allImages } = useTimelineStore();
 
   const isFiltered = filter.noDate || filter.yearFrom !== null || filter.yearTo !== null || filter.month !== null || filter.groupId !== null;
@@ -84,7 +85,7 @@ export function FilterPanel() {
           </SelectTrigger>
           <SelectContent>
             {availableMonths.map(m => (
-              <SelectItem key={m} value={m.toString()}>{MONTH_NAMES[m - 1]}</SelectItem>
+              <SelectItem key={m} value={m.toString()}>{monthNames[m - 1]}</SelectItem>
             ))}
           </SelectContent>
         </Select>

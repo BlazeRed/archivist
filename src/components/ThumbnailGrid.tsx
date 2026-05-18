@@ -6,7 +6,8 @@ import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { useGroupUIStore } from '../stores/groupUIStore';
 import type { Image } from '../types';
-import { MONTH_NAMES } from '../lib/months';
+import { useMonthNames } from '../lib/months';
+import { cn } from '@/lib/utils';
 
 const SIZES = {
   small:  { px: 120, cols: 6, gap: 8,  rowH: 134 },
@@ -20,7 +21,7 @@ type HeaderRow = { type: 'header'; label: string };
 type ImagesRow = { type: 'images'; images: Image[] };
 type TimelineRow = HeaderRow | ImagesRow;
 
-function buildRows(images: Image[], cols: number, noDateLabel: string): TimelineRow[] {
+function buildRows(images: Image[], cols: number, noDateLabel: string, monthNames: string[]): TimelineRow[] {
   const groups = new Map<string, Image[]>();
 
   for (const img of images) {
@@ -51,7 +52,7 @@ function buildRows(images: Image[], cols: number, noDateLabel: string): Timeline
       label = noDateLabel;
     } else {
       const [year, month] = key.split('-').map(Number);
-      label = `${year}  ›  ${MONTH_NAMES[month - 1]}`;
+      label = `${year}  ›  ${monthNames[month - 1]}`;
     }
 
     rows.push({ type: 'header', label });
@@ -211,7 +212,30 @@ export function ThumbnailGrid() {
   const { config } = useAppConfigStore();
   const { isSelectionMode, selectedImageIds, toggleSelection } = useGroupUIStore();
   const [stickyLabel, setStickyLabel] = useState('');
+  const [scrollVisible, setScrollVisible] = useState(false);
+  const [scrollFraction, setScrollFraction] = useState(0);
+  const scrollHideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.target as HTMLElement;
+    const max = el.scrollHeight - el.clientHeight;
+    if (max <= 0) return;
+    setScrollFraction(el.scrollTop / max);
+    setScrollVisible(true);
+    clearTimeout(scrollHideTimer.current);
+    scrollHideTimer.current = setTimeout(() => setScrollVisible(false), 1500);
+  }, []);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (e.clientX >= rect.right - 20) {
+      setScrollVisible(true);
+      clearTimeout(scrollHideTimer.current);
+      scrollHideTimer.current = setTimeout(() => setScrollVisible(false), 1500);
+    }
+  }, []);
+
+  const monthNames = useMonthNames();
   const sizeKey = config.thumbnail_size as SizeKey;
   const size = SIZES[sizeKey];
 
@@ -234,8 +258,8 @@ export function ThumbnailGrid() {
     : size.cols;
 
   const rows = useMemo(
-    () => buildRows(images, dynamicCols, t('timeline.noDateHeader')),
-    [images, dynamicCols, t]
+    () => buildRows(images, dynamicCols, t('timeline.noDateHeader'), monthNames),
+    [images, dynamicCols, t, monthNames]
   );
 
   const getRowHeight = useCallback(
@@ -295,8 +319,17 @@ export function ThumbnailGrid() {
     );
   }
 
+  const containerH = containerRef.current?.clientHeight ?? 0;
+  const thumbH = Math.max(40, containerH * 0.05);
+  const labelTop = scrollFraction * (containerH - thumbH) + thumbH / 2;
+
   return (
-    <div ref={containerRef} className="relative h-full">
+    <div
+      ref={containerRef}
+      className="relative h-full"
+      onScrollCapture={handleScroll}
+      onMouseMove={handleMouseMove}
+    >
       {/* Sticky header overlay */}
       {stickyLabel && (
         <div className="absolute top-0 left-0 right-0 z-10 h-10 flex items-center px-6 bg-[#D2E8F7]/95 backdrop-blur-sm border-b border-[rgba(0,45,88,0.12)] pointer-events-none">
@@ -313,6 +346,21 @@ export function ThumbnailGrid() {
         className="h-full"
         style={{ height: '100%' }}
       />
+
+      {/* Scrollbar date label */}
+      {stickyLabel && (
+        <div
+          className={cn(
+            'pointer-events-none absolute right-5 z-20 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap',
+            'bg-foreground/80 text-background shadow-sm',
+            'transition-opacity duration-150',
+            scrollVisible ? 'opacity-100' : 'opacity-0'
+          )}
+          style={{ top: labelTop, transform: 'translateY(-50%)' }}
+        >
+          {stickyLabel}
+        </div>
+      )}
     </div>
   );
 }
