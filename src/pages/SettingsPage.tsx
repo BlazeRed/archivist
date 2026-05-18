@@ -174,36 +174,6 @@ export function SettingsPage() {
           )}
         </div>
 
-        {/* Advanced Settings */}
-        <div className="border-t border-border pt-6">
-          <h3 className="text-sm font-medium text-foreground mb-4">{t('settings.advancedSettings')}</h3>
-
-          <div className="space-y-4">
-            <div>
-              <Label className="text-xs text-muted-foreground mb-1">{t('settings.blockSize')}</Label>
-              <Input
-                type="number"
-                value={config.block_size}
-                onChange={(e) => setConfig({ block_size: parseInt(e.target.value) || 50 })}
-                className="w-24"
-                min={10}
-                max={200}
-              />
-              <p className="text-[10px] text-muted-foreground mt-1">{t('settings.blockSizeDesc')}</p>
-            </div>
-
-            <div>
-              <Label className="text-xs text-muted-foreground mb-1">{t('settings.lastImportSource')}</Label>
-              <Input
-                type="text"
-                value={config.last_import_source}
-                readOnly
-                className="w-full cursor-default"
-                placeholder="—"
-              />
-            </div>
-          </div>
-        </div>
       </div>
 
       {appVersion && (
