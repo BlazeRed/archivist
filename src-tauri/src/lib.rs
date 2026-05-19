@@ -237,11 +237,27 @@ async fn rescan_archive(
 #[tauri::command]
 fn delete_files(paths: Vec<String>) -> usize {
     let mut count = 0;
-    for path in paths {
-        if std::fs::remove_file(&path).is_ok() {
+    let mut parent_dirs: Vec<std::path::PathBuf> = Vec::new();
+
+    for path in &paths {
+        let p = std::path::Path::new(path);
+        if std::fs::remove_file(p).is_ok() {
             count += 1;
+            if let Some(parent) = p.parent() {
+                let pb = parent.to_path_buf();
+                if !parent_dirs.contains(&pb) {
+                    parent_dirs.push(pb);
+                }
+            }
         }
     }
+
+    // Sort deepest first so children are checked before parents
+    parent_dirs.sort_by(|a, b| b.components().count().cmp(&a.components().count()));
+    for dir in parent_dirs {
+        let _ = std::fs::remove_dir(&dir); // no-op if non-empty
+    }
+
     count
 }
 

@@ -17,6 +17,7 @@ pub struct RescanResult {
     pub repaired: usize,
     pub moved: usize,
     pub thumbnailed: usize,
+    pub folders_removed: usize,
 }
 
 struct DiscoveredFile {
@@ -117,7 +118,8 @@ pub fn rescan_archive(archive_path: &str, db: &Database) -> Result<RescanResult,
     // Thumbnails: generate for images that lack one
     let thumbnailed = repair_missing_thumbnails(archive_path, db)?;
 
-    Ok(RescanResult { added, removed, repaired, moved, thumbnailed })
+    let folders_removed = remove_empty_dirs(root)?;
+    Ok(RescanResult { added, removed, repaired, moved, thumbnailed, folders_removed })
 }
 
 pub fn run_migrations(archive_path: &str, db: &Database) -> Result<(), AppError> {
@@ -284,6 +286,43 @@ fn is_image_file(path: &Path) -> bool {
         .map(|e| e.to_lowercase());
 
     matches!(ext.as_deref(), Some("jpg") | Some("jpeg") | Some("png") | Some("gif") | Some("webp") | Some("tiff") | Some("tif") | Some("bmp") | Some("heic") | Some("heif"))
+}
+
+fn collect_dirs_inner(dir: &Path, dirs: &mut Vec<PathBuf>) -> Result<(), AppError> {
+    let entries = fs::read_dir(dir).map_err(|e| AppError::FileRead {
+        path: dir.to_string_lossy().to_string(),
+        message: e.to_string(),
+    })?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if name == ".archivist" { continue; }
+            collect_dirs_inner(&path, dirs)?;
+            dirs.push(path); // push after recursing = children before parents
+        }
+    }
+    Ok(())
+}
+
+fn remove_empty_dirs(root: &Path) -> Result<usize, AppError> {
+    let mut dirs: Vec<PathBuf> = Vec::new();
+    collect_dirs_inner(root, &mut dirs)?;
+    let mut removed = 0usize;
+    for dir in dirs {
+        let mut entries = fs::read_dir(&dir).map_err(|e| AppError::FileRead {
+            path: dir.to_string_lossy().to_string(),
+            message: e.to_string(),
+        })?;
+        if entries.next().is_none() {
+            fs::remove_dir(&dir).map_err(|e| AppError::FileRead {
+                path: dir.to_string_lossy().to_string(),
+                message: e.to_string(),
+            })?;
+            removed += 1;
+        }
+    }
+    Ok(removed)
 }
 
 fn compute_image_id(path: &Path) -> Result<String, AppError> {

@@ -8,6 +8,7 @@ import { useAppConfigStore } from '../stores/appConfigStore';
 import { ConflictReview } from '../components/ConflictReview';
 import { ProgressBar } from '../components/ProgressBar';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
 function StepIndicator({ current }: { current: number }) {
@@ -104,6 +105,7 @@ function DropZone({
 export function ImportPage() {
   const { t } = useTranslation();
   const [cleanupDismissed, setCleanupDismissed] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
   const { config } = useAppConfigStore();
@@ -210,6 +212,7 @@ export function ImportPage() {
     const canCleanup = result !== null && result.errors.length === 0 && result.imported > 0 && (result.imported_sources?.length ?? 0) > 0;
     const showCleanupBanner = canCleanup && !cleanupDismissed;
     return (
+      <>
       <div className="p-6 max-w-2xl mx-auto">
         <div className="bg-card p-8 rounded-xl text-center">
           <div className="w-12 h-12 rounded-full bg-accent/15 flex items-center justify-center mx-auto mb-4">
@@ -244,7 +247,7 @@ export function ImportPage() {
                 {t('import.sourceCleanup', { count: result!.imported_sources.length })}
               </p>
               <div className="flex gap-2">
-                <Button variant="destructive" size="sm" onClick={handleDeleteSources}>
+                <Button variant="destructive" size="sm" onClick={() => setShowDeleteConfirm(true)}>
                   {t('import.deleteSource')}
                 </Button>
                 <Button variant="outline" size="sm" autoFocus onClick={() => setCleanupDismissed(true)}>
@@ -256,6 +259,26 @@ export function ImportPage() {
           <Button onClick={handleReset}>{t('common.confirm')}</Button>
         </div>
       </div>
+
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('import.deleteConfirmTitle')}</DialogTitle>
+            <DialogDescription>
+              {t('import.deleteConfirmBody', { count: result?.imported_sources?.length ?? 0 })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button variant="destructive" onClick={() => { setShowDeleteConfirm(false); handleDeleteSources(); }}>
+              {t('import.deleteConfirmAction')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      </>
     );
   }
 

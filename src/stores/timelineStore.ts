@@ -84,7 +84,16 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
       }
 
       const images = applyClientFilter(allImages, filter, groupIds);
-      set({ allImages, images, availableYears: years, loading: false });
+      const { selectedImage, previewImage } = get();
+      const newIds = new Set(allImages.map(img => img.id));
+      set({
+        allImages,
+        images,
+        availableYears: years,
+        loading: false,
+        selectedImage: selectedImage && !newIds.has(selectedImage.id) ? null : selectedImage,
+        previewImage: previewImage && !newIds.has(previewImage.id) ? null : previewImage,
+      });
     } catch (e) {
       set({ error: String(e), loading: false });
     }
