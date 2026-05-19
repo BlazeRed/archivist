@@ -7,7 +7,7 @@ import { ImageMetadata } from './ImageMetadata';
 
 export function ImagePreview({ width }: { width: number }) {
   const { t } = useTranslation();
-  const { previewImage, selectImage } = useTimelineStore();
+  const { previewImage, selectImage, setPreviewImage } = useTimelineStore();
   const { config } = useAppConfigStore();
 
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -66,6 +66,16 @@ export function ImagePreview({ width }: { width: number }) {
             className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-200 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
           />
         )}
+        {/* Close button */}
+        <button
+          onClick={() => setPreviewImage(null)}
+          className="absolute top-2 left-2 w-8 h-8 rounded-full bg-black/55 hover:bg-black/80 text-white flex items-center justify-center transition-colors"
+          title={t('common.close')}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
         {/* Expand button */}
         <button
           onClick={() => selectImage(previewImage)}
