@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -6,7 +6,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { getVersion } from '@tauri-apps/api/app';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { useTimelineStore } from '../stores/timelineStore';
-import { useImageStore, useGroupStore } from '../stores/dataStore';
+import { useGroupStore } from '../stores/dataStore';
 import { useImportStore } from '../stores/importStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,8 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 export function SettingsPage() {
   const { t, i18n } = useTranslation();
   const { config, setConfig } = useAppConfigStore();
-  const { fetchImages } = useTimelineStore();
-  const clearImages = useImageStore((s) => s.clearImages);
+  const { fetchImages, clearImages, selectImage } = useTimelineStore();
   const clearGroups = useGroupStore((s) => s.clearGroups);
   const phase = useImportStore((s) => s.phase);
   const isImportActive = phase === 'scanning' || phase === 'analyzing' || phase === 'thumbnailing' || phase === 'importing';
@@ -26,27 +25,34 @@ export function SettingsPage() {
   const [rescanResult, setRescanResult] = useState<string | null>(null);
   const [appVersion, setAppVersion] = useState<string>('');
   const [showImportWarning, setShowImportWarning] = useState(false);
+  const rescanClearTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     getVersion().then(setAppVersion).catch(() => {});
   }, []);
 
+  useEffect(() => () => clearTimeout(rescanClearTimer.current), []);
+
   const selectArchiveFolder = async () => {
     if (isImportActive) { setShowImportWarning(true); return; }
     const selected = await open({ directory: true, title: t('settings.selectArchiveFolder') });
     if (selected) {
-      setConfig({ archive_path: selected as string });
+      clearImages();
+      selectImage(null);
+      clearGroups();
       try {
         await invoke('init_archive', { archivePath: selected });
       } catch (e) {
         console.error('Failed to init archive:', e);
       }
+      setConfig({ archive_path: selected as string });
     }
   };
 
   const handleCloseArchive = () => {
     if (isImportActive) { setShowImportWarning(true); return; }
     clearImages();
+    selectImage(null);
     clearGroups();
     setConfig({ archive_path: '' });
   };
@@ -67,9 +73,13 @@ export function SettingsPage() {
       if (result.thumbnailed > 0) msg += ` · ${t('settings.rescanThumbnailed', { count: result.thumbnailed })}`;
       if (result.folders_removed > 0) msg += ` · ${t('settings.rescanFoldersRemoved', { count: result.folders_removed })}`;
       setRescanResult(msg);
+      clearTimeout(rescanClearTimer.current);
+      rescanClearTimer.current = setTimeout(() => setRescanResult(null), 5000);
       fetchImages();
     } catch (e) {
       setRescanResult(t('settings.rescanError', { error: String(e) }));
+      clearTimeout(rescanClearTimer.current);
+      rescanClearTimer.current = setTimeout(() => setRescanResult(null), 5000);
     } finally {
       setRescanLoading(false);
     }

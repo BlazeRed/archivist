@@ -24,9 +24,9 @@ interface ExportResult {
 
 export function GroupsPage() {
   const { t } = useTranslation();
-  const { groups, fetchGroups, createGroup, updateGroup, deleteGroup } = useGroupStore();
+  const { groups, fetchGroups, createGroup, updateGroup, deleteGroup, clearGroups } = useGroupStore();
   const { config, setConfig } = useAppConfigStore();
-  const { selectImage } = useTimelineStore();
+  const { selectImage, clearImages } = useTimelineStore();
   const { selectedImageIds, isSelectionMode, clearSelection, getSelectedCount } = useGroupUIStore();
 
   const [view, setView] = useState<'grid' | 'detail'>('grid');
@@ -51,12 +51,15 @@ export function GroupsPage() {
   const handleOpenArchive = async () => {
     const selected = await open({ directory: true });
     if (selected) {
-      setConfig({ archive_path: selected as string });
+      clearImages();
+      selectImage(null);
+      clearGroups();
       try {
         await invoke('init_archive', { archivePath: selected });
       } catch (e) {
         console.error('Failed to init archive:', e);
       }
+      setConfig({ archive_path: selected as string });
     }
   };
 

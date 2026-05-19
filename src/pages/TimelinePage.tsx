@@ -6,6 +6,7 @@ import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { useGroupUIStore } from '../stores/groupUIStore';
 import { useImportStore } from '../stores/importStore';
+import { useGroupStore } from '../stores/dataStore';
 import { TimelineNavbar } from '../components/TimelineNavbar';
 import { ThumbnailGrid } from '../components/ThumbnailGrid';
 import { ImageDetail } from '../components/ImageDetail';
@@ -111,7 +112,8 @@ function SelectionActionBar() {
 
 export function TimelinePage() {
   const { t } = useTranslation();
-  const { fetchImages, fetchGroups } = useTimelineStore();
+  const { fetchImages, fetchGroups, clearImages, selectImage } = useTimelineStore();
+  const clearGroups = useGroupStore((s) => s.clearGroups);
   const { config, setConfig } = useAppConfigStore();
   const { isSelectionMode } = useGroupUIStore();
   const phase = useImportStore((s) => s.phase);
@@ -136,12 +138,15 @@ export function TimelinePage() {
     if (isImportActive) { setShowImportWarning(true); return; }
     const selected = await open({ directory: true });
     if (selected) {
-      setConfig({ archive_path: selected as string });
+      clearImages();
+      selectImage(null);
+      clearGroups();
       try {
         await invoke('init_archive', { archivePath: selected });
       } catch (e) {
         console.error('Failed to init archive:', e);
       }
+      setConfig({ archive_path: selected as string });
     }
   };
 

@@ -7,6 +7,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { useImportStore } from '../stores/importStore';
 import { useTimelineStore } from '../stores/timelineStore';
+import { useGroupStore } from '../stores/dataStore';
 import { useUIStore } from '../stores/uiStore';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -18,7 +19,8 @@ export function Topbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { phase } = useImportStore();
-  const { fetchImages, clearImages } = useTimelineStore();
+  const { fetchImages, clearImages, selectImage } = useTimelineStore();
+  const clearGroups = useGroupStore((s) => s.clearGroups);
   const { settingsOpen, toggleSettings } = useUIStore();
   const [pendingPath, setPendingPath] = useState<string | null>(null);
   const [isRescanning, setIsRescanning] = useState(false);
@@ -39,8 +41,10 @@ export function Topbar() {
     const selected = await open({ directory: true });
     if (selected) {
       clearImages();
-      setConfig({ archive_path: selected as string });
+      selectImage(null);
+      clearGroups();
       try { await invoke('init_archive', { archivePath: selected }); } catch {}
+      setConfig({ archive_path: selected as string });
     }
   };
 

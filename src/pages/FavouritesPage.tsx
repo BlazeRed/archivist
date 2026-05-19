@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
+import { useGroupStore } from '../stores/dataStore';
 import { ImageDetail } from '../components/ImageDetail';
 import { Button } from '@/components/ui/button';
 import { getThumbnailUrl } from '@/lib/archivePath';
@@ -59,15 +60,18 @@ function FavouriteThumb({ image, archivePath }: { image: Image; archivePath: str
 
 export function FavouritesPage() {
   const { t } = useTranslation();
-  const { allImages, clearImages } = useTimelineStore();
+  const { allImages, clearImages, selectImage } = useTimelineStore();
   const { config, setConfig } = useAppConfigStore();
+  const clearGroups = useGroupStore((s) => s.clearGroups);
 
   const handleOpenArchive = async () => {
     const selected = await open({ directory: true });
     if (selected) {
       clearImages();
-      setConfig({ archive_path: selected as string });
+      selectImage(null);
+      clearGroups();
       try { await invoke('init_archive', { archivePath: selected }); } catch {}
+      setConfig({ archive_path: selected as string });
     }
   };
 
