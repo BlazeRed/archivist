@@ -1,7 +1,8 @@
 import { useMemo, useCallback, useState, useRef, useEffect, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { List, RowComponentProps } from 'react-window';
-import { convertFileSrc } from '@tauri-apps/api/core';
+import { getThumbnailUrl } from '@/lib/archivePath';
+import { yearMonthKey, parseYearMonth } from '@/lib/dateKeys';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { useGroupUIStore } from '../stores/groupUIStore';
@@ -25,13 +26,7 @@ function buildRows(images: Image[], cols: number, noDateLabel: string, monthName
   const groups = new Map<string, Image[]>();
 
   for (const img of images) {
-    let key: string;
-    if (!img.taken_at) {
-      key = '__nodate__';
-    } else {
-      const d = new Date(img.taken_at);
-      key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    }
+    const key = yearMonthKey(img.taken_at);
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(img);
   }
@@ -51,8 +46,8 @@ function buildRows(images: Image[], cols: number, noDateLabel: string, monthName
     if (key === '__nodate__') {
       label = noDateLabel;
     } else {
-      const [year, month] = key.split('-').map(Number);
-      label = `${year}  ›  ${monthNames[month - 1]}`;
+      const ym = parseYearMonth(key)!;
+      label = `${ym.year}  ›  ${monthNames[ym.month - 1]}`;
     }
 
     rows.push({ type: 'header', label });
@@ -97,22 +92,19 @@ const ThumbnailCell = memo(function ThumbnailCell({
 }) {
   const { t } = useTranslation();
   const { px } = SIZES[sizeKey];
-  const root = archivePath.replace(/\/+$/, '');
-  const thumbnailUrl = root && image.thumbnail_path
-    ? convertFileSrc(`${root}/${image.thumbnail_path}`)
-    : '';
+  const thumbnailUrl = getThumbnailUrl(archivePath, image.thumbnail_path);
 
   return (
     <div
       style={{ width: px, height: px }}
       onClick={() => onImageClick(image)}
       className={cn(
-        'group/thumb relative bg-[#E8F3FB] border rounded-md overflow-hidden cursor-pointer flex-shrink-0 transition-shadow hover:shadow-lg',
+        'group/thumb relative bg-card border rounded-md overflow-hidden cursor-pointer flex-shrink-0 transition-shadow hover:shadow-lg',
         isSelected
-          ? 'ring-2 ring-[#0084C5] border-[#0084C5]'
+          ? 'ring-2 ring-primary border-primary'
           : isPreviewed
-            ? 'ring-2 ring-[#0084C5]/60 border-[#0084C5]/60'
-            : 'border-[rgba(0,45,88,0.15)]'
+            ? 'ring-2 ring-primary/60 border-primary/60'
+            : 'border-border'
       )}
     >
       {thumbnailUrl ? (
@@ -123,7 +115,7 @@ const ThumbnailCell = memo(function ThumbnailCell({
           loading="lazy"
         />
       ) : (
-        <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-[rgba(0,45,88,0.4)]">
+        <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-foreground/40">
           <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
             <line x1="3" y1="3" x2="21" y2="21"/>
@@ -153,7 +145,7 @@ const ThumbnailCell = memo(function ThumbnailCell({
           onClick={(e) => { e.stopPropagation(); onToggleSelect(image.id); }}
         >
           <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-            isSelected ? 'bg-[#0084C5] border-[#0084C5]' : 'bg-white/80 border-[rgba(0,45,88,0.4)]'
+            isSelected ? 'bg-primary border-primary' : 'bg-white/80 border-foreground/40'
           }`}>
             {isSelected && (
               <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -166,7 +158,7 @@ const ThumbnailCell = memo(function ThumbnailCell({
 
       {/* Filename bar — always visible when previewed, hover only otherwise */}
       <div className={cn(
-        'absolute bottom-0 left-0 right-0 bg-[#002D58] px-1 py-0.5 transition-opacity pointer-events-none',
+        'absolute bottom-0 left-0 right-0 bg-foreground px-1 py-0.5 transition-opacity pointer-events-none',
         isPreviewed ? 'opacity-100' : 'opacity-0 group-hover/thumb:opacity-100'
       )}>
         <p className="text-[10px] text-white truncate">{image.filename}</p>
@@ -192,8 +184,8 @@ function TimelineRowComponent({
 
   if (row.type === 'header') {
     return (
-      <div style={style} className="flex items-center px-6 bg-[#D2E8F7] border-b border-[rgba(0,45,88,0.12)]">
-        <span className="text-[13px] font-semibold text-[#002D58] tracking-wide">{row.label}</span>
+      <div style={style} className="flex items-center px-6 bg-background border-b border-foreground/12">
+        <span className="text-[13px] font-semibold text-foreground tracking-wide">{row.label}</span>
       </div>
     );
   }
@@ -320,7 +312,7 @@ export function ThumbnailGrid() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-[rgba(0,45,88,0.55)]">{t('common.loading')}</p>
+        <p className="text-muted-foreground">{t('common.loading')}</p>
       </div>
     );
   }
@@ -328,7 +320,7 @@ export function ThumbnailGrid() {
   if (images.length === 0) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-[rgba(0,45,88,0.55)]">{t('timeline.noPhotos')}</p>
+        <p className="text-muted-foreground">{t('timeline.noPhotos')}</p>
       </div>
     );
   }
@@ -346,8 +338,8 @@ export function ThumbnailGrid() {
     >
       {/* Sticky header overlay */}
       {stickyLabel && (
-        <div className="absolute top-0 left-0 right-0 z-10 h-10 flex items-center px-6 bg-[#D2E8F7]/95 backdrop-blur-sm border-b border-[rgba(0,45,88,0.12)] pointer-events-none">
-          <span className="text-[13px] font-semibold text-[#002D58] tracking-wide">{stickyLabel}</span>
+        <div className="absolute top-0 left-0 right-0 z-10 h-10 flex items-center px-6 bg-background/95 backdrop-blur-sm border-b border-foreground/12 pointer-events-none">
+          <span className="text-[13px] font-semibold text-foreground tracking-wide">{stickyLabel}</span>
         </div>
       )}
 

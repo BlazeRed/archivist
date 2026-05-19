@@ -78,7 +78,7 @@ export function TimelineNavbar() {
           {isFiltered && !open && filterChips.map((chip, i) => (
             <span
               key={i}
-              className="text-xs px-2 py-0.5 rounded-full bg-[rgba(0,132,197,0.12)] text-[#0084C5] font-medium whitespace-nowrap"
+              className="text-xs px-2 py-0.5 rounded-full bg-primary/12 text-primary font-medium whitespace-nowrap"
             >
               {chip}
             </span>

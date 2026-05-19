@@ -400,7 +400,7 @@ pub fn execute_import(
     Ok(ImportResult { imported, skipped, errors, imported_sources })
 }
 
-pub fn destination_path(archive_root: &str, taken_at: &Option<String>) -> String {
+pub(crate) fn destination_path(archive_root: &str, taken_at: &Option<String>) -> String {
     if let Some(ref dt) = taken_at {
         if let Ok(parsed) = chrono::DateTime::parse_from_rfc3339(dt) {
             let year = parsed.format("%Y").to_string();

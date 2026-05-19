@@ -1,19 +1,17 @@
 import { useTranslation } from 'react-i18next';
-import { convertFileSrc, invoke } from '@tauri-apps/api/core';
+import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { ImageDetail } from '../components/ImageDetail';
 import { Button } from '@/components/ui/button';
+import { getThumbnailUrl } from '@/lib/archivePath';
 import type { Image } from '../types';
 
 function FavouriteThumb({ image, archivePath }: { image: Image; archivePath: string }) {
   const { t } = useTranslation();
   const { selectImage, updateImageFavourite } = useTimelineStore();
-  const root = archivePath.replace(/\/+$/, '');
-  const thumbnailUrl = root && image.thumbnail_path
-    ? convertFileSrc(`${root}/${image.thumbnail_path}`)
-    : '';
+  const thumbnailUrl = getThumbnailUrl(archivePath, image.thumbnail_path);
 
   const handleRemove = async (e: React.MouseEvent) => {
     e.stopPropagation();

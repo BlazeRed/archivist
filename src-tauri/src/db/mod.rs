@@ -27,7 +27,7 @@ impl Database {
     }
 
     fn init_schema(&self) -> Result<(), AppError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().expect("mutex poisoned");
         
         conn.execute_batch(
             "
@@ -88,7 +88,7 @@ impl Database {
     }
 
     pub fn get_setting(&self, key: &str) -> Result<Option<String>, AppError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().expect("mutex poisoned");
         let mut stmt = conn.prepare("SELECT value FROM settings WHERE key = ?1")?;
         match stmt.query_row([key], |row| row.get(0)) {
             Ok(v) => Ok(Some(v)),
@@ -98,7 +98,7 @@ impl Database {
     }
 
     pub fn set_setting(&self, key: &str, value: &str) -> Result<(), AppError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().expect("mutex poisoned");
         conn.execute(
             "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
             [key, value],
@@ -107,6 +107,6 @@ impl Database {
     }
 
     pub fn connection(&self) -> std::sync::MutexGuard<'_, Connection> {
-        self.conn.lock().unwrap()
+        self.conn.lock().expect("mutex poisoned")
     }
 }

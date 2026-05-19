@@ -7,6 +7,7 @@ use crate::error::AppError;
 use crate::db::Database;
 use crate::exif::{self, ExifResult};
 use crate::commands::import::destination_path;
+use crate::hasher;
 use crate::thumbnail::{self, ThumbnailSize};
 
 #[derive(Debug, Serialize)]
@@ -286,28 +287,7 @@ fn is_image_file(path: &Path) -> bool {
 }
 
 fn compute_image_id(path: &Path) -> Result<String, AppError> {
-    use sha2::{Sha256, Digest};
-
-    let mut file = fs::File::open(path).map_err(|e| AppError::FileRead {
-        path: path.to_string_lossy().to_string(),
-        message: e.to_string(),
-    })?;
-
-    let mut hasher = Sha256::new();
-    let mut buffer = [0u8; 8192];
-
-    loop {
-        use std::io::Read;
-        let bytes_read = file.read(&mut buffer).map_err(|e| AppError::FileRead {
-            path: path.to_string_lossy().to_string(),
-            message: e.to_string(),
-        })?;
-
-        if bytes_read == 0 { break; }
-        hasher.update(&buffer[..bytes_read]);
-    }
-
-    Ok(hex::encode(hasher.finalize()))
+    hasher::compute_hash(path)
 }
 
 fn get_image_dimensions(path: &Path) -> Result<(Option<u32>, Option<u32>), AppError> {

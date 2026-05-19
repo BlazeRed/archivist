@@ -33,7 +33,7 @@ export function SettingsPage() {
 
   const selectArchiveFolder = async () => {
     if (isImportActive) { setShowImportWarning(true); return; }
-    const selected = await open({ directory: true, title: 'Select archive folder' });
+    const selected = await open({ directory: true, title: t('settings.selectArchiveFolder') });
     if (selected) {
       setConfig({ archive_path: selected as string });
       try {

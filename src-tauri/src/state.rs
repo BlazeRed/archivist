@@ -16,7 +16,7 @@ impl AppState {
     }
 
     pub fn db(&self) -> Arc<Database> {
-        Arc::clone(&self.db.lock().unwrap())
+        Arc::clone(&self.db.lock().expect("mutex poisoned"))
     }
 
     pub fn reinit_db(&self, archive_path: &str) -> Result<(), crate::error::AppError> {
@@ -32,16 +32,16 @@ impl AppState {
             .join(".archivist")
             .join("archivist.db");
         let new_db = Database::new(&db_path)?;
-        *self.db.lock().unwrap() = Arc::new(new_db);
+        *self.db.lock().expect("mutex poisoned") = Arc::new(new_db);
         Ok(())
     }
 
     pub fn set_archive_path(&self, path: String) {
-        let mut guard = self.archive_path.lock().unwrap();
+        let mut guard = self.archive_path.lock().expect("mutex poisoned");
         *guard = Some(path);
     }
 
     pub fn get_archive_path(&self) -> Option<String> {
-        self.archive_path.lock().unwrap().clone()
+        self.archive_path.lock().expect("mutex poisoned").clone()
     }
 }

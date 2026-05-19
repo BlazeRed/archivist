@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { convertFileSrc } from '@tauri-apps/api/core';
+import { trimArchivePath } from '@/lib/archivePath';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { ImageMetadata } from './ImageMetadata';
@@ -14,7 +15,7 @@ export function ImageDetail({ hideGroups, hideDetails }: { hideGroups?: boolean;
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imgSrc, setImgSrc] = useState('');
 
-  const archivePath = config.archive_path.replace(/\/+$/, '');
+  const archivePath = trimArchivePath(config.archive_path);
 
   useEffect(() => {
     if (!selectedImage) { setImgSrc(''); return; }
@@ -36,7 +37,7 @@ export function ImageDetail({ hideGroups, hideDetails }: { hideGroups?: boolean;
     >
       <div
         className={cn(
-          'bg-[#E8F3FB] rounded-xl w-full max-h-[90vh] flex overflow-hidden',
+          'bg-card rounded-xl w-full max-h-[90vh] flex overflow-hidden',
           hideDetails ? 'max-w-3xl' : 'max-w-5xl'
         )}
         onClick={(e) => e.stopPropagation()}
@@ -71,13 +72,13 @@ export function ImageDetail({ hideGroups, hideDetails }: { hideGroups?: boolean;
 
         {/* Details panel — hidden when hideDetails=true */}
         {!hideDetails && (
-          <div className="w-72 flex flex-col bg-[#E8F3FB] overflow-y-auto">
+          <div className="w-72 flex flex-col bg-card overflow-y-auto">
             {/* Header */}
-            <div className="flex justify-between items-center px-4 py-3 border-b border-[rgba(0,45,88,0.12)]">
-              <h3 className="text-sm font-semibold text-[#002D58]">{t('detail.title')}</h3>
+            <div className="flex justify-between items-center px-4 py-3 border-b border-foreground/12">
+              <h3 className="text-sm font-semibold text-foreground">{t('detail.title')}</h3>
               <button
                 onClick={() => selectImage(null)}
-                className="text-[rgba(0,45,88,0.55)] hover:text-[#0084C5] transition-colors"
+                className="text-muted-foreground hover:text-primary transition-colors"
                 title={t('common.close')}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

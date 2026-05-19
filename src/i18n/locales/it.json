@@ -1,7 +1,6 @@
 {
   "app": {
-    "name": "Archivist",
-    "tagline": "Organizzatore di archivi fotografici"
+    "name": "Archivist"
   },
   "nav": {
     "timeline": "Cronologia",
@@ -23,13 +22,10 @@
     "browse": "Sfoglia",
     "change": "Cambia",
     "noThumbnail": "Anteprima non disponibile",
-    "dateFromFile": "Data dal file (non da fotocamera)",
-    "dateFromFilename": "Data dal nome del file",
-    "noDate": "Nessuna data disponibile"
+    "dateFromFilename": "Data dal nome del file"
   },
   "import": {
     "title": "Importa",
-    "selectSource": "Seleziona sorgente",
     "selectDestination": "Seleziona cartella archivio",
     "analyzing": "Analizzo le immagini...",
     "analyzingProgress": "Analizzo {{current}} di {{total}}",
@@ -39,8 +35,6 @@
     "imported": "Importate",
     "skipped": "Saltate",
     "sourceCleanup": "Eliminare le {{count}} foto sorgente?",
-    "noDate": "Senza data",
-    "missingDate": "Data mancante — inserita in Senza data",
     "selectFolder": "Seleziona cartella",
     "selectFile": "Seleziona file",
     "step1Title": "Seleziona sorgente",
@@ -68,8 +62,6 @@
     "dropHere": "Rilascia per importare"
   },
   "timeline": {
-    "title": "Cronologia",
-    "allPhotos": "Tutte le foto",
     "noPhotos": "Nessuna foto nell'archivio",
     "filter": "Filtro",
     "allYears": "Tutti gli anni",
@@ -84,8 +76,7 @@
     "archiveNotSet": "Imposta un percorso archivio nelle Impostazioni.",
     "openArchive": "Apri Archivio",
     "clearFilter": "Azzera filtri",
-    "photos": "foto",
-    "moreFilters": "Altri filtri"
+    "photos": "foto"
   },
   "preview": {
     "empty": "Seleziona un'immagine per l'anteprima",
@@ -100,11 +91,9 @@
     "title": "Gruppi",
     "create": "Crea gruppo",
     "noGroups": "Nessun gruppo creato",
-    "selectPhotos": "Seleziona foto da aggiungere",
     "export": "Esporta",
     "photosCount": "{{count}} foto",
     "noPhotos": "Nessuna foto in questo gruppo",
-    "selectGroup": "Seleziona un gruppo per vedere le foto",
     "namePlaceholder": "Nome gruppo",
     "deleteConfirm": "Eliminare questo gruppo? Le immagini non saranno eliminate.",
     "selectedPhotosInfo": "{{count}} foto selezionate — verranno aggiunte al nuovo gruppo",
@@ -139,7 +128,8 @@
     "coverSizeMedium": "Medio (176px)",
     "coverSizeLarge": "Grande (220px)",
     "closeArchive": "Chiudi archivio",
-    "closeArchiveDesc": "Disconnettiti dall'archivio corrente"
+    "closeArchiveDesc": "Disconnettiti dall'archivio corrente",
+    "selectArchiveFolder": "Seleziona cartella archivio"
   },
   "detail": {
     "title": "Dettagli",
@@ -164,15 +154,11 @@
     "applyToAll": "Applica a tutti:",
     "noConflicts": "Nessun conflitto — {{count}} foto pronte per l'importazione.",
     "conflictsFound": "{{count}} conflitto/i — scegli come gestire ciascuno:",
-    "existingPath": "Copia archiviata:",
     "incoming": "Nuovo",
     "inArchive": "In archivio"
   },
   "status": {
-    "success": "Successo",
-    "warning": "Attenzione",
-    "error": "Errore",
-    "info": "Info"
+    "error": "Errore"
   },
   "months": {
     "1": "Gennaio",

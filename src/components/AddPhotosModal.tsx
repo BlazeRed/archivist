@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
-import { convertFileSrc } from "@tauri-apps/api/core";
+import { getThumbnailUrl } from "@/lib/archivePath";
+import { yearMonthKey, parseYearMonth } from "@/lib/dateKeys";
 import { useAppConfigStore } from "../stores/appConfigStore";
 import type { Image } from "../types";
 import {
@@ -26,13 +27,7 @@ function groupByDate(images: Image[], sortField: 'taken_at' | 'imported_at', mon
   const map = new Map<string, Image[]>();
   for (const img of images) {
     const dateStr = sortField === 'imported_at' ? img.imported_at : img.taken_at;
-    let key: string;
-    if (!dateStr) {
-      key = "__nodate__";
-    } else {
-      const d = new Date(dateStr);
-      key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    }
+    const key = yearMonthKey(dateStr);
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(img);
   }
@@ -53,8 +48,8 @@ function groupByDate(images: Image[], sortField: 'taken_at' | 'imported_at', mon
         key === "__nodate__"
           ? "No Date"
           : (() => {
-              const [y, m] = key.split("-").map(Number);
-              return `${y}  ›  ${monthNames[m - 1]}`;
+              const ym = parseYearMonth(key)!;
+              return `${ym.year}  ›  ${monthNames[ym.month - 1]}`;
             })(),
       images: imgs,
     };
@@ -83,7 +78,7 @@ export function AddPhotosModal({
   const [adding, setAdding] = useState(false);
   const [sortBy, setSortBy] = useState<'taken_at' | 'imported_at'>('taken_at');
 
-  const archivePath = config.archive_path.replace(/\/+$/, "");
+  const archivePath = config.archive_path;
   const thumbPx = config.thumbnail_size === 'small' ? 120 : config.thumbnail_size === 'large' ? 280 : 180;
 
   useEffect(() => {
@@ -277,9 +272,7 @@ export function AddPhotosModal({
                   </div>
                   <div className="flex flex-wrap gap-2 px-6 py-3">
                     {group.images.map((img) => {
-                      const thumbnailUrl = archivePath && img.thumbnail_path
-                        ? convertFileSrc(`${archivePath}/${img.thumbnail_path}`)
-                        : "";
+                      const thumbnailUrl = getThumbnailUrl(archivePath, img.thumbnail_path);
                       const isSelected = selectedIds.has(img.id);
                       return (
                         <div
@@ -336,7 +329,7 @@ export function AddPhotosModal({
                             )}
                           </div>
 
-                          <div className="absolute bottom-0 left-0 right-0 bg-[rgba(0,45,88,0.6)] px-1 py-0.5">
+                          <div className="absolute bottom-0 left-0 right-0 bg-foreground/60 px-1 py-0.5">
                             <p className="text-[10px] text-white truncate">
                               {img.filename}
                             </p>

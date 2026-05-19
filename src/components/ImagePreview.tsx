@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
+import { trimArchivePath } from '@/lib/archivePath';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { ImageMetadata } from './ImageMetadata';
@@ -13,7 +14,7 @@ export function ImagePreview({ width }: { width: number }) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imgSrc, setImgSrc] = useState('');
 
-  const archivePath = config.archive_path.replace(/\/+$/, '');
+  const archivePath = trimArchivePath(config.archive_path);
 
   useEffect(() => {
     if (!previewImage) { setImgSrc(''); setImageLoaded(false); return; }

@@ -1,7 +1,6 @@
 {
   "app": {
-    "name": "Archivist",
-    "tagline": "Photographic archive organizer"
+    "name": "Archivist"
   },
   "nav": {
     "timeline": "Timeline",
@@ -23,13 +22,10 @@
     "browse": "Browse",
     "change": "Change",
     "noThumbnail": "No thumbnail available",
-    "dateFromFile": "Date from file modification time",
-    "dateFromFilename": "Date from filename",
-    "noDate": "No date available"
+    "dateFromFilename": "Date from filename"
   },
   "import": {
     "title": "Import",
-    "selectSource": "Select Source",
     "selectDestination": "Select archive folder",
     "analyzing": "Analyzing images...",
     "analyzingProgress": "Analyzing {{current}} of {{total}}",
@@ -39,8 +35,6 @@
     "imported": "Imported",
     "skipped": "Skipped",
     "sourceCleanup": "Delete the {{count}} source images?",
-    "noDate": "No Date",
-    "missingDate": "Missing date — placed in No Date",
     "selectFolder": "Select Folder",
     "selectFile": "Select File",
     "step1Title": "Select Source",
@@ -68,8 +62,6 @@
     "dropHere": "Drop to import"
   },
   "timeline": {
-    "title": "Timeline",
-    "allPhotos": "All Photos",
     "noPhotos": "No photos in archive",
     "filter": "Filter",
     "allYears": "All years",
@@ -84,8 +76,7 @@
     "archiveNotSet": "Set an archive path in Settings to view photos.",
     "openArchive": "Open Archive",
     "clearFilter": "Clear filters",
-    "photos": "photos",
-    "moreFilters": "More filters"
+    "photos": "photos"
   },
   "preview": {
     "empty": "Select an image to preview",
@@ -100,11 +91,9 @@
     "title": "Groups",
     "create": "Create Group",
     "noGroups": "No groups created",
-    "selectPhotos": "Select photos to add",
     "export": "Export",
     "photosCount": "{{count}} photos",
     "noPhotos": "No photos in this group",
-    "selectGroup": "Select a group to view its photos",
     "namePlaceholder": "Group name",
     "deleteConfirm": "Delete this group? This will not delete the images.",
     "selectedPhotosInfo": "{{count}} photos selected — they will be added to the new group",
@@ -139,7 +128,8 @@
     "coverSizeMedium": "Medium (176px)",
     "coverSizeLarge": "Large (220px)",
     "closeArchive": "Close archive",
-    "closeArchiveDesc": "Disconnect from the current archive"
+    "closeArchiveDesc": "Disconnect from the current archive",
+    "selectArchiveFolder": "Select archive folder"
   },
   "detail": {
     "title": "Details",
@@ -164,15 +154,11 @@
     "applyToAll": "Apply to all:",
     "noConflicts": "No conflicts — all {{count}} photos ready to import.",
     "conflictsFound": "{{count}} conflict(s) — choose how to handle each:",
-    "existingPath": "Archived copy:",
     "incoming": "New",
     "inArchive": "In archive"
   },
   "status": {
-    "success": "Success",
-    "warning": "Warning",
-    "error": "Error",
-    "info": "Info"
+    "error": "Error"
   },
   "months": {
     "1": "January",
