@@ -136,16 +136,6 @@ const ThumbnailCell = memo(function ThumbnailCell({
       {/* Hover dark overlay */}
       <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/thumb:opacity-100 transition-opacity pointer-events-none" />
 
-      {/* Date source badge */}
-      {image.date_source === 'filename' && (
-        <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#0084C5]" title={t('common.dateFromFilename')} />
-      )}
-      {image.date_source === 'mtime' && (
-        <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#E6A817]" title={t('common.dateFromFile')} />
-      )}
-      {!image.date_source && !image.taken_at && (
-        <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-muted-foreground/60" title={t('common.noDate')} />
-      )}
 
       {/* Favourite indicator */}
       {image.is_favourite && (
