@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { Topbar } from './components/Topbar';
 import { Toaster } from './components/ui/sonner';
 import { TimelinePage } from './pages/TimelinePage';
@@ -9,10 +9,13 @@ import { GroupsPage } from './pages/GroupsPage';
 import { ImportPage } from './pages/ImportPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { useAppConfigStore } from './stores/appConfigStore';
+import { useUIStore } from './stores/uiStore';
+import { cn } from './lib/utils';
 
 function App() {
   const { i18n } = useTranslation();
   const { setConfig } = useAppConfigStore();
+  const { settingsOpen, closeSettings } = useUIStore();
 
   useEffect(() => {
     (async () => {
@@ -46,14 +49,34 @@ function App() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Topbar />
-      <main className="flex-1">
+      <main className="flex-1 relative">
         <Routes>
           <Route path="/" element={<TimelinePage />} />
           <Route path="/groups" element={<GroupsPage />} />
           <Route path="/import" element={<ImportPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/settings" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
+
+      {/* Settings backdrop */}
+      <div
+        className={cn(
+          'fixed inset-0 z-40 bg-black/30 transition-opacity duration-200',
+          settingsOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        )}
+        onClick={closeSettings}
+      />
+
+      {/* Settings slide-over panel */}
+      <div
+        className={cn(
+          'fixed top-[52px] right-0 bottom-0 z-50 w-80 bg-card border-l border-border shadow-xl transition-transform duration-200',
+          settingsOpen ? 'translate-x-0' : 'translate-x-full'
+        )}
+      >
+        <SettingsPage />
+      </div>
+
       <Toaster />
     </div>
   );

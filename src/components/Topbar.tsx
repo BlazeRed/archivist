@@ -3,20 +3,23 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
+import { open } from '@tauri-apps/plugin-dialog';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { useImportStore } from '../stores/importStore';
 import { useTimelineStore } from '../stores/timelineStore';
+import { useUIStore } from '../stores/uiStore';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
 export function Topbar() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { config, setConfig } = useAppConfigStore();
   const navigate = useNavigate();
   const location = useLocation();
   const { phase } = useImportStore();
   const { fetchImages } = useTimelineStore();
+  const { settingsOpen, toggleSettings } = useUIStore();
   const [pendingPath, setPendingPath] = useState<string | null>(null);
   const [isRescanning, setIsRescanning] = useState(false);
 
@@ -32,10 +35,12 @@ export function Topbar() {
     return () => { unlisten?.(); };
   }, [isImportActive]);
 
-  const toggleLanguage = () => {
-    const newLang = config.language === 'en' ? 'it' : 'en';
-    i18n.changeLanguage(newLang);
-    setConfig({ language: newLang });
+  const handleOpenArchive = async () => {
+    const selected = await open({ directory: true });
+    if (selected) {
+      setConfig({ archive_path: selected as string });
+      try { await invoke('init_archive', { archivePath: selected }); } catch {}
+    }
   };
 
   const handleRescan = async () => {
@@ -52,6 +57,7 @@ export function Topbar() {
   };
 
   const handleNav = (to: string) => navigate(to);
+  const isActive = (to: string) => to === '/' ? location.pathname === '/' : location.pathname.startsWith(to);
 
   return (
     <header className="h-[52px] bg-background border-b border-border flex items-center justify-between px-4">
@@ -73,29 +79,51 @@ export function Topbar() {
         {[
           { to: '/', label: t('nav.timeline') },
           { to: '/groups', label: t('nav.groups') },
-          { to: '/import', label: t('nav.import') },
-          { to: '/settings', label: t('nav.settings') },
-        ].map(({ to, label }) => {
-          const isActive = to === '/' ? location.pathname === '/' : location.pathname.startsWith(to);
-          return (
-            <button
-              key={to}
-              onClick={() => handleNav(to)}
-              className={cn(
-                'relative px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-                isActive ? 'bg-primary/12 text-primary' : 'text-foreground hover:bg-foreground/8'
-              )}
-            >
-              {label}
-              {to === '/import' && isImportActive && (
-                <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-primary animate-pulse" />
-              )}
-            </button>
-          );
-        })}
+        ].map(({ to, label }) => (
+          <button
+            key={to}
+            onClick={() => handleNav(to)}
+            className={cn(
+              'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+              isActive(to) ? 'bg-primary/12 text-primary' : 'text-foreground hover:bg-foreground/8'
+            )}
+          >
+            {label}
+          </button>
+        ))}
+
+        {/* Divider — separates content pages from utility pages */}
+        <div className="w-px h-4 bg-border mx-1 shrink-0" />
+
+        <button
+          onClick={() => handleNav('/import')}
+          className={cn(
+            'relative px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+            isActive('/import') ? 'bg-primary/12 text-primary' : 'text-foreground hover:bg-foreground/8'
+          )}
+        >
+          {t('nav.import')}
+          {isImportActive && (
+            <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-primary animate-pulse" />
+          )}
+        </button>
       </nav>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1">
+        {/* Open archive */}
+        <button
+          onClick={handleOpenArchive}
+          disabled={isImportActive}
+          title={t('timeline.openArchive')}
+          className="p-1.5 rounded-md text-foreground/60 hover:text-foreground hover:bg-foreground/8 transition-colors disabled:opacity-40"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+          </svg>
+        </button>
+
+        {/* Rescan */}
         {config.archive_path && (
           <button
             onClick={handleRescan}
@@ -114,9 +142,24 @@ export function Topbar() {
             </svg>
           </button>
         )}
-        <Button variant="outline" size="sm" onClick={toggleLanguage}>
-          {config.language.toUpperCase()}
-        </Button>
+
+        {/* Settings cog */}
+        <button
+          onClick={toggleSettings}
+          title={t('nav.settings')}
+          className={cn(
+            'p-1.5 rounded-md transition-colors',
+            settingsOpen
+              ? 'text-primary bg-primary/12'
+              : 'text-foreground/60 hover:text-foreground hover:bg-foreground/8'
+          )}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </button>
       </div>
 
       <Dialog open={pendingPath === '__close__'} onOpenChange={(open) => { if (!open) setPendingPath(null); }}>

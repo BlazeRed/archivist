@@ -75,10 +75,10 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="relative p-6 h-[calc(100vh-52px)]">
+    <div className="relative p-6 h-full overflow-y-auto">
       <h1 className="text-[22px] font-medium text-foreground mb-6">{t('settings.title')}</h1>
 
-      <div className="space-y-6 max-w-md">
+      <div className="space-y-6">
         {/* Archive Path */}
         <div className="space-y-2">
           <Label>{t('settings.archivePath')}</Label>
@@ -90,7 +90,7 @@ export function SettingsPage() {
               placeholder="/path/to/archive"
               className="flex-1"
             />
-            <Button variant="secondary" onClick={selectArchiveFolder}>
+            <Button variant="default" onClick={selectArchiveFolder}>
               {t('common.browse')}
             </Button>
           </div>
@@ -160,7 +160,7 @@ export function SettingsPage() {
             <Button
               onClick={handleRescan}
               disabled={rescanLoading || !config.archive_path}
-              variant="secondary"
+              variant="default"
               className="gap-2"
             >
               {rescanLoading && (
