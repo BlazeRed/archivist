@@ -4,8 +4,9 @@ import { convertFileSrc } from '@tauri-apps/api/core';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { ImageMetadata } from './ImageMetadata';
+import { cn } from '@/lib/utils';
 
-export function ImageDetail({ hideGroups }: { hideGroups?: boolean }) {
+export function ImageDetail({ hideGroups, hideDetails }: { hideGroups?: boolean; hideDetails?: boolean }) {
   const { t } = useTranslation();
   const { selectedImage, selectImage } = useTimelineStore();
   const { config } = useAppConfigStore();
@@ -34,7 +35,10 @@ export function ImageDetail({ hideGroups }: { hideGroups?: boolean }) {
       onClick={() => selectImage(null)}
     >
       <div
-        className="bg-[#E8F3FB] rounded-xl max-w-5xl w-full max-h-[90vh] flex overflow-hidden"
+        className={cn(
+          'bg-[#E8F3FB] rounded-xl w-full max-h-[90vh] flex overflow-hidden',
+          hideDetails ? 'max-w-3xl' : 'max-w-5xl'
+        )}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Image */}
@@ -52,29 +56,42 @@ export function ImageDetail({ hideGroups }: { hideGroups?: boolean }) {
             onLoad={() => setImageLoaded(true)}
             className={`max-w-full max-h-[80vh] object-contain transition-opacity duration-200 ${imageLoaded ? 'opacity-100' : 'opacity-0 absolute'}`}
           />
-        </div>
-
-        {/* Details panel */}
-        <div className="w-72 flex flex-col bg-[#E8F3FB] overflow-y-auto">
-          {/* Header */}
-          <div className="flex justify-between items-center px-4 py-3 border-b border-[rgba(0,45,88,0.12)]">
-            <h3 className="text-sm font-semibold text-[#002D58]">{t('detail.title')}</h3>
+          {hideDetails && (
             <button
               onClick={() => selectImage(null)}
-              className="text-[rgba(0,45,88,0.55)] hover:text-[#0084C5] transition-colors"
+              className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/55 hover:bg-black/80 text-white flex items-center justify-center transition-colors"
               title={t('common.close')}
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
-          </div>
-
-          {/* Metadata + groups */}
-          <div className="px-4 py-3 flex-1 overflow-y-auto">
-            <ImageMetadata image={selectedImage} hideGroups={hideGroups} />
-          </div>
+          )}
         </div>
+
+        {/* Details panel — hidden when hideDetails=true */}
+        {!hideDetails && (
+          <div className="w-72 flex flex-col bg-[#E8F3FB] overflow-y-auto">
+            {/* Header */}
+            <div className="flex justify-between items-center px-4 py-3 border-b border-[rgba(0,45,88,0.12)]">
+              <h3 className="text-sm font-semibold text-[#002D58]">{t('detail.title')}</h3>
+              <button
+                onClick={() => selectImage(null)}
+                className="text-[rgba(0,45,88,0.55)] hover:text-[#0084C5] transition-colors"
+                title={t('common.close')}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Metadata + groups */}
+            <div className="px-4 py-3 flex-1 overflow-y-auto">
+              <ImageMetadata image={selectedImage} hideGroups={hideGroups} />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

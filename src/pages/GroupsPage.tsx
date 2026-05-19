@@ -364,13 +364,15 @@ export function GroupsPage() {
                         onClick={e => handleSetCover(e, img.id)}
                         title={t('groups.setCover')}
                         className={cn(
-                          'absolute top-1.5 left-1.5 w-6 h-6 rounded-full text-xs flex items-center justify-center transition-all',
+                          'absolute top-1.5 left-1.5 w-6 h-6 rounded-full flex items-center justify-center transition-all',
                           isCover
                             ? 'bg-primary text-primary-foreground opacity-100'
                             : 'bg-black/60 text-white opacity-0 group-hover/img:opacity-100 hover:bg-primary'
                         )}
                       >
-                        ★
+                        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                        </svg>
                       </button>
 
                       {/* Remove button */}

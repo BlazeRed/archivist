@@ -10,6 +10,7 @@ export interface Image {
   has_exif: boolean;
   date_source: 'exif' | 'filename' | 'mtime' | null;
   thumbnail_path: string | null;
+  is_favourite: boolean;
 }
 
 export interface Group {

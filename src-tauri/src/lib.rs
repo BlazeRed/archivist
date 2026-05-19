@@ -270,6 +270,16 @@ fn load_config(app: tauri::AppHandle) -> Option<serde_json::Value> {
 }
 
 #[tauri::command]
+fn toggle_favourite(state: tauri::State<'_, Arc<AppState>>, image_id: String, is_favourite: bool) -> Result<(), error::AppError> {
+    state.db().set_image_favourite(&image_id, is_favourite)
+}
+
+#[tauri::command]
+fn get_favourite_images(state: tauri::State<'_, Arc<AppState>>) -> Result<Vec<db::image::Image>, error::AppError> {
+    state.db().get_favourite_images()
+}
+
+#[tauri::command]
 fn path_exists(path: String) -> bool {
     std::path::Path::new(&path).exists()
 }
@@ -315,6 +325,8 @@ pub fn run() {
             save_config,
             load_config,
             path_exists,
+            toggle_favourite,
+            get_favourite_images,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -61,7 +61,12 @@ export function Topbar() {
 
   return (
     <header className="h-[52px] bg-background border-b border-border flex items-center justify-between px-4">
-      <div className="flex items-center gap-2">
+      <button
+        onClick={handleOpenArchive}
+        disabled={isImportActive}
+        title={t('timeline.openArchive')}
+        className="flex items-center gap-2 rounded-lg px-1 py-0.5 hover:bg-foreground/8 transition-colors disabled:opacity-40 cursor-pointer"
+      >
         <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shrink-0">
           <svg className="w-5 h-5 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -72,7 +77,7 @@ export function Topbar() {
             />
           </svg>
         </div>
-        <div className="flex flex-col leading-none">
+        <div className="flex flex-col leading-none text-left">
           <span className="text-lg font-medium text-foreground leading-none">{t('app.name')}</span>
           {config.archive_path && (
             <span className="text-[10px] text-muted-foreground truncate max-w-[200px]" title={config.archive_path}>
@@ -80,54 +85,44 @@ export function Topbar() {
             </span>
           )}
         </div>
-      </div>
+      </button>
 
-      <nav className="flex items-center gap-1">
+      <nav className="flex items-center bg-muted rounded-lg p-0.5">
         {[
           { to: '/', label: t('nav.timeline') },
           { to: '/groups', label: t('nav.groups') },
+          { to: '/favourites', label: t('nav.favourites') },
         ].map(({ to, label }) => (
           <button
             key={to}
             onClick={() => handleNav(to)}
             className={cn(
               'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-              isActive(to) ? 'bg-primary/12 text-primary' : 'text-foreground hover:bg-foreground/8'
+              isActive(to) ? 'bg-white text-foreground font-medium shadow-sm' : 'text-muted-foreground hover:text-foreground'
             )}
           >
             {label}
           </button>
         ))}
-
-        {/* Divider — separates content pages from utility pages */}
-        <div className="w-px h-4 bg-border mx-1 shrink-0" />
-
-        <button
-          onClick={() => handleNav('/import')}
-          className={cn(
-            'relative px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-            isActive('/import') ? 'bg-primary/12 text-primary' : 'text-foreground hover:bg-foreground/8'
-          )}
-        >
-          {t('nav.import')}
-          {isImportActive && (
-            <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-primary animate-pulse" />
-          )}
-        </button>
       </nav>
 
       <div className="flex items-center gap-1">
-        {/* Open archive */}
+        {/* Import */}
         <button
-          onClick={handleOpenArchive}
-          disabled={isImportActive}
-          title={t('timeline.openArchive')}
-          className="p-1.5 rounded-md text-foreground/60 hover:text-foreground hover:bg-foreground/8 transition-colors disabled:opacity-40"
+          onClick={() => handleNav('/import')}
+          title={t('nav.import')}
+          className={cn(
+            'relative p-1.5 rounded-md transition-colors',
+            isActive('/import') ? 'text-primary bg-primary/12' : 'text-foreground/60 hover:text-foreground hover:bg-foreground/8'
+          )}
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
           </svg>
+          {isImportActive && (
+            <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-primary animate-pulse" />
+          )}
         </button>
 
         {/* Rescan */}

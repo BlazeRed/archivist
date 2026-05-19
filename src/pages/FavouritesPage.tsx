@@ -1,0 +1,88 @@
+import { useTranslation } from 'react-i18next';
+import { convertFileSrc, invoke } from '@tauri-apps/api/core';
+import { useTimelineStore } from '../stores/timelineStore';
+import { useAppConfigStore } from '../stores/appConfigStore';
+import { ImageDetail } from '../components/ImageDetail';
+import type { Image } from '../types';
+
+function FavouriteThumb({ image, archivePath }: { image: Image; archivePath: string }) {
+  const { t } = useTranslation();
+  const { selectImage, updateImageFavourite } = useTimelineStore();
+  const root = archivePath.replace(/\/+$/, '');
+  const thumbnailUrl = root && image.thumbnail_path
+    ? convertFileSrc(`${root}/${image.thumbnail_path}`)
+    : '';
+
+  const handleRemove = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await invoke('toggle_favourite', { imageId: image.id, isFavourite: false });
+    updateImageFavourite(image.id, false);
+  };
+
+  return (
+    <div
+      onClick={() => selectImage(image)}
+      className="group/thumb relative bg-[#E8F3FB] border border-[rgba(0,45,88,0.15)] rounded-md overflow-hidden cursor-pointer aspect-square hover:shadow-lg transition-shadow"
+    >
+      {thumbnailUrl ? (
+        <img src={thumbnailUrl} alt={image.filename} className="w-full h-full object-cover" loading="lazy" />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center text-[rgba(0,45,88,0.4)]">
+          <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+            <line x1="3" y1="3" x2="21" y2="21" />
+            <circle cx="8.5" cy="8.5" r="1.5" />
+          </svg>
+        </div>
+      )}
+      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/thumb:opacity-100 transition-opacity pointer-events-none" />
+      {/* Remove from favourites — appears on hover */}
+      <button
+        onClick={handleRemove}
+        title={t('preview.favourite')}
+        className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/60 hover:bg-black/85 text-white flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity"
+      >
+        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+        </svg>
+      </button>
+      <div className="absolute bottom-0 left-0 right-0 bg-[rgba(0,45,88,0.6)] px-1 py-0.5">
+        <p className="text-[10px] text-white truncate">{image.filename}</p>
+      </div>
+    </div>
+  );
+}
+
+export function FavouritesPage() {
+  const { t } = useTranslation();
+  const { allImages } = useTimelineStore();
+  const { config } = useAppConfigStore();
+  const favourites = allImages.filter(img => img.is_favourite);
+
+  return (
+    <div className="flex flex-col h-[calc(100vh-52px)]">
+      <div className="shrink-0 h-12 px-4 flex items-center border-b border-border bg-card">
+        <h2 className="font-semibold text-sm text-foreground">{t('favourites.title')}</h2>
+        {favourites.length > 0 && (
+          <span className="ml-2 text-xs text-muted-foreground">{favourites.length}</span>
+        )}
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-6">
+        {favourites.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-muted-foreground text-sm">{t('favourites.empty')}</p>
+          </div>
+        ) : (
+          <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
+            {favourites.map(img => (
+              <FavouriteThumb key={img.id} image={img} archivePath={config.archive_path} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <ImageDetail />
+    </div>
+  );
+}

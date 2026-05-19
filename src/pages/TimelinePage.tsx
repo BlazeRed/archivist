@@ -199,7 +199,7 @@ export function TimelinePage() {
         )}
       </div>
 
-      <ImageDetail />
+      <ImageDetail hideDetails />
     </div>
   );
 }

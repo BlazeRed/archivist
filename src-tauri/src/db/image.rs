@@ -15,6 +15,7 @@ pub struct Image {
     pub has_exif: bool,
     pub date_source: Option<String>,
     pub thumbnail_path: Option<String>,
+    pub is_favourite: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,11 +45,12 @@ fn map_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Image> {
         has_exif:      row.get::<_, i32>(8)? != 0,
         date_source:   row.get(9)?,
         thumbnail_path: row.get(10)?,
+        is_favourite:  row.get::<_, i32>(11).unwrap_or(0) != 0,
     })
 }
 
 const SELECT_COLS: &str =
-    "id, filename, file_path, taken_at, imported_at, width, height, file_size, has_exif, date_source, thumbnail_path";
+    "id, filename, file_path, taken_at, imported_at, width, height, file_size, has_exif, date_source, thumbnail_path, is_favourite";
 
 impl super::Database {
     pub fn insert_image(&self, image: &NewImage) -> Result<(), super::AppError> {
@@ -202,5 +204,25 @@ impl super::Database {
             params![taken_at_str, has_exif as i32, date_source, id],
         )?;
         Ok(())
+    }
+
+    pub fn set_image_favourite(&self, id: &str, is_favourite: bool) -> Result<(), super::AppError> {
+        let conn = self.connection();
+        conn.execute(
+            "UPDATE images SET is_favourite = ?1 WHERE id = ?2",
+            params![is_favourite as i32, id],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_favourite_images(&self) -> Result<Vec<Image>, super::AppError> {
+        let conn = self.connection();
+        let sql = format!(
+            "SELECT {} FROM images WHERE is_favourite = 1 ORDER BY taken_at DESC, imported_at DESC",
+            SELECT_COLS
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let images = stmt.query_map([], map_row)?.collect::<Result<Vec<_>, _>>()?;
+        Ok(images)
     }
 }

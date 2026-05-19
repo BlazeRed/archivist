@@ -74,6 +74,7 @@ impl Database {
         let _ = conn.execute("ALTER TABLE groups ADD COLUMN cover_image_id TEXT", []);
         let _ = conn.execute("ALTER TABLE images ADD COLUMN thumbnail_path TEXT", []);
         let _ = conn.execute("ALTER TABLE images ADD COLUMN date_source TEXT", []);
+        let _ = conn.execute("ALTER TABLE images ADD COLUMN is_favourite INTEGER DEFAULT 0", []);
         let _ = conn.execute(
             "UPDATE images SET date_source = CASE \
              WHEN has_exif = 1 THEN 'exif' \

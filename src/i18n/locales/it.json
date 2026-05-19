@@ -6,6 +6,7 @@
   "nav": {
     "timeline": "Cronologia",
     "groups": "Gruppi",
+    "favourites": "Preferiti",
     "import": "Importa",
     "settings": "Impostazioni",
     "rescan": "Riscansiona archivio"
@@ -88,7 +89,12 @@
   },
   "preview": {
     "empty": "Seleziona un'immagine per l'anteprima",
-    "expand": "Apri anteprima completa"
+    "expand": "Apri anteprima completa",
+    "favourite": "Aggiungi ai preferiti"
+  },
+  "favourites": {
+    "title": "Preferiti",
+    "empty": "Nessun preferito. Aggiungi stelle alle immagini dall'anteprima."
   },
   "groups": {
     "title": "Gruppi",

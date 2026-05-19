@@ -6,6 +6,7 @@
   "nav": {
     "timeline": "Timeline",
     "groups": "Groups",
+    "favourites": "Favourites",
     "import": "Import",
     "settings": "Settings",
     "rescan": "Rescan archive"
@@ -88,7 +89,12 @@
   },
   "preview": {
     "empty": "Select an image to preview",
-    "expand": "Open full preview"
+    "expand": "Open full preview",
+    "favourite": "Toggle favourite"
+  },
+  "favourites": {
+    "title": "Favourites",
+    "empty": "No favourites yet. Star images from the timeline preview."
   },
   "groups": {
     "title": "Groups",

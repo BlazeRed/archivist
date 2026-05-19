@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { convertFileSrc } from '@tauri-apps/api/core';
+import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { ImageMetadata } from './ImageMetadata';
 
 export function ImagePreview({ width }: { width: number }) {
   const { t } = useTranslation();
-  const { previewImage, selectImage, setPreviewImage } = useTimelineStore();
+  const { previewImage, selectImage, setPreviewImage, updateImageFavourite } = useTimelineStore();
   const { config } = useAppConfigStore();
 
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -74,6 +74,21 @@ export function ImagePreview({ width }: { width: number }) {
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+        {/* Favourite toggle */}
+        <button
+          onClick={async () => {
+            const next = !previewImage.is_favourite;
+            await invoke('toggle_favourite', { imageId: previewImage.id, isFavourite: next });
+            updateImageFavourite(previewImage.id, next);
+          }}
+          className="absolute top-2 left-12 w-8 h-8 rounded-full bg-black/55 hover:bg-black/80 text-white flex items-center justify-center transition-colors"
+          title={t('preview.favourite')}
+        >
+          <svg className="w-4 h-4" fill={previewImage.is_favourite ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
           </svg>
         </button>
         {/* Expand button */}
