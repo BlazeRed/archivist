@@ -18,7 +18,7 @@ export function Topbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { phase } = useImportStore();
-  const { fetchImages } = useTimelineStore();
+  const { fetchImages, clearImages } = useTimelineStore();
   const { settingsOpen, toggleSettings } = useUIStore();
   const [pendingPath, setPendingPath] = useState<string | null>(null);
   const [isRescanning, setIsRescanning] = useState(false);
@@ -38,6 +38,7 @@ export function Topbar() {
   const handleOpenArchive = async () => {
     const selected = await open({ directory: true });
     if (selected) {
+      clearImages();
       setConfig({ archive_path: selected as string });
       try { await invoke('init_archive', { archivePath: selected }); } catch {}
     }

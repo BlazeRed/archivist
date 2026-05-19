@@ -1,8 +1,10 @@
 import { useTranslation } from 'react-i18next';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
+import { open } from '@tauri-apps/plugin-dialog';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { ImageDetail } from '../components/ImageDetail';
+import { Button } from '@/components/ui/button';
 import type { Image } from '../types';
 
 function FavouriteThumb({ image, archivePath }: { image: Image; archivePath: string }) {
@@ -59,8 +61,29 @@ function FavouriteThumb({ image, archivePath }: { image: Image; archivePath: str
 
 export function FavouritesPage() {
   const { t } = useTranslation();
-  const { allImages } = useTimelineStore();
-  const { config } = useAppConfigStore();
+  const { allImages, clearImages } = useTimelineStore();
+  const { config, setConfig } = useAppConfigStore();
+
+  const handleOpenArchive = async () => {
+    const selected = await open({ directory: true });
+    if (selected) {
+      clearImages();
+      setConfig({ archive_path: selected as string });
+      try { await invoke('init_archive', { archivePath: selected }); } catch {}
+    }
+  };
+
+  if (!config.archive_path) {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-52px)]">
+        <div className="bg-card px-8 py-6 rounded-xl text-center max-w-sm">
+          <p className="text-muted-foreground text-sm mb-4">{t('timeline.archiveNotSet')}</p>
+          <Button onClick={handleOpenArchive}>{t('timeline.openArchive')}</Button>
+        </div>
+      </div>
+    );
+  }
+
   const favourites = allImages.filter(img => img.is_favourite);
 
   return (

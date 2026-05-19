@@ -26,6 +26,7 @@ interface TimelineState {
   selectImage: (image: Image | null) => void;
   setPreviewImage: (image: Image | null) => void;
   updateImageFavourite: (imageId: string, isFavourite: boolean) => void;
+  clearImages: () => void;
 }
 
 function applyClientFilter(all: Image[], filter: TimelineFilter, groupIds: Set<string> | null): Image[] {
@@ -128,4 +129,5 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
     images: s.images.map(img => img.id === imageId ? { ...img, is_favourite: isFavourite } : img),
     previewImage: s.previewImage?.id === imageId ? { ...s.previewImage, is_favourite: isFavourite } : s.previewImage,
   })),
+  clearImages: () => set({ allImages: [], images: [], previewImage: null }),
 }));
