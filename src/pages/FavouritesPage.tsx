@@ -22,32 +22,36 @@ function FavouriteThumb({ image, archivePath }: { image: Image; archivePath: str
   return (
     <div
       onClick={() => selectImage(image)}
-      className="group/thumb relative bg-[#E8F3FB] border border-[rgba(0,45,88,0.15)] rounded-md overflow-hidden cursor-pointer aspect-square hover:shadow-lg transition-shadow"
+      className="group/img bg-card rounded-lg border border-border overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
     >
-      {thumbnailUrl ? (
-        <img src={thumbnailUrl} alt={image.filename} className="w-full h-full object-cover" loading="lazy" />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center text-[rgba(0,45,88,0.4)]">
-          <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-            <line x1="3" y1="3" x2="21" y2="21" />
-            <circle cx="8.5" cy="8.5" r="1.5" />
+      <div className="aspect-square bg-[#001A36] overflow-hidden relative">
+        {thumbnailUrl ? (
+          <img src={thumbnailUrl} alt={image.filename} className="w-full h-full object-cover" loading="lazy" />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-white/40">
+            <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <line x1="3" y1="3" x2="21" y2="21" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+            </svg>
+          </div>
+        )}
+        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/img:opacity-100 transition-opacity pointer-events-none" />
+        <button
+          onClick={handleRemove}
+          title={t('preview.favourite')}
+          className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity hover:bg-destructive"
+        >
+          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
           </svg>
-        </div>
-      )}
-      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/thumb:opacity-100 transition-opacity pointer-events-none" />
-      {/* Remove from favourites — appears on hover */}
-      <button
-        onClick={handleRemove}
-        title={t('preview.favourite')}
-        className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/60 hover:bg-black/85 text-white flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity"
-      >
-        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-        </svg>
-      </button>
-      <div className="absolute bottom-0 left-0 right-0 bg-[rgba(0,45,88,0.6)] px-1 py-0.5">
-        <p className="text-[10px] text-white truncate">{image.filename}</p>
+        </button>
+      </div>
+      <div className="p-2">
+        <p className="text-xs text-foreground truncate font-medium">{image.filename}</p>
+        <p className="text-[10px] text-muted-foreground mt-0.5">
+          {image.taken_at ? new Date(image.taken_at).toLocaleDateString() : t('detail.noDate')}
+        </p>
       </div>
     </div>
   );

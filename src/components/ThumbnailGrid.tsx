@@ -174,8 +174,11 @@ const ThumbnailCell = memo(function ThumbnailCell({
         </div>
       )}
 
-      {/* Filename bar */}
-      <div className="absolute bottom-0 left-0 right-0 bg-[rgba(0,45,88,0.6)] px-1 py-0.5">
+      {/* Filename bar — always visible when previewed, hover only otherwise */}
+      <div className={cn(
+        'absolute bottom-0 left-0 right-0 bg-[#002D58] px-1 py-0.5 transition-opacity pointer-events-none',
+        isPreviewed ? 'opacity-100' : 'opacity-0 group-hover/thumb:opacity-100'
+      )}>
         <p className="text-[10px] text-white truncate">{image.filename}</p>
       </div>
     </div>
