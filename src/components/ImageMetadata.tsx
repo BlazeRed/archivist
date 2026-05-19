@@ -29,7 +29,7 @@ function Field({ label, value, truncate }: { label: string; value: string; trunc
   );
 }
 
-export function ImageMetadata({ image }: { image: Image }) {
+export function ImageMetadata({ image, hideGroups }: { image: Image; hideGroups?: boolean }) {
   const { t } = useTranslation();
   const { availableGroups } = useTimelineStore();
   const { config } = useAppConfigStore();
@@ -132,7 +132,7 @@ export function ImageMetadata({ image }: { image: Image }) {
       </div>
 
       {/* Groups section */}
-      <div className="pt-3 mt-1 border-t border-[rgba(0,45,88,0.12)]">
+      {!hideGroups && <div className="pt-3 mt-1 border-t border-[rgba(0,45,88,0.12)]">
         <p className="text-xs font-semibold text-[#002D58] uppercase tracking-wide mb-2">
           {t('nav.groups')}
         </p>
@@ -180,7 +180,7 @@ export function ImageMetadata({ image }: { image: Image }) {
             </button>
           </div>
         )}
-      </div>
+      </div>}
     </>
   );
 }

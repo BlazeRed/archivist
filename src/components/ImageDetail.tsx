@@ -5,7 +5,7 @@ import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { ImageMetadata } from './ImageMetadata';
 
-export function ImageDetail() {
+export function ImageDetail({ hideGroups }: { hideGroups?: boolean }) {
   const { t } = useTranslation();
   const { selectedImage, selectImage } = useTimelineStore();
   const { config } = useAppConfigStore();
@@ -72,7 +72,7 @@ export function ImageDetail() {
 
           {/* Metadata + groups */}
           <div className="px-4 py-3 flex-1 overflow-y-auto">
-            <ImageMetadata image={selectedImage} />
+            <ImageMetadata image={selectedImage} hideGroups={hideGroups} />
           </div>
         </div>
       </div>

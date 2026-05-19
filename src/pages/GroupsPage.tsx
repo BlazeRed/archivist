@@ -399,7 +399,7 @@ export function GroupsPage() {
         )}
       </div>
 
-      <ImageDetail />
+      <ImageDetail hideGroups />
 
       {/* Add photos modal */}
       {showAddPhotos && selectedGroupId !== null && (
