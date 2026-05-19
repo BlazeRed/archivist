@@ -4,6 +4,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { useImportStore } from '../stores/importStore';
+import { useAppConfigStore } from '../stores/appConfigStore';
 import { ConflictReview } from '../components/ConflictReview';
 import { ProgressBar } from '../components/ProgressBar';
 import { Button } from '@/components/ui/button';
@@ -105,6 +106,8 @@ export function ImportPage() {
   const [cleanupDismissed, setCleanupDismissed] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
+  const { config } = useAppConfigStore();
+
   const {
     phase,
     step,
@@ -125,6 +128,12 @@ export function ImportPage() {
 
   const stepRef = useRef<number>(step);
   stepRef.current = step;
+
+  useEffect(() => {
+    if (step === 2 && !archivePath && config.archive_path) {
+      setArchivePath(config.archive_path);
+    }
+  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSelectSource = async () => {
     const sel = await open({ directory: true });

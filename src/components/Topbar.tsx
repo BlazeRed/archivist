@@ -62,7 +62,7 @@ export function Topbar() {
   return (
     <header className="h-[52px] bg-background border-b border-border flex items-center justify-between px-4">
       <div className="flex items-center gap-2">
-        <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+        <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shrink-0">
           <svg className="w-5 h-5 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               strokeLinecap="round"
@@ -72,7 +72,14 @@ export function Topbar() {
             />
           </svg>
         </div>
-        <span className="text-lg font-medium text-foreground">{t('app.name')}</span>
+        <div className="flex flex-col leading-none">
+          <span className="text-lg font-medium text-foreground leading-none">{t('app.name')}</span>
+          {config.archive_path && (
+            <span className="text-[10px] text-muted-foreground truncate max-w-[200px]" title={config.archive_path}>
+              {config.archive_path}
+            </span>
+          )}
+        </div>
       </div>
 
       <nav className="flex items-center gap-1">
