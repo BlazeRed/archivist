@@ -83,7 +83,12 @@
     "archiveNotSet": "Set an archive path in Settings to view photos.",
     "openArchive": "Open Archive",
     "clearFilter": "Clear filters",
-    "photos": "photos"
+    "photos": "photos",
+    "moreFilters": "More filters"
+  },
+  "preview": {
+    "empty": "Select an image to preview",
+    "expand": "Open full preview"
   },
   "groups": {
     "title": "Groups",

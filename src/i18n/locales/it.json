@@ -83,7 +83,12 @@
     "archiveNotSet": "Imposta un percorso archivio nelle Impostazioni.",
     "openArchive": "Apri Archivio",
     "clearFilter": "Azzera filtri",
-    "photos": "foto"
+    "photos": "foto",
+    "moreFilters": "Altri filtri"
+  },
+  "preview": {
+    "empty": "Seleziona un'immagine per l'anteprima",
+    "expand": "Apri anteprima completa"
   },
   "groups": {
     "title": "Gruppi",

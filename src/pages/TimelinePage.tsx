@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -6,24 +6,131 @@ import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { useGroupUIStore } from '../stores/groupUIStore';
 import { useImportStore } from '../stores/importStore';
-import { FilterPanel } from '../components/FilterPanel';
+import { TimelineNavbar } from '../components/TimelineNavbar';
 import { ThumbnailGrid } from '../components/ThumbnailGrid';
 import { ImageDetail } from '../components/ImageDetail';
+import { ImagePreview } from '../components/ImagePreview';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
+const PREVIEW_MIN = 280;
+const PREVIEW_MAX = 720;
+
+function ResizeHandle({ onResize }: { onResize: (w: number) => void }) {
+  const dragging = useRef(false);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!dragging.current) return;
+      const newW = window.innerWidth - e.clientX;
+      onResize(Math.max(PREVIEW_MIN, Math.min(PREVIEW_MAX, newW)));
+    };
+    const onUp = () => {
+      dragging.current = false;
+      document.body.style.cursor = '';
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [onResize]);
+
+  return (
+    <div
+      onMouseDown={() => {
+        dragging.current = true;
+        document.body.style.cursor = 'col-resize';
+      }}
+      className="w-1 shrink-0 cursor-col-resize bg-border hover:bg-primary transition-colors"
+    />
+  );
+}
+
+function SelectionActionBar() {
+  const { t } = useTranslation();
+  const { availableGroups } = useTimelineStore();
+  const { selectedImageIds, clearSelection, getSelectedCount } = useGroupUIStore();
+  const [addToGroupId, setAddToGroupId] = useState('');
+  const [addingToGroup, setAddingToGroup] = useState(false);
+
+  const handleAddToGroup = async () => {
+    if (!addToGroupId || selectedImageIds.size === 0) return;
+    setAddingToGroup(true);
+    try {
+      for (const imageId of selectedImageIds) {
+        await invoke('add_image_to_group', { imageId, groupId: Number(addToGroupId) });
+      }
+      clearSelection();
+      setAddToGroupId('');
+    } catch (e) {
+      console.error('Failed to add to group:', e);
+    }
+    setAddingToGroup(false);
+  };
+
+  return (
+    <div className="flex-shrink-0 h-14 bg-foreground flex items-center px-6 gap-4 shadow-lg">
+      <span className="text-background text-sm font-medium">
+        {t('timeline.selected', { count: getSelectedCount() })}
+      </span>
+
+      {availableGroups.length > 0 && (
+        <div className="flex items-center gap-2 ml-auto">
+          <Select value={addToGroupId} onValueChange={setAddToGroupId}>
+            <SelectTrigger className="w-48 bg-white/12 border-white/25 text-white">
+              <SelectValue placeholder={`${t('timeline.filterGroups')}…`} />
+            </SelectTrigger>
+            <SelectContent>
+              {availableGroups.map(g => (
+                <SelectItem key={g.id} value={g.id.toString()}>{g.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            onClick={handleAddToGroup}
+            disabled={!addToGroupId || addingToGroup || getSelectedCount() === 0}
+          >
+            {t('timeline.addToGroup')}
+          </Button>
+        </div>
+      )}
+
+      <Button
+        variant="outline"
+        onClick={clearSelection}
+        className="border-white/30 text-background hover:text-foreground"
+      >
+        {t('timeline.cancelSelection')}
+      </Button>
+    </div>
+  );
+}
+
 export function TimelinePage() {
   const { t } = useTranslation();
-  const { fetchImages, availableGroups, fetchGroups } = useTimelineStore();
+  const { fetchImages, fetchGroups } = useTimelineStore();
   const { config, setConfig } = useAppConfigStore();
-  const { isSelectionMode, selectedImageIds, clearSelection, getSelectedCount } = useGroupUIStore();
+  const { isSelectionMode } = useGroupUIStore();
   const phase = useImportStore((s) => s.phase);
   const isImportActive = phase === 'scanning' || phase === 'analyzing' || phase === 'thumbnailing' || phase === 'importing';
 
-  const [addToGroupId, setAddToGroupId] = useState<string>('');
-  const [addingToGroup, setAddingToGroup] = useState(false);
   const [showImportWarning, setShowImportWarning] = useState(false);
+
+  const [previewWidth, setPreviewWidthState] = useState(
+    () => config.timeline_preview_width ?? 380
+  );
+
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const handleResize = useCallback((w: number) => {
+    setPreviewWidthState(w);
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      setConfig({ timeline_preview_width: w });
+    }, 200);
+  }, [setConfig]);
 
   const handleOpenArchive = async () => {
     if (isImportActive) { setShowImportWarning(true); return; }
@@ -44,21 +151,6 @@ export function TimelinePage() {
       fetchGroups();
     }
   }, [config.archive_path, fetchImages, fetchGroups]);
-
-  const handleAddToGroup = async () => {
-    if (!addToGroupId || selectedImageIds.size === 0) return;
-    setAddingToGroup(true);
-    try {
-      for (const imageId of selectedImageIds) {
-        await invoke('add_image_to_group', { imageId, groupId: Number(addToGroupId) });
-      }
-      clearSelection();
-      setAddToGroupId('');
-    } catch (e) {
-      console.error('Failed to add to group:', e);
-    }
-    setAddingToGroup(false);
-  };
 
   if (!config.archive_path) {
     return (
@@ -85,58 +177,28 @@ export function TimelinePage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-52px)] relative">
-      {/* Sidebar */}
-      <aside className="w-56 flex-shrink-0 p-4 border-r border-border bg-card overflow-y-auto">
-        <FilterPanel />
-      </aside>
+    <div className="flex flex-col h-[calc(100vh-52px)]">
+      <TimelineNavbar />
 
-      {/* Main content */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <div className="flex-1 min-h-0">
-          <ThumbnailGrid />
-        </div>
-
-        {/* Selection action bar */}
-        {isSelectionMode && (
-          <div className="flex-shrink-0 h-14 bg-foreground flex items-center px-6 gap-4 shadow-lg">
-            <span className="text-background text-sm font-medium">
-              {t('timeline.selected', { count: getSelectedCount() })}
-            </span>
-
-            {availableGroups.length > 0 && (
-              <div className="flex items-center gap-2 ml-auto">
-                <Select value={addToGroupId} onValueChange={setAddToGroupId}>
-                  <SelectTrigger className="w-48 bg-white/12 border-white/25 text-white">
-                    <SelectValue placeholder={`${t('timeline.filterGroups')}…`} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableGroups.map(g => (
-                      <SelectItem key={g.id} value={g.id.toString()}>{g.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  onClick={handleAddToGroup}
-                  disabled={!addToGroupId || addingToGroup || getSelectedCount() === 0}
-                >
-                  {t('timeline.addToGroup')}
-                </Button>
-              </div>
-            )}
-
-            <Button
-              variant="outline"
-              onClick={clearSelection}
-              className="border-white/30 text-background hover:text-foreground"
-            >
-              {t('timeline.cancelSelection')}
-            </Button>
-          </div>
+      <div className="flex-1 flex min-h-0">
+        {isSelectionMode ? (
+          <main className="flex-1 flex flex-col min-w-0">
+            <div className="flex-1 min-h-0">
+              <ThumbnailGrid />
+            </div>
+            <SelectionActionBar />
+          </main>
+        ) : (
+          <>
+            <main className="flex-1 min-w-0 overflow-hidden">
+              <ThumbnailGrid />
+            </main>
+            <ResizeHandle onResize={handleResize} />
+            <ImagePreview width={previewWidth} />
+          </>
         )}
-      </main>
+      </div>
 
-      {/* Image detail modal */}
       <ImageDetail />
     </div>
   );

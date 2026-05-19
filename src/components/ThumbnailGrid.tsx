@@ -71,6 +71,7 @@ type RowProps = {
   archivePath: string;
   isSelectionMode: boolean;
   selectedImageIds: Set<string>;
+  previewImageId: string | null;
   onImageClick: (img: Image) => void;
   onToggleSelect: (id: string) => void;
 };
@@ -81,6 +82,7 @@ const ThumbnailCell = memo(function ThumbnailCell({
   sizeKey,
   isSelectionMode,
   isSelected,
+  isPreviewed,
   onImageClick,
   onToggleSelect,
 }: {
@@ -89,6 +91,7 @@ const ThumbnailCell = memo(function ThumbnailCell({
   sizeKey: SizeKey;
   isSelectionMode: boolean;
   isSelected: boolean;
+  isPreviewed: boolean;
   onImageClick: (img: Image) => void;
   onToggleSelect: (id: string) => void;
 }) {
@@ -103,11 +106,14 @@ const ThumbnailCell = memo(function ThumbnailCell({
     <div
       style={{ width: px, height: px }}
       onClick={() => onImageClick(image)}
-      className={`relative bg-[#E8F3FB] border rounded-md overflow-hidden cursor-pointer flex-shrink-0 transition-all ${
+      className={cn(
+        'group/thumb relative bg-[#E8F3FB] border rounded-md overflow-hidden cursor-pointer flex-shrink-0 transition-shadow hover:shadow-lg',
         isSelected
           ? 'ring-2 ring-[#0084C5] border-[#0084C5]'
-          : 'border-[rgba(0,45,88,0.15)] hover:ring-2 hover:ring-[#0084C5]'
-      }`}
+          : isPreviewed
+            ? 'ring-2 ring-[#0084C5]/60 border-[#0084C5]/60'
+            : 'border-[rgba(0,45,88,0.15)]'
+      )}
     >
       {thumbnailUrl ? (
         <img
@@ -126,6 +132,9 @@ const ThumbnailCell = memo(function ThumbnailCell({
           <p className="text-[8px] text-center px-1 leading-tight">{t('common.noThumbnail')}</p>
         </div>
       )}
+
+      {/* Hover dark overlay */}
+      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/thumb:opacity-100 transition-opacity pointer-events-none" />
 
       {/* Date source badge */}
       {image.date_source === 'filename' && (
@@ -172,6 +181,7 @@ function TimelineRowComponent({
   archivePath,
   isSelectionMode,
   selectedImageIds,
+  previewImageId,
   onImageClick,
   onToggleSelect,
 }: RowComponentProps<RowProps>) {
@@ -197,6 +207,7 @@ function TimelineRowComponent({
             sizeKey={sizeKey}
             isSelectionMode={isSelectionMode}
             isSelected={selectedImageIds.has(img.id)}
+            isPreviewed={previewImageId === img.id}
             onImageClick={onImageClick}
             onToggleSelect={onToggleSelect}
           />
@@ -208,7 +219,7 @@ function TimelineRowComponent({
 
 export function ThumbnailGrid() {
   const { t } = useTranslation();
-  const { images, selectImage, loading } = useTimelineStore();
+  const { images, setPreviewImage, previewImage, loading } = useTimelineStore();
   const { config } = useAppConfigStore();
   const { isSelectionMode, selectedImageIds, toggleSelection } = useGroupUIStore();
   const [stickyLabel, setStickyLabel] = useState('');
@@ -272,10 +283,10 @@ export function ThumbnailGrid() {
       if (isSelectionMode) {
         toggleSelection(img.id);
       } else {
-        selectImage(img);
+        setPreviewImage(img);
       }
     },
-    [isSelectionMode, toggleSelection, selectImage]
+    [isSelectionMode, toggleSelection, setPreviewImage]
   );
 
   const rowProps = useMemo<RowProps>(
@@ -285,10 +296,11 @@ export function ThumbnailGrid() {
       archivePath: config.archive_path,
       isSelectionMode,
       selectedImageIds,
+      previewImageId: previewImage?.id ?? null,
       onImageClick: handleImageClick,
       onToggleSelect: toggleSelection,
     }),
-    [rows, sizeKey, config.archive_path, isSelectionMode, selectedImageIds, handleImageClick, toggleSelection]
+    [rows, sizeKey, config.archive_path, isSelectionMode, selectedImageIds, previewImage?.id, handleImageClick, toggleSelection]
   );
 
   const handleRowsRendered = useCallback(

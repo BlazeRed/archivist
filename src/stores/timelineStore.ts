@@ -16,6 +16,7 @@ interface TimelineState {
   loading: boolean;
   error: string | null;
   selectedImage: Image | null;
+  previewImage: Image | null;
   filter: TimelineFilter;
   availableYears: number[];
   availableGroups: GroupWithCount[];
@@ -23,6 +24,7 @@ interface TimelineState {
   fetchGroups: () => Promise<void>;
   setFilter: (partial: Partial<TimelineFilter>) => Promise<void>;
   selectImage: (image: Image | null) => void;
+  setPreviewImage: (image: Image | null) => void;
 }
 
 function applyClientFilter(all: Image[], filter: TimelineFilter, groupIds: Set<string> | null): Image[] {
@@ -59,6 +61,7 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
   loading: false,
   error: null,
   selectedImage: null,
+  previewImage: null,
   filter: { yearFrom: null, yearTo: null, month: null, noDate: false, groupId: null },
   availableYears: [],
   availableGroups: [],
@@ -118,4 +121,5 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
   },
 
   selectImage: (image) => set({ selectedImage: image }),
+  setPreviewImage: (image) => set({ previewImage: image }),
 }));
