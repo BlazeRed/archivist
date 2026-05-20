@@ -6,8 +6,13 @@ import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { ImageMetadata } from './ImageMetadata';
 import { cn } from '@/lib/utils';
+import type { Image } from '../types';
 
-export function ImageDetail({ hideGroups, hideDetails }: { hideGroups?: boolean; hideDetails?: boolean }) {
+export function ImageDetail({ hideGroups, hideDetails, navImages }: {
+  hideGroups?: boolean;
+  hideDetails?: boolean;
+  navImages?: Image[];
+}) {
   const { t } = useTranslation();
   const { selectedImage, selectImage } = useTimelineStore();
   const { config } = useAppConfigStore();
@@ -30,6 +35,18 @@ export function ImageDetail({ hideGroups, hideDetails }: { hideGroups?: boolean;
 
   if (!selectedImage) return null;
 
+  const currentIdx = navImages ? navImages.findIndex(img => img.id === selectedImage.id) : -1;
+  const hasNav = currentIdx > -1 && (navImages?.length ?? 0) > 1;
+
+  const handlePrev = () => {
+    if (!navImages || currentIdx === -1) return;
+    selectImage(navImages[(currentIdx - 1 + navImages.length) % navImages.length]);
+  };
+  const handleNext = () => {
+    if (!navImages || currentIdx === -1) return;
+    selectImage(navImages[(currentIdx + 1) % navImages.length]);
+  };
+
   return (
     <div
       className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
@@ -38,7 +55,7 @@ export function ImageDetail({ hideGroups, hideDetails }: { hideGroups?: boolean;
       <div
         className={cn(
           'bg-card rounded-xl w-full max-h-[90vh] flex overflow-hidden',
-          hideDetails ? 'max-w-3xl' : 'max-w-5xl'
+          'max-w-5xl'
         )}
         onClick={(e) => e.stopPropagation()}
       >
@@ -67,6 +84,28 @@ export function ImageDetail({ hideGroups, hideDetails }: { hideGroups?: boolean;
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
+          )}
+          {hasNav && (
+            <>
+              <button
+                onClick={(e) => { e.stopPropagation(); handlePrev(); }}
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/55 hover:bg-black/80 text-white flex items-center justify-center transition-colors z-10"
+                title={t('common.previous')}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); handleNext(); }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/55 hover:bg-black/80 text-white flex items-center justify-center transition-colors z-10"
+                title={t('common.next')}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </>
           )}
         </div>
 
