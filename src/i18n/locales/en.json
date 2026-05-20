@@ -30,6 +30,7 @@
     "analyzing": "Analyzing images...",
     "analyzingProgress": "Analyzing {{current}} of {{total}}",
     "importing": "Importing...",
+    "finalizing": "Saving to library…",
     "importProgress": "Importing {{current}} of {{total}}",
     "complete": "Import complete",
     "imported": "Imported",
