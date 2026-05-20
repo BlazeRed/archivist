@@ -16,6 +16,11 @@ pub struct Image {
     pub date_source: Option<String>,
     pub thumbnail_path: Option<String>,
     pub is_favourite: bool,
+    pub media_type: String,
+    pub duration_ms: Option<i64>,
+    pub codec: Option<String>,
+    pub rotation: Option<i32>,
+    pub web_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -30,6 +35,11 @@ pub struct NewImage {
     pub has_exif: bool,
     pub date_source: Option<String>,
     pub thumbnail_path: Option<String>,
+    pub media_type: String,
+    pub duration_ms: Option<i64>,
+    pub codec: Option<String>,
+    pub rotation: Option<i32>,
+    pub web_path: Option<String>,
 }
 
 fn map_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Image> {
@@ -46,11 +56,16 @@ fn map_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Image> {
         date_source:   row.get(9)?,
         thumbnail_path: row.get(10)?,
         is_favourite:  row.get::<_, i32>(11).unwrap_or(0) != 0,
+        media_type:    row.get::<_, Option<String>>(12)?.unwrap_or_else(|| "image".to_string()),
+        duration_ms:   row.get(13)?,
+        codec:         row.get(14)?,
+        rotation:      row.get(15)?,
+        web_path:      row.get(16)?,
     })
 }
 
 const SELECT_COLS: &str =
-    "id, filename, file_path, taken_at, imported_at, width, height, file_size, has_exif, date_source, thumbnail_path, is_favourite";
+    "id, filename, file_path, taken_at, imported_at, width, height, file_size, has_exif, date_source, thumbnail_path, is_favourite, media_type, duration_ms, codec, rotation, web_path";
 
 impl super::Database {
     pub fn insert_image(&self, image: &NewImage) -> Result<(), super::AppError> {
@@ -59,8 +74,8 @@ impl super::Database {
 
         conn.execute(
             "INSERT OR REPLACE INTO images \
-             (id, filename, file_path, taken_at, imported_at, width, height, file_size, has_exif, date_source, thumbnail_path) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+             (id, filename, file_path, taken_at, imported_at, width, height, file_size, has_exif, date_source, thumbnail_path, media_type, duration_ms, codec, rotation, web_path) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
             params![
                 image.id,
                 image.filename,
@@ -73,6 +88,11 @@ impl super::Database {
                 image.has_exif as i32,
                 image.date_source,
                 image.thumbnail_path,
+                image.media_type,
+                image.duration_ms,
+                image.codec,
+                image.rotation,
+                image.web_path,
             ],
         )?;
 
@@ -224,5 +244,94 @@ impl super::Database {
         let mut stmt = conn.prepare(&sql)?;
         let images = stmt.query_map([], map_row)?.collect::<Result<Vec<_>, _>>()?;
         Ok(images)
+    }
+
+    pub fn update_video_metadata(
+        &self,
+        id: &str,
+        width: u32,
+        height: u32,
+        duration_ms: i64,
+    ) -> Result<(), super::AppError> {
+        let conn = self.connection();
+        conn.execute(
+            "UPDATE images SET width=?1, height=?2, duration_ms=?3 WHERE id=?4",
+            params![width, height, duration_ms, id],
+        )?;
+        Ok(())
+    }
+
+    pub fn update_video_meta_fields(
+        &self,
+        id: &str,
+        width: Option<u32>,
+        height: Option<u32>,
+        duration_ms: Option<i64>,
+        codec: Option<&str>,
+        rotation: Option<i32>,
+        web_path: Option<&str>,
+    ) -> Result<(), super::AppError> {
+        let conn = self.connection();
+        conn.execute(
+            "UPDATE images SET width=?1, height=?2, duration_ms=?3, codec=?4, rotation=?5, web_path=?6 WHERE id=?7",
+            params![
+                width.map(|w| w as i32),
+                height.map(|h| h as i32),
+                duration_ms,
+                codec,
+                rotation,
+                web_path,
+                id,
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_videos_without_thumbnail(&self) -> Result<Vec<crate::commands::video::VideoStub>, super::AppError> {
+        let conn = self.connection();
+        let mut stmt = conn.prepare(
+            "SELECT id, file_path FROM images WHERE media_type='video' AND thumbnail_path IS NULL"
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(crate::commands::video::VideoStub {
+                id: row.get(0)?,
+                file_path: row.get(1)?,
+            })
+        })?.collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    pub fn get_videos_without_metadata(&self) -> Result<Vec<(String, String)>, super::AppError> {
+        let conn = self.connection();
+        let mut stmt = conn.prepare(
+            "SELECT id, file_path FROM images WHERE media_type='video' AND width IS NULL"
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?.collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    pub fn update_web_path(&self, id: &str, web_path: &str) -> Result<(), super::AppError> {
+        let conn = self.connection();
+        conn.execute(
+            "UPDATE images SET web_path = ?1 WHERE id = ?2",
+            [web_path, id],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_videos_needing_transcode(&self) -> Result<Vec<crate::commands::video::VideoStub>, super::AppError> {
+        let conn = self.connection();
+        let mut stmt = conn.prepare(
+            "SELECT id, file_path FROM images WHERE media_type='video' AND web_path IS NULL"
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(crate::commands::video::VideoStub {
+                id: row.get(0)?,
+                file_path: row.get(1)?,
+            })
+        })?.collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
     }
 }

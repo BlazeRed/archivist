@@ -19,6 +19,8 @@ export interface AnalyzedImage {
   has_exif: boolean;
   date_source: string | null;
   conflict: ConflictInfo | null;
+  media_type: string;
+  duration_ms: number | null;
 }
 
 export interface ConflictInfo {
@@ -94,19 +96,19 @@ export const useImportStore = create<ImportState>((set, get) => ({
   setStep: (step) => set({ step }),
 
   setSourcePath: (path) => set({ sourcePath: path }),
-  
+
   setArchivePath: (path) => set({ archivePath: path }),
 
   startScan: async () => {
     const { sourcePath } = get();
     if (!sourcePath) return;
-    
+
     set({ phase: 'scanning', error: null });
-    
+
     try {
       const images = await invoke<ScannedImage[]>('scan_source', { sourcePath });
-      set({ 
-        scannedImages: images, 
+      set({
+        scannedImages: images,
         phase: 'analyzing',
         progress: { current: 0, total: images.length, currentFile: '' }
       });
@@ -214,6 +216,7 @@ export const useImportStore = create<ImportState>((set, get) => ({
         resolutions,
         archivePath,
       });
+
       set({
         result,
         phase: 'complete',

@@ -11,12 +11,14 @@ import { SettingsPage } from './pages/SettingsPage';
 import { FavouritesPage } from './pages/FavouritesPage';
 import { useAppConfigStore } from './stores/appConfigStore';
 import { useUIStore } from './stores/uiStore';
+import { useTranscodeQueue } from './hooks/useTranscodeQueue';
 import { cn } from './lib/utils';
 
 function App() {
   const { i18n } = useTranslation();
   const { setConfig } = useAppConfigStore();
   const { settingsOpen, closeSettings } = useUIStore();
+  useTranscodeQueue();
 
   useEffect(() => {
     (async () => {

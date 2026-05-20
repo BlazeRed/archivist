@@ -145,7 +145,7 @@ export function ImportPage() {
   const handleSelectSourceFile = async () => {
     const sel = await open({
       multiple: false,
-      filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'heic', 'heif', 'webp', 'tiff', 'tif', 'bmp', 'gif', 'avif'] }],
+      filters: [{ name: 'Media', extensions: ['jpg', 'jpeg', 'png', 'heic', 'heif', 'webp', 'tiff', 'tif', 'bmp', 'gif', 'mp4', 'mov', 'mkv', 'avi', 'webm', 'm4v', '3gp'] }],
     });
     if (sel) setSourcePath(sel as string);
   };

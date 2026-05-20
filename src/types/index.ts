@@ -1,3 +1,5 @@
+export type MediaType = 'image' | 'video';
+
 export interface Image {
   id: string;
   filename: string;
@@ -11,6 +13,11 @@ export interface Image {
   date_source: 'exif' | 'filename' | 'mtime' | null;
   thumbnail_path: string | null;
   is_favourite: boolean;
+  media_type: MediaType;
+  duration_ms: number | null;
+  codec: string | null;
+  rotation: number | null;
+  web_path: string | null;
 }
 
 export interface Group {

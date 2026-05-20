@@ -4,7 +4,15 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::{exif, hasher, thumbnail, error::AppError};
 use crate::db::image::NewImage;
 
-const SUPPORTED_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "gif", "webp", "tiff", "tif", "bmp", "heic", "heif"];
+const SUPPORTED_IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "gif", "webp", "tiff", "tif", "bmp", "heic", "heif"];
+const SUPPORTED_VIDEO_EXTENSIONS: &[&str] = &["mp4", "mov", "mkv", "avi", "webm", "m4v", "3gp"];
+
+pub fn classify_media(path: &Path) -> Option<&'static str> {
+    let ext = path.extension()?.to_str()?.to_lowercase();
+    if SUPPORTED_IMAGE_EXTENSIONS.iter().any(|e| *e == ext.as_str()) { return Some("image"); }
+    if SUPPORTED_VIDEO_EXTENSIONS.iter().any(|e| *e == ext.as_str()) { return Some("video"); }
+    None
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScannedImage {
@@ -25,6 +33,10 @@ pub struct AnalyzedImage {
     pub has_exif: bool,
     pub date_source: Option<String>,
     pub conflict: Option<ConflictInfo>,
+    pub media_type: String,
+    pub duration_ms: Option<i64>,
+    pub codec: Option<String>,
+    pub rotation: Option<i32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -89,7 +101,7 @@ pub fn scan_source(source_path: &str) -> Result<Vec<ScannedImage>, AppError> {
     let mut images = Vec::new();
 
     if path.is_file() {
-        if is_supported_image(path) {
+        if is_supported_media(path) {
             let metadata = std::fs::metadata(path).map_err(|e| AppError::FileRead {
                 path: source_path.to_string(),
                 message: e.to_string(),
@@ -102,7 +114,7 @@ pub fn scan_source(source_path: &str) -> Result<Vec<ScannedImage>, AppError> {
         } else {
             return Err(AppError::FileRead {
                 path: source_path.to_string(),
-                message: "Unsupported image format".to_string(),
+                message: "Unsupported file format".to_string(),
             });
         }
     } else {
@@ -123,7 +135,7 @@ fn scan_directory(dir: &Path, images: &mut Vec<ScannedImage>) -> Result<(), AppE
         let path = entry.path();
         if path.is_dir() {
             scan_directory(&path, images)?;
-        } else if is_supported_image(&path) {
+        } else if is_supported_media(&path) {
             if let Ok(metadata) = std::fs::metadata(&path) {
                 images.push(ScannedImage {
                     path: path.to_string_lossy().to_string(),
@@ -139,27 +151,49 @@ fn scan_directory(dir: &Path, images: &mut Vec<ScannedImage>) -> Result<(), AppE
     Ok(())
 }
 
-fn is_supported_image(path: &Path) -> bool {
-    path.extension()
-        .and_then(|ext| ext.to_str())
-        .map(|ext| SUPPORTED_EXTENSIONS.contains(&ext.to_lowercase().as_str()))
-        .unwrap_or(false)
+fn is_supported_media(path: &Path) -> bool {
+    classify_media(path).is_some()
 }
 
 pub fn analyze_image(scanned: &ScannedImage) -> Result<AnalyzedImage, AppError> {
     let path = Path::new(&scanned.path);
 
+    let media_type = classify_media(path).unwrap_or("image").to_string();
     let hash = hasher::compute_hash(path)?;
-
-    let (width, height) = match thumbnail::get_image_dimensions(path) {
-        Ok((w, h)) => (Some(w), Some(h)),
-        Err(_) => (None, None),
-    };
 
     let exif_result = exif::extract_date(path);
     let has_exif = exif_result.has_exif();
-    let date_source = exif_result.date_source_label().map(|s| s.to_string());
-    let taken_at = exif_result.datetime().map(|dt| dt.to_rfc3339());
+
+    let (width, height, duration_ms, taken_at, date_source, codec, rotation) = if media_type == "video" {
+        let vm = crate::video_meta::parse_video_meta(path);
+        eprintln!("[import] analyze {:?}: codec={:?} is_web_compatible={}", path, vm.codec,
+            crate::video_meta::is_web_compatible(&vm.codec, path));
+        // Priority: filename pattern > atom/probe creation_time > mtime
+        let exif_src = exif_result.date_source_label();
+        let (final_taken_at, final_source) = match exif_src {
+            Some("exif") | Some("filename") => (
+                exif_result.datetime().map(|dt| dt.to_rfc3339()),
+                exif_src.map(|s| s.to_string()),
+            ),
+            _ => {
+                if let Some(ct) = vm.creation_time {
+                    (Some(ct.to_rfc3339()), Some("atom".to_string()))
+                } else {
+                    (
+                        exif_result.datetime().map(|dt| dt.to_rfc3339()),
+                        exif_src.map(|s| s.to_string()),
+                    )
+                }
+            }
+        };
+        (vm.width, vm.height, vm.duration_ms, final_taken_at, final_source, vm.codec, vm.rotation)
+    } else {
+        let (w, h) = match thumbnail::get_image_dimensions(path) {
+            Ok((w, h)) => (Some(w), Some(h)),
+            Err(_) => (None, None),
+        };
+        (w, h, None, exif_result.datetime().map(|dt| dt.to_rfc3339()), exif_result.date_source_label().map(|s| s.to_string()), None, None)
+    };
 
     Ok(AnalyzedImage {
         path: scanned.path.clone(),
@@ -172,6 +206,10 @@ pub fn analyze_image(scanned: &ScannedImage) -> Result<AnalyzedImage, AppError> 
         has_exif,
         date_source,
         conflict: None,
+        media_type,
+        duration_ms,
+        codec,
+        rotation,
     })
 }
 
@@ -331,6 +369,15 @@ pub fn execute_import(
                 Ok(_) => {
                     let stored_thumbnail = if p.thumbnail_abs.exists() {
                         Some(p.thumbnail_rel.clone())
+                    } else if p.image.media_type == "video" {
+                        match crate::thumbnail::generate_video_thumbnail(
+                            &p.dest_path,
+                            &p.thumbnail_abs,
+                            &crate::thumbnail::ThumbnailSize::medium(),
+                        ) {
+                            Ok(_) => Some(p.thumbnail_rel),
+                            Err(_) => None,
+                        }
                     } else {
                         match crate::thumbnail::generate_thumbnail(
                             &p.dest_path,
@@ -351,6 +398,16 @@ pub fn execute_import(
                         &p.final_filename
                     );
 
+                    let web_path = if p.image.media_type == "video" {
+                        let compat = crate::video_meta::is_web_compatible(&p.image.codec, &p.dest_path);
+                        eprintln!("[import] execute web_path for {:?}: codec={:?} compat={} → {:?}",
+                            p.dest_path, p.image.codec, compat,
+                            if compat { "set to file_path" } else { "null (needs transcode)" });
+                        if compat { Some(relative_path.clone()) } else { None }
+                    } else {
+                        None
+                    };
+
                     let new_image = NewImage {
                         id: p.entry_id,
                         filename: p.final_filename.clone(),
@@ -362,6 +419,11 @@ pub fn execute_import(
                         has_exif: p.image.has_exif,
                         date_source: p.image.date_source,
                         thumbnail_path: stored_thumbnail,
+                        media_type: p.image.media_type.clone(),
+                        duration_ms: p.image.duration_ms,
+                        codec: p.image.codec.clone(),
+                        rotation: p.image.rotation,
+                        web_path,
                     };
 
                     let n = counter.fetch_add(1, Ordering::SeqCst) + 1;
@@ -468,6 +530,15 @@ pub fn import_single_image(
             let thumbnail_rel = format!(".archivist/thumbnails/{}.jpg", &image.hash);
             let stored_thumbnail = if thumbnail_abs.exists() {
                 Some(thumbnail_rel.clone())
+            } else if image.media_type == "video" {
+                match crate::thumbnail::generate_video_thumbnail(
+                    &dest_path,
+                    &thumbnail_abs,
+                    &crate::thumbnail::ThumbnailSize::medium(),
+                ) {
+                    Ok(_) => Some(thumbnail_rel),
+                    Err(_) => None,
+                }
             } else {
                 match crate::thumbnail::generate_thumbnail(
                     &dest_path,
@@ -496,6 +567,16 @@ pub fn import_single_image(
                 image.hash.clone()
             };
 
+            let web_path = if image.media_type == "video" {
+                let compat = crate::video_meta::is_web_compatible(&image.codec, &dest_path);
+                eprintln!("[import] single web_path for {:?}: codec={:?} compat={} → {:?}",
+                    dest_path, image.codec, compat,
+                    if compat { "set to file_path" } else { "null (needs transcode)" });
+                if compat { Some(relative_path.clone()) } else { None }
+            } else {
+                None
+            };
+
             let new_image = NewImage {
                 id: entry_id,
                 filename: final_filename,
@@ -507,6 +588,11 @@ pub fn import_single_image(
                 has_exif: image.has_exif,
                 date_source: image.date_source,
                 thumbnail_path: stored_thumbnail,
+                media_type: image.media_type.clone(),
+                duration_ms: image.duration_ms,
+                codec: image.codec.clone(),
+                rotation: image.rotation,
+                web_path,
             };
 
             match db.insert_image(&new_image) {
@@ -606,13 +692,15 @@ pub fn pre_generate_all_thumbnails_batch(
     let counter = AtomicUsize::new(0);
 
     analyzed.par_iter().for_each(|img| {
-        let dest = thumb_dir.join(format!("{}.jpg", img.hash));
-        if !dest.exists() {
-            let _ = thumbnail::generate_thumbnail(
-                Path::new(&img.path),
-                &dest,
-                &thumbnail::ThumbnailSize::medium(),
-            );
+        if img.media_type != "video" {
+            let dest = thumb_dir.join(format!("{}.jpg", img.hash));
+            if !dest.exists() {
+                let _ = thumbnail::generate_thumbnail(
+                    Path::new(&img.path),
+                    &dest,
+                    &thumbnail::ThumbnailSize::medium(),
+                );
+            }
         }
         let n = counter.fetch_add(1, Ordering::SeqCst) + 1;
         let _ = app.emit("thumb_progress", ThumbProgressPayload { current: n, total });

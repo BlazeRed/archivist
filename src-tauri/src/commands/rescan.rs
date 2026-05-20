@@ -6,7 +6,7 @@ use rayon::prelude::*;
 use crate::error::AppError;
 use crate::db::Database;
 use crate::exif::{self, ExifResult};
-use crate::commands::import::destination_path;
+use crate::commands::import::{destination_path, classify_media};
 use crate::hasher;
 use crate::thumbnail::{self, ThumbnailSize};
 
@@ -25,8 +25,13 @@ struct DiscoveredFile {
     id: String,
     exif_result: ExifResult,
     dims: (Option<u32>, Option<u32>),
+    duration_ms: Option<i64>,
+    video_creation_time: Option<chrono::DateTime<chrono::Utc>>,
     file_size: Option<i64>,
     filename: String,
+    media_type: String,
+    codec: Option<String>,
+    rotation: Option<i32>,
 }
 
 pub fn rescan_archive(archive_path: &str, db: &Database) -> Result<RescanResult, AppError> {
@@ -48,10 +53,16 @@ pub fn rescan_archive(archive_path: &str, db: &Database) -> Result<RescanResult,
             let id = compute_image_id(path).ok()?;
             if db.image_exists(&id).ok()? { return None; }
             let filename = path.file_name()?.to_str()?.to_string();
+            let media_type = classify_media(path).unwrap_or("image").to_string();
             let exif_result = exif::extract_date(path);
-            let dims = get_image_dimensions(path).unwrap_or((None, None));
+            let (dims, duration_ms, video_creation_time, codec, rotation) = if media_type == "video" {
+                let vm = crate::video_meta::parse_video_meta(path);
+                ((vm.width, vm.height), vm.duration_ms, vm.creation_time, vm.codec, vm.rotation)
+            } else {
+                (get_image_dimensions(path).unwrap_or((None, None)), None, None, None, None)
+            };
             let file_size = fs::metadata(path).ok().map(|m| m.len() as i64);
-            Some(DiscoveredFile { original_path: path.clone(), id, exif_result, dims, file_size, filename })
+            Some(DiscoveredFile { original_path: path.clone(), id, exif_result, dims, duration_ms, video_creation_time, file_size, filename, media_type, codec, rotation })
         })
         .collect();
 
@@ -60,9 +71,29 @@ pub fn rescan_archive(archive_path: &str, db: &Database) -> Result<RescanResult,
     let mut moved = 0usize;
 
     for disc in discovered {
-        let taken_at = disc.exif_result.datetime().map(|dt| dt.to_rfc3339());
         let has_exif = disc.exif_result.has_exif();
-        let date_source = disc.exif_result.date_source_label().map(|s| s.to_string());
+        // For videos: prefer atom creation_time over mtime (but keep exif/filename if present)
+        let (taken_at, date_source) = if disc.media_type == "video" {
+            let exif_src = disc.exif_result.date_source_label();
+            match exif_src {
+                Some("exif") | Some("filename") => (
+                    disc.exif_result.datetime().map(|dt| dt.to_rfc3339()),
+                    exif_src.map(|s| s.to_string()),
+                ),
+                _ => {
+                    if let Some(ct) = disc.video_creation_time {
+                        (Some(ct.to_rfc3339()), Some("atom".to_string()))
+                    } else {
+                        (
+                            disc.exif_result.datetime().map(|dt| dt.to_rfc3339()),
+                            exif_src.map(|s| s.to_string()),
+                        )
+                    }
+                }
+            }
+        } else {
+            (disc.exif_result.datetime().map(|dt| dt.to_rfc3339()), disc.exif_result.date_source_label().map(|s| s.to_string()))
+        };
 
         let (final_path, rel_path) = if let Some((new_abs, new_rel)) =
             relocate_if_misplaced(archive_path, &disc.original_path, &taken_at, &disc.filename)
@@ -83,6 +114,17 @@ pub fn rescan_archive(archive_path: &str, db: &Database) -> Result<RescanResult,
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or(disc.filename);
 
+        let web_path = if disc.media_type == "video" {
+            let full_path = PathBuf::from(&rel_path);
+            if crate::video_meta::is_web_compatible(&disc.codec, &full_path) {
+                Some(rel_path.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         let new_image = crate::db::image::NewImage {
             id: disc.id,
             filename: final_filename,
@@ -94,6 +136,11 @@ pub fn rescan_archive(archive_path: &str, db: &Database) -> Result<RescanResult,
             has_exif,
             date_source,
             thumbnail_path,
+            media_type: disc.media_type,
+            duration_ms: disc.duration_ms,
+            codec: disc.codec,
+            rotation: disc.rotation,
+            web_path,
         };
 
         db.insert_image(&new_image)?;
@@ -117,6 +164,9 @@ pub fn rescan_archive(archive_path: &str, db: &Database) -> Result<RescanResult,
 
     // Thumbnails: generate for images that lack one
     let thumbnailed = repair_missing_thumbnails(archive_path, db)?;
+
+    // Backfill: update metadata for existing videos that have null width (imported before video_meta support)
+    backfill_video_metadata(archive_path, db)?;
 
     let folders_removed = remove_empty_dirs(root)?;
     Ok(RescanResult { added, removed, repaired, moved, thumbnailed, folders_removed })
@@ -163,9 +213,16 @@ fn ensure_thumbnail(archive_root: &str, image_id: &str, image_path: &Path) -> Op
     }
 
     let size = ThumbnailSize::medium();
-    match thumbnail::generate_thumbnail(image_path, &thumb_abs, &size) {
-        Ok(()) => Some(rel),
-        Err(_) => None,
+    if classify_media(image_path) == Some("video") {
+        match thumbnail::generate_video_thumbnail(image_path, &thumb_abs, &size) {
+            Ok(()) => Some(rel),
+            Err(_) => None,
+        }
+    } else {
+        match thumbnail::generate_thumbnail(image_path, &thumb_abs, &size) {
+            Ok(()) => Some(rel),
+            Err(_) => None,
+        }
     }
 }
 
@@ -281,11 +338,7 @@ fn relocate_if_misplaced(
 }
 
 fn is_image_file(path: &Path) -> bool {
-    let ext = path.extension()
-        .and_then(|e| e.to_str())
-        .map(|e| e.to_lowercase());
-
-    matches!(ext.as_deref(), Some("jpg") | Some("jpeg") | Some("png") | Some("gif") | Some("webp") | Some("tiff") | Some("tif") | Some("bmp") | Some("heic") | Some("heif"))
+    classify_media(path).is_some()
 }
 
 fn collect_dirs_inner(dir: &Path, dirs: &mut Vec<PathBuf>) -> Result<(), AppError> {
@@ -337,4 +390,31 @@ fn get_image_dimensions(path: &Path) -> Result<(Option<u32>, Option<u32>), AppEr
         }
         Err(_) => Ok((None, None)),
     }
+}
+
+fn backfill_video_metadata(archive_path: &str, db: &Database) -> Result<(), AppError> {
+    let stubs = db.get_videos_without_metadata()?;
+    for (id, rel_path) in stubs {
+        let abs = Path::new(archive_path).join(&rel_path);
+        if !abs.exists() { continue; }
+        let vm = crate::video_meta::parse_video_meta(&abs);
+        if vm.width.is_some() || vm.duration_ms.is_some() || vm.codec.is_some() {
+            let rel_path_obj = Path::new(&rel_path);
+            let web_path = if crate::video_meta::is_web_compatible(&vm.codec, rel_path_obj) {
+                Some(rel_path.as_str())
+            } else {
+                None
+            };
+            let _ = db.update_video_meta_fields(
+                &id,
+                vm.width,
+                vm.height,
+                vm.duration_ms,
+                vm.codec.as_deref(),
+                vm.rotation,
+                web_path,
+            );
+        }
+    }
+    Ok(())
 }

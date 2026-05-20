@@ -9,6 +9,7 @@ import { useGroupUIStore } from '../stores/groupUIStore';
 import type { Image } from '../types';
 import { useMonthNames } from '../lib/months';
 import { cn } from '@/lib/utils';
+import { formatDuration } from '@/lib/formatDuration';
 
 const SIZES = {
   small:  { px: 120, cols: 6, gap: 8,  rowH: 134 },
@@ -114,6 +115,16 @@ const ThumbnailCell = memo(function ThumbnailCell({
           className="w-full h-full object-cover"
           loading="lazy"
         />
+      ) : image.media_type === 'video' ? (
+        <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-foreground/40">
+          <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="6" width="14" height="12" rx="2" />
+            <path d="M16 10l6-3v10l-6-3V10z" />
+          </svg>
+          <svg className="w-4 h-4 opacity-60" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+        </div>
       ) : (
         <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-foreground/40">
           <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -128,6 +139,20 @@ const ThumbnailCell = memo(function ThumbnailCell({
       {/* Hover dark overlay */}
       <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/thumb:opacity-100 transition-opacity pointer-events-none" />
 
+
+      {/* Video badge + duration */}
+      {image.media_type === 'video' && (
+        <div className="absolute bottom-6 left-1 w-5 h-5 rounded-full bg-black/50 flex items-center justify-center pointer-events-none">
+          <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+        </div>
+      )}
+      {image.media_type === 'video' && image.duration_ms != null && (
+        <span className="absolute bottom-1 right-1 text-[9px] font-mono text-white bg-black/60 rounded px-1 leading-tight pointer-events-none">
+          {formatDuration(image.duration_ms)}
+        </span>
+      )}
 
       {/* Favourite indicator */}
       {image.is_favourite && (

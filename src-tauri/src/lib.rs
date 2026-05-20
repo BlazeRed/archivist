@@ -4,6 +4,7 @@ pub mod state;
 pub mod exif;
 pub mod hasher;
 pub mod thumbnail;
+pub mod video_meta;
 pub mod commands;
 
 use std::sync::Arc;
@@ -300,6 +301,54 @@ fn path_exists(path: String) -> bool {
     std::path::Path::new(&path).exists()
 }
 
+#[tauri::command]
+async fn save_video_thumbnail(
+    state: tauri::State<'_, Arc<AppState>>,
+    image_id: String,
+    jpeg_bytes: Vec<u8>,
+) -> Result<String, error::AppError> {
+    let archive_path = state.get_archive_path().ok_or_else(|| error::AppError::ArchiveNotFound {
+        path: "No archive path set".to_string(),
+    })?;
+    let db = state.db();
+    tauri::async_runtime::spawn_blocking(move || {
+        commands::save_video_thumbnail_impl(&image_id, jpeg_bytes, &archive_path, &*db)
+    })
+    .await
+    .map_err(|e| error::AppError::Internal { message: e.to_string() })?
+}
+
+#[tauri::command]
+fn get_videos_needing_thumbnails(
+    state: tauri::State<'_, Arc<AppState>>,
+) -> Result<Vec<commands::VideoStub>, error::AppError> {
+    commands::get_videos_needing_thumbnails_impl(&*state.db())
+}
+
+#[tauri::command]
+fn get_videos_needing_transcode(
+    state: tauri::State<'_, Arc<AppState>>,
+) -> Result<Vec<commands::VideoStub>, error::AppError> {
+    commands::get_videos_needing_transcode_impl(&*state.db())
+}
+
+#[tauri::command]
+async fn transcode_video(
+    state: tauri::State<'_, Arc<AppState>>,
+    image_id: String,
+    file_path: String,
+) -> Result<String, error::AppError> {
+    let archive_path = state.get_archive_path().ok_or_else(|| error::AppError::ArchiveNotFound {
+        path: "No archive path set".to_string(),
+    })?;
+    let db = state.db();
+    tauri::async_runtime::spawn_blocking(move || {
+        commands::transcode_video_impl(&image_id, &file_path, &archive_path, &*db)
+    })
+    .await
+    .map_err(|e| error::AppError::Internal { message: e.to_string() })?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app_state = Arc::new(
@@ -343,6 +392,10 @@ pub fn run() {
             path_exists,
             toggle_favourite,
             get_favourite_images,
+            save_video_thumbnail,
+            get_videos_needing_thumbnails,
+            get_videos_needing_transcode,
+            transcode_video,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

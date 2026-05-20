@@ -7,14 +7,15 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useMonthNames } from '@/lib/months';
+import { cn } from '@/lib/utils';
 
 export function FilterPanel() {
   const { t } = useTranslation();
   const monthNames = useMonthNames();
   const { filter, setFilter, availableYears, availableGroups, images, allImages } = useTimelineStore();
 
-  const isFiltered = filter.noDate || filter.yearFrom !== null || filter.yearTo !== null || filter.month !== null || filter.groupId !== null;
-  const clearFilter = () => setFilter({ yearFrom: null, yearTo: null, month: null, noDate: false, groupId: null });
+  const isFiltered = filter.noDate || filter.yearFrom !== null || filter.yearTo !== null || filter.month !== null || filter.groupId !== null || filter.mediaType !== 'all';
+  const clearFilter = () => setFilter({ yearFrom: null, yearTo: null, month: null, noDate: false, groupId: null, mediaType: 'all' });
 
   const singleYear = !filter.noDate && availableYears.length === 1 ? availableYears[0] : null;
   const monthYear = filter.yearFrom ?? singleYear;
@@ -44,6 +45,23 @@ export function FilterPanel() {
             {t('timeline.clearFilter')}
           </Button>
         )}
+      </div>
+
+      <div className="flex rounded-md border border-border overflow-hidden">
+        {(['all', 'images', 'videos'] as const).map(v => (
+          <button
+            key={v}
+            onClick={() => setFilter({ mediaType: v })}
+            className={cn(
+              'flex-1 py-1 text-xs font-medium transition-colors',
+              filter.mediaType === v
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-card text-muted-foreground hover:text-foreground'
+            )}
+          >
+            {t(`timeline.media${v.charAt(0).toUpperCase() + v.slice(1)}`)}
+          </button>
+        ))}
       </div>
 
       <div className="flex items-center gap-2">
@@ -136,8 +154,8 @@ export function FilterPanel() {
 
       <p className="text-xs text-muted-foreground">
         {images.length !== allImages.length
-          ? `${images.length} / ${allImages.length} ${t('timeline.photos')}`
-          : `${allImages.length} ${t('timeline.photos')}`}
+          ? `${images.length} / ${allImages.length} ${t('timeline.items')}`
+          : `${allImages.length} ${t('timeline.items')}`}
       </p>
     </div>
   );

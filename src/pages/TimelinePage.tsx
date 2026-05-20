@@ -157,6 +157,7 @@ export function TimelinePage() {
     }
   }, [config.archive_path, fetchImages, fetchGroups]);
 
+
   if (!config.archive_path) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-52px)]">

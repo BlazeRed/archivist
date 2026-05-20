@@ -11,6 +11,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+ffmpeg-sidecar = "2"
 
 [dependencies]
 tauri = { version = "2", features = ["protocol-asset"] }
@@ -29,6 +30,7 @@ nom-exif = "3"
 tempfile = "3"
 rayon = "1"
 regex = "1"
+ffmpeg-sidecar = "2"
 
 [features]
 default = ["custom-protocol"]

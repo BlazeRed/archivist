@@ -8,6 +8,7 @@ export interface TimelineFilter {
   month: number | null;
   noDate: boolean;
   groupId: number | null;
+  mediaType: 'all' | 'images' | 'videos';
 }
 
 interface TimelineState {
@@ -26,11 +27,18 @@ interface TimelineState {
   selectImage: (image: Image | null) => void;
   setPreviewImage: (image: Image | null) => void;
   updateImageFavourite: (imageId: string, isFavourite: boolean) => void;
+  updateImageWebPath: (imageId: string, webPath: string) => void;
   clearImages: () => void;
 }
 
 function applyClientFilter(all: Image[], filter: TimelineFilter, groupIds: Set<string> | null): Image[] {
   let result = all;
+
+  if (filter.mediaType !== 'all') {
+    result = result.filter(img =>
+      filter.mediaType === 'images' ? img.media_type === 'image' : img.media_type === 'video'
+    );
+  }
 
   if (filter.groupId !== null && groupIds !== null) {
     result = result.filter(img => groupIds.has(img.id));
@@ -64,7 +72,7 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
   error: null,
   selectedImage: null,
   previewImage: null,
-  filter: { yearFrom: null, yearTo: null, month: null, noDate: false, groupId: null },
+  filter: { yearFrom: null, yearTo: null, month: null, noDate: false, groupId: null, mediaType: 'all' },
   availableYears: [],
   availableGroups: [],
 
@@ -137,6 +145,12 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
     allImages: s.allImages.map(img => img.id === imageId ? { ...img, is_favourite: isFavourite } : img),
     images: s.images.map(img => img.id === imageId ? { ...img, is_favourite: isFavourite } : img),
     previewImage: s.previewImage?.id === imageId ? { ...s.previewImage, is_favourite: isFavourite } : s.previewImage,
+  })),
+  updateImageWebPath: (imageId, webPath) => set((s) => ({
+    allImages: s.allImages.map(img => img.id === imageId ? { ...img, web_path: webPath } : img),
+    images: s.images.map(img => img.id === imageId ? { ...img, web_path: webPath } : img),
+    previewImage: s.previewImage?.id === imageId ? { ...s.previewImage, web_path: webPath } : s.previewImage,
+    selectedImage: s.selectedImage?.id === imageId ? { ...s.selectedImage, web_path: webPath } : s.selectedImage,
   })),
   clearImages: () => set({ allImages: [], images: [], previewImage: null }),
 }));

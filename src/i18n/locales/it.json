@@ -81,7 +81,11 @@
     "archiveNotSet": "Imposta un percorso archivio nelle Impostazioni.",
     "openArchive": "Apri Archivio",
     "clearFilter": "Azzera filtri",
-    "photos": "foto"
+    "photos": "foto",
+    "items": "elementi",
+    "mediaAll": "Tutti",
+    "mediaImages": "Immagini",
+    "mediaVideos": "Video"
   },
   "preview": {
     "empty": "Seleziona un'immagine per l'anteprima",
@@ -150,7 +154,8 @@
     "addToGroup": "Aggiungi al gruppo…",
     "removeFromGroup": "Rimuovi dal gruppo",
     "noGroups": "—",
-    "showInFolder": "Mostra nella cartella"
+    "showInFolder": "Mostra nella cartella",
+    "duration": "Durata"
   },
   "conflicts": {
     "title": "Rivedi conflitti",

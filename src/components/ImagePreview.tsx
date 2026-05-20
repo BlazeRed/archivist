@@ -20,8 +20,11 @@ export function ImagePreview({ width }: { width: number }) {
     if (!previewImage) { setImgSrc(''); setImageLoaded(false); return; }
     setImageLoaded(false);
     setImgSrc('');
-    const url = archivePath
-      ? convertFileSrc(`${archivePath}/${previewImage.file_path}`)
+    const playPath = previewImage.media_type === 'video'
+      ? (previewImage.web_path ?? null)
+      : previewImage.file_path;
+    const url = archivePath && playPath
+      ? convertFileSrc(`${archivePath}/${playPath}`)
       : '';
     const id = requestAnimationFrame(() => setImgSrc(url));
     return () => cancelAnimationFrame(id);
@@ -62,7 +65,7 @@ export function ImagePreview({ width }: { width: number }) {
     >
       {/* Sticky image pane */}
       <div className="relative shrink-0 bg-[#001A36]" style={{ aspectRatio: '1 / 1' }}>
-        {(!imgSrc || !imageLoaded) && (
+        {(!imgSrc || (previewImage.media_type === 'video' && !previewImage.web_path) || (previewImage.media_type !== 'video' && !imageLoaded)) && (
           <div className="absolute inset-0 flex items-center justify-center">
             <svg className="animate-spin size-8 text-white/40" viewBox="0 0 24 24" fill="none">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -71,13 +74,22 @@ export function ImagePreview({ width }: { width: number }) {
           </div>
         )}
         {imgSrc && (
-          <img
-            src={imgSrc}
-            alt={previewImage.filename}
-            decoding="async"
-            onLoad={() => setImageLoaded(true)}
-            className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-200 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
-          />
+          previewImage.media_type === 'video' ? (
+            <video
+              src={imgSrc}
+              controls
+              preload="metadata"
+              className="absolute inset-0 w-full h-full object-contain"
+            />
+          ) : (
+            <img
+              src={imgSrc}
+              alt={previewImage.filename}
+              decoding="async"
+              onLoad={() => setImageLoaded(true)}
+              className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-200 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+            />
+          )
         )}
         {/* Close button */}
         <button

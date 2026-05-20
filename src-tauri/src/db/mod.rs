@@ -75,6 +75,21 @@ impl Database {
         let _ = conn.execute("ALTER TABLE images ADD COLUMN thumbnail_path TEXT", []);
         let _ = conn.execute("ALTER TABLE images ADD COLUMN date_source TEXT", []);
         let _ = conn.execute("ALTER TABLE images ADD COLUMN is_favourite INTEGER DEFAULT 0", []);
+        let _ = conn.execute("ALTER TABLE images ADD COLUMN media_type TEXT NOT NULL DEFAULT 'image'", []);
+        let _ = conn.execute("ALTER TABLE images ADD COLUMN duration_ms INTEGER", []);
+        let _ = conn.execute("ALTER TABLE images ADD COLUMN codec TEXT", []);
+        let _ = conn.execute("ALTER TABLE images ADD COLUMN rotation INTEGER DEFAULT 0", []);
+        let _ = conn.execute("ALTER TABLE images ADD COLUMN web_path TEXT", []);
+
+        // On Linux, h264 videos previously marked web_compatible can't play in
+        // WebKitGTK without gstreamer-libav. Reset them so the transcode queue
+        // converts them to VP9 WebM.
+        #[cfg(target_os = "linux")]
+        let _ = conn.execute(
+            "UPDATE images SET web_path = NULL WHERE codec = 'h264' AND web_path IS NOT NULL",
+            [],
+        );
+
         let _ = conn.execute(
             "UPDATE images SET date_source = CASE \
              WHEN has_exif = 1 THEN 'exif' \

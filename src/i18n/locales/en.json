@@ -81,7 +81,11 @@
     "archiveNotSet": "Set an archive path in Settings to view photos.",
     "openArchive": "Open Archive",
     "clearFilter": "Clear filters",
-    "photos": "photos"
+    "photos": "photos",
+    "items": "items",
+    "mediaAll": "All",
+    "mediaImages": "Images",
+    "mediaVideos": "Videos"
   },
   "preview": {
     "empty": "Select an image to preview",
@@ -150,7 +154,8 @@
     "addToGroup": "Add to group…",
     "removeFromGroup": "Remove from group",
     "noGroups": "—",
-    "showInFolder": "Show in Folder"
+    "showInFolder": "Show in Folder",
+    "duration": "Duration"
   },
   "conflicts": {
     "title": "Review Conflicts",

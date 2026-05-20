@@ -25,8 +25,11 @@ export function ImageDetail({ hideGroups, hideDetails, navImages }: {
   useEffect(() => {
     if (!selectedImage) { setImgSrc(''); setImageLoaded(false); return; }
     setImageLoaded(false);
-    const url = archivePath
-      ? convertFileSrc(`${archivePath}/${selectedImage.file_path}`)
+    const playPath = selectedImage.media_type === 'video'
+      ? (selectedImage.web_path ?? null)
+      : selectedImage.file_path;
+    const url = archivePath && playPath
+      ? convertFileSrc(`${archivePath}/${playPath}`)
       : '';
     const id = requestAnimationFrame(() => setImgSrc(url));
     return () => cancelAnimationFrame(id);
@@ -60,7 +63,7 @@ export function ImageDetail({ hideGroups, hideDetails, navImages }: {
       >
         {/* Image */}
         <div className="flex-1 bg-[#001A36] flex items-center justify-center p-4 min-w-0 relative">
-          {!imageLoaded && (
+          {selectedImage.media_type !== 'video' && !imageLoaded && (
             <div className="absolute inset-0 flex items-center justify-center">
               <svg className="animate-spin size-8 text-white/40" viewBox="0 0 24 24" fill="none">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
@@ -68,13 +71,32 @@ export function ImageDetail({ hideGroups, hideDetails, navImages }: {
               </svg>
             </div>
           )}
-          <img
-            src={imgSrc}
-            alt={selectedImage.filename}
-            decoding="async"
-            onLoad={() => setImageLoaded(true)}
-            className={`max-w-full max-h-[80vh] object-contain transition-opacity duration-200 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
-          />
+          {selectedImage.media_type === 'video' ? (
+            imgSrc ? (
+              <video
+                src={imgSrc}
+                controls
+                preload="metadata"
+                className="max-w-full max-h-[80vh] object-contain"
+              />
+            ) : (
+              <div className="flex flex-col items-center gap-2 text-white/60 text-sm">
+                <svg className="animate-spin size-8 text-white/40" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
+                <span>{selectedImage.web_path === null ? 'Processing…' : ''}</span>
+              </div>
+            )
+          ) : (
+            <img
+              src={imgSrc}
+              alt={selectedImage.filename}
+              decoding="async"
+              onLoad={() => setImageLoaded(true)}
+              className={`max-w-full max-h-[80vh] object-contain transition-opacity duration-200 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+            />
+          )}
           {hideDetails && (
             <button
               onClick={() => selectImage(null)}

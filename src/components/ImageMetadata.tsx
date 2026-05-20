@@ -6,6 +6,7 @@ import { trimArchivePath } from '@/lib/archivePath';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import type { Image, GroupWithCount } from '../types';
+import { formatDuration } from '@/lib/formatDuration';
 
 function formatDate(dateStr: string | null, fallback: string) {
   if (!dateStr) return fallback;
@@ -100,6 +101,10 @@ export function ImageMetadata({ image, hideGroups }: { image: Image; hideGroups?
             )}
           </p>
         </div>
+
+        {image.media_type === 'video' && image.duration_ms != null && (
+          <Field label={t('detail.duration')} value={formatDuration(image.duration_ms)} />
+        )}
 
         {image.width && image.height && (
           <Field label={t('detail.dimensions')} value={`${image.width} × ${image.height}`} />
