@@ -112,7 +112,7 @@ function SelectionActionBar() {
 
 export function TimelinePage() {
   const { t } = useTranslation();
-  const { fetchImages, fetchGroups, clearImages, selectImage, images, selectedImage } = useTimelineStore();
+  const { fetchImages, fetchGroups, clearImages, selectImage } = useTimelineStore();
   const clearGroups = useGroupStore((s) => s.clearGroups);
   const { config, setConfig } = useAppConfigStore();
   const { isSelectionMode } = useGroupUIStore();
@@ -126,10 +126,6 @@ export function TimelinePage() {
   );
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const imagesRef = useRef(images);
-  imagesRef.current = images;
-  const selectedImageRef = useRef(selectedImage);
-  selectedImageRef.current = selectedImage;
   const handleResize = useCallback((w: number) => {
     setPreviewWidthState(w);
     clearTimeout(saveTimer.current);
@@ -160,25 +156,6 @@ export function TimelinePage() {
       fetchGroups();
     }
   }, [config.archive_path, fetchImages, fetchGroups]);
-
-  useEffect(() => {
-    if (!selectedImage) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-      const imgs = imagesRef.current;
-      const current = selectedImageRef.current;
-      if (!current || imgs.length < 2) return;
-      const idx = imgs.findIndex(img => img.id === current.id);
-      if (idx === -1) return;
-      if (e.key === 'ArrowLeft') {
-        selectImage(imgs[(idx - 1 + imgs.length) % imgs.length]);
-      } else {
-        selectImage(imgs[(idx + 1) % imgs.length]);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedImage, selectImage]);
 
   if (!config.archive_path) {
     return (
@@ -227,7 +204,7 @@ export function TimelinePage() {
         )}
       </div>
 
-      <ImageDetail hideDetails navImages={images} />
+      <ImageDetail hideDetails />
     </div>
   );
 }

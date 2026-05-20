@@ -8,7 +8,7 @@ import { ImageMetadata } from './ImageMetadata';
 
 export function ImagePreview({ width }: { width: number }) {
   const { t } = useTranslation();
-  const { previewImage, selectImage, setPreviewImage, updateImageFavourite } = useTimelineStore();
+  const { previewImage, selectImage, setPreviewImage, updateImageFavourite, images } = useTimelineStore();
   const { config } = useAppConfigStore();
 
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -42,6 +42,18 @@ export function ImagePreview({ width }: { width: number }) {
       </aside>
     );
   }
+
+  const currentIdx = images.findIndex(img => img.id === previewImage.id);
+  const hasNav = currentIdx > -1 && images.length > 1;
+
+  const handlePrev = () => {
+    if (!hasNav) return;
+    setPreviewImage(images[(currentIdx - 1 + images.length) % images.length]);
+  };
+  const handleNext = () => {
+    if (!hasNav) return;
+    setPreviewImage(images[(currentIdx + 1) % images.length]);
+  };
 
   return (
     <aside
@@ -103,6 +115,29 @@ export function ImagePreview({ width }: { width: number }) {
               d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
           </svg>
         </button>
+        {/* Prev / Next navigation */}
+        {hasNav && (
+          <>
+            <button
+              onClick={handlePrev}
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/55 hover:bg-black/80 text-white flex items-center justify-center transition-colors"
+              title={t('common.previous')}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <button
+              onClick={handleNext}
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/55 hover:bg-black/80 text-white flex items-center justify-center transition-colors"
+              title={t('common.next')}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </>
+        )}
       </div>
 
       {/* Scrollable metadata */}
