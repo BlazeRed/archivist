@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
-import { flushSync } from 'react-dom';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
@@ -8,6 +7,7 @@ import { useAppConfigStore } from '../stores/appConfigStore';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useGroupStore } from '../stores/dataStore';
 import { useImportStore } from '../stores/importStore';
+import { useRescan } from '../hooks/useRescan';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,21 +17,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 export function SettingsPage() {
   const { t, i18n } = useTranslation();
   const { config, setConfig } = useAppConfigStore();
-  const { fetchImages, clearImages, selectImage } = useTimelineStore();
+  const { clearImages, selectImage } = useTimelineStore();
   const clearGroups = useGroupStore((s) => s.clearGroups);
   const phase = useImportStore((s) => s.phase);
   const isImportActive = phase === 'scanning' || phase === 'analyzing' || phase === 'thumbnailing' || phase === 'importing';
-  const [rescanLoading, setRescanLoading] = useState(false);
-  const [rescanResult, setRescanResult] = useState<string | null>(null);
+  const { isRescanning, handleRescan } = useRescan();
   const [appVersion, setAppVersion] = useState<string>('');
   const [showImportWarning, setShowImportWarning] = useState(false);
-  const rescanClearTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     getVersion().then(setAppVersion).catch(() => {});
   }, []);
-
-  useEffect(() => () => clearTimeout(rescanClearTimer.current), []);
 
   const selectArchiveFolder = async () => {
     if (isImportActive) { setShowImportWarning(true); return; }
@@ -55,34 +51,6 @@ export function SettingsPage() {
     selectImage(null);
     clearGroups();
     setConfig({ archive_path: '' });
-  };
-
-  const handleRescan = async () => {
-    if (isImportActive) { setShowImportWarning(true); return; }
-    if (!config.archive_path) return;
-    flushSync(() => {
-      setRescanLoading(true);
-      setRescanResult(null);
-    });
-    try {
-      const result = await invoke<{ added: number; removed: number; repaired: number; moved: number; thumbnailed: number; folders_removed: number }>('rescan_archive');
-      let msg = t('settings.rescanFound', { count: result.added });
-      if (result.removed > 0) msg += ` · ${t('settings.rescanRemoved', { count: result.removed })}`;
-      if (result.repaired > 0) msg += ` · ${t('settings.rescanRepaired', { count: result.repaired })}`;
-      if (result.moved > 0) msg += ` · ${t('settings.rescanMoved', { count: result.moved })}`;
-      if (result.thumbnailed > 0) msg += ` · ${t('settings.rescanThumbnailed', { count: result.thumbnailed })}`;
-      if (result.folders_removed > 0) msg += ` · ${t('settings.rescanFoldersRemoved', { count: result.folders_removed })}`;
-      setRescanResult(msg);
-      clearTimeout(rescanClearTimer.current);
-      rescanClearTimer.current = setTimeout(() => setRescanResult(null), 5000);
-      fetchImages();
-    } catch (e) {
-      setRescanResult(t('settings.rescanError', { error: String(e) }));
-      clearTimeout(rescanClearTimer.current);
-      rescanClearTimer.current = setTimeout(() => setRescanResult(null), 5000);
-    } finally {
-      setRescanLoading(false);
-    }
   };
 
   return (
@@ -170,17 +138,17 @@ export function SettingsPage() {
           <div className="flex items-start gap-3 flex-wrap">
             <Button
               onClick={handleRescan}
-              disabled={rescanLoading || !config.archive_path}
+              disabled={isRescanning || isImportActive || !config.archive_path}
               variant="default"
               className="gap-2"
             >
-              {rescanLoading && (
+              {isRescanning && (
                 <svg className="animate-spin size-4" viewBox="0 0 24 24" fill="none">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                 </svg>
               )}
-              {rescanLoading ? t('common.loading') : t('settings.rescanArchive')}
+              {isRescanning ? t('common.loading') : t('settings.rescanArchive')}
             </Button>
 
             {config.archive_path && (
@@ -196,11 +164,6 @@ export function SettingsPage() {
             )}
           </div>
 
-          {rescanResult && (
-            <p className={`mt-2 text-sm ${rescanResult.includes('Error') ? 'text-destructive' : 'text-accent'}`}>
-              {rescanResult}
-            </p>
-          )}
         </div>
 
       </div>

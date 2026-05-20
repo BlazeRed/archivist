@@ -9,6 +9,7 @@ import { useImportStore } from '../stores/importStore';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useGroupStore } from '../stores/dataStore';
 import { useUIStore } from '../stores/uiStore';
+import { useRescan } from '../hooks/useRescan';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
@@ -19,11 +20,11 @@ export function Topbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { phase } = useImportStore();
-  const { fetchImages, clearImages, selectImage } = useTimelineStore();
+  const { clearImages, selectImage } = useTimelineStore();
   const clearGroups = useGroupStore((s) => s.clearGroups);
   const { settingsOpen, toggleSettings } = useUIStore();
+  const { isRescanning, handleRescan } = useRescan();
   const [pendingPath, setPendingPath] = useState<string | null>(null);
-  const [isRescanning, setIsRescanning] = useState(false);
 
   const isImportActive = phase === 'scanning' || phase === 'analyzing' || phase === 'thumbnailing' || phase === 'importing';
 
@@ -45,19 +46,6 @@ export function Topbar() {
       clearGroups();
       try { await invoke('init_archive', { archivePath: selected }); } catch {}
       setConfig({ archive_path: selected as string });
-    }
-  };
-
-  const handleRescan = async () => {
-    if (!config.archive_path || isRescanning) return;
-    setIsRescanning(true);
-    try {
-      await invoke('rescan_archive');
-      fetchImages();
-    } catch {
-      // silent — errors visible in Settings
-    } finally {
-      setIsRescanning(false);
     }
   };
 
