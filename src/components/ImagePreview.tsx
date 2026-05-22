@@ -1,34 +1,78 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
+import { toast } from 'sonner';
 import { trimArchivePath } from '@/lib/archivePath';
+import { makeVideoUrl } from '@/lib/mediaServer';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { ImageMetadata } from './ImageMetadata';
 
 export function ImagePreview({ width }: { width: number }) {
   const { t } = useTranslation();
-  const { previewImage, selectImage, setPreviewImage, updateImageFavourite, images } = useTimelineStore();
+  const { previewImage, selectImage, setPreviewImage, updateImageFavourite, updateImageWebPath, images } = useTimelineStore();
   const { config } = useAppConfigStore();
 
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imgSrc, setImgSrc] = useState('');
+  const [playing, setPlaying] = useState(false);
+  const [transcoding, setTranscoding] = useState(false);
 
   const archivePath = trimArchivePath(config.archive_path);
 
+  // Reset all state when selected image changes
   useEffect(() => {
-    if (!previewImage) { setImgSrc(''); setImageLoaded(false); return; }
     setImageLoaded(false);
     setImgSrc('');
-    const playPath = previewImage.media_type === 'video'
-      ? (previewImage.web_path ?? null)
-      : previewImage.file_path;
-    const url = archivePath && playPath
-      ? convertFileSrc(`${archivePath}/${playPath}`)
+    setPlaying(false);
+    setTranscoding(false);
+  }, [previewImage?.id]);
+
+  // Rebuild src URL when the playable path or archive changes (without resetting playing)
+  useEffect(() => {
+    if (!previewImage || !archivePath) { setImgSrc(''); return; }
+    if (previewImage.media_type === 'video') {
+      if (!previewImage.web_path) { setImgSrc(''); return; }
+      let cancelled = false;
+      makeVideoUrl(archivePath, previewImage.web_path).then(url => {
+        if (!cancelled) setImgSrc(url);
+      });
+      return () => { cancelled = true; };
+    }
+    const url = previewImage.file_path
+      ? convertFileSrc(`${archivePath}/${previewImage.file_path}`)
       : '';
     const id = requestAnimationFrame(() => setImgSrc(url));
     return () => cancelAnimationFrame(id);
-  }, [previewImage, archivePath]);
+  }, [previewImage?.id, previewImage?.web_path, previewImage?.file_path, archivePath]);
+
+  const thumbSrc = previewImage?.thumbnail_path && archivePath
+    ? convertFileSrc(`${archivePath}/${previewImage.thumbnail_path}`)
+    : '';
+
+  const handlePlay = async () => {
+    if (!previewImage || !archivePath) return;
+    if (previewImage.web_path) {
+      setPlaying(true);
+      return;
+    }
+    setTranscoding(true);
+    toast.info(t('preview.transcoding'));
+    try {
+      const webPath = await invoke<string>('transcode_video', {
+        imageId: previewImage.id,
+        filePath: previewImage.file_path,
+      });
+      updateImageWebPath(previewImage.id, webPath);
+      setImgSrc(await makeVideoUrl(archivePath, webPath));
+      setPlaying(true);
+    } catch (e) {
+      console.error('[transcode] failed:', e);
+      toast.error(t('preview.transcodeError'));
+    } finally {
+      setTranscoding(false);
+    }
+  };
 
   if (!previewImage) {
     return (
@@ -65,7 +109,8 @@ export function ImagePreview({ width }: { width: number }) {
     >
       {/* Sticky image pane */}
       <div className="relative shrink-0 bg-[#001A36]" style={{ aspectRatio: '1 / 1' }}>
-        {(!imgSrc || (previewImage.media_type === 'video' && !previewImage.web_path) || (previewImage.media_type !== 'video' && !imageLoaded)) && (
+        {/* Image: loading spinner */}
+        {previewImage.media_type !== 'video' && !imageLoaded && (
           <div className="absolute inset-0 flex items-center justify-center">
             <svg className="animate-spin size-8 text-white/40" viewBox="0 0 24 24" fill="none">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -73,23 +118,55 @@ export function ImagePreview({ width }: { width: number }) {
             </svg>
           </div>
         )}
-        {imgSrc && (
-          previewImage.media_type === 'video' ? (
-            <video
-              src={imgSrc}
-              controls
-              preload="metadata"
-              className="absolute inset-0 w-full h-full object-contain"
-            />
-          ) : (
-            <img
-              src={imgSrc}
-              alt={previewImage.filename}
-              decoding="async"
-              onLoad={() => setImageLoaded(true)}
-              className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-200 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
-            />
-          )
+        {previewImage.media_type !== 'video' && imgSrc && (
+          <img
+            src={imgSrc}
+            alt={previewImage.filename}
+            decoding="async"
+            onLoad={() => setImageLoaded(true)}
+            className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-200 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+          />
+        )}
+        {/* Video: transcoding in progress */}
+        {previewImage.media_type === 'video' && transcoding && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+            <svg className="animate-spin size-8 text-white/40" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            <span className="text-white/60 text-xs text-center px-4">{t('preview.transcoding')}</span>
+          </div>
+        )}
+        {/* Video: not transcoding, not playing — thumbnail + play button */}
+        {previewImage.media_type === 'video' && !transcoding && !playing && (
+          <button
+            onClick={handlePlay}
+            className="absolute inset-0 flex items-center justify-center group"
+            title={t('preview.play')}
+          >
+            {thumbSrc && (
+              <img src={thumbSrc} alt="" className="absolute inset-0 w-full h-full object-contain" />
+            )}
+            <div className="relative z-10 w-14 h-14 rounded-full bg-black/60 group-hover:bg-black/80 flex items-center justify-center transition-colors">
+              <svg className="w-6 h-6 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            </div>
+          </button>
+        )}
+        {/* Video: playing */}
+        {previewImage.media_type === 'video' && playing && imgSrc && (
+          <video
+            controls
+            autoPlay
+            onError={(e) => {
+              const v = e.currentTarget;
+              console.error('[video] error:', v.error?.code, v.error?.message, 'networkState:', v.networkState, 'src:', imgSrc);
+            }}
+            className="absolute inset-0 w-full h-full object-contain"
+          >
+            <source src={imgSrc} type="video/webm" />
+          </video>
         )}
         {/* Close button */}
         <button

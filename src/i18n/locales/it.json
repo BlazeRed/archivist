@@ -90,7 +90,11 @@
   "preview": {
     "empty": "Seleziona un'immagine per l'anteprima",
     "expand": "Apri anteprima completa",
-    "favourite": "Aggiungi ai preferiti"
+    "favourite": "Aggiungi ai preferiti",
+    "videoProcessing": "Elaborazione video…",
+    "play": "Riproduci",
+    "transcoding": "Conversione video in corso, potrebbe richiedere qualche minuto…",
+    "transcodeError": "Conversione video fallita"
   },
   "favourites": {
     "title": "Preferiti",

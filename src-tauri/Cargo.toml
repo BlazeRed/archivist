@@ -31,6 +31,8 @@ tempfile = "3"
 rayon = "1"
 regex = "1"
 ffmpeg-sidecar = "2"
+axum = "0.7"
+tower-http = { version = "0.5", features = ["fs"] }
 
 [features]
 default = ["custom-protocol"]

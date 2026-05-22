@@ -6,6 +6,7 @@ pub mod hasher;
 pub mod thumbnail;
 pub mod video_meta;
 pub mod commands;
+pub mod media_server;
 
 use std::sync::Arc;
 use state::AppState;
@@ -349,10 +350,16 @@ async fn transcode_video(
     .map_err(|e| error::AppError::Internal { message: e.to_string() })?
 }
 
+#[tauri::command]
+fn get_media_server_port(state: tauri::State<'_, Arc<AppState>>) -> u16 {
+    state.media_port()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let media_port = tauri::async_runtime::block_on(media_server::start());
     let app_state = Arc::new(
-        AppState::new(std::path::PathBuf::from("/tmp/archivist.db")).expect("Failed to init db")
+        AppState::new(std::path::PathBuf::from("/tmp/archivist.db"), media_port).expect("Failed to init db")
     );
 
     tauri::Builder::default()
@@ -396,6 +403,7 @@ pub fn run() {
             get_videos_needing_thumbnails,
             get_videos_needing_transcode,
             transcode_video,
+            get_media_server_port,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

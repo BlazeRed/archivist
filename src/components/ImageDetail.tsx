@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { convertFileSrc } from '@tauri-apps/api/core';
+import { convertFileSrc, invoke } from '@tauri-apps/api/core';
+import { toast } from 'sonner';
 import { trimArchivePath } from '@/lib/archivePath';
+import { makeVideoUrl } from '@/lib/mediaServer';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { ImageMetadata } from './ImageMetadata';
@@ -19,21 +21,62 @@ export function ImageDetail({ hideGroups, hideDetails, navImages }: {
 
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imgSrc, setImgSrc] = useState('');
+  const [transcoding, setTranscoding] = useState(false);
 
   const archivePath = trimArchivePath(config.archive_path);
 
+  // Reset when selected image changes
   useEffect(() => {
-    if (!selectedImage) { setImgSrc(''); setImageLoaded(false); return; }
     setImageLoaded(false);
-    const playPath = selectedImage.media_type === 'video'
-      ? (selectedImage.web_path ?? null)
-      : selectedImage.file_path;
-    const url = archivePath && playPath
-      ? convertFileSrc(`${archivePath}/${playPath}`)
+    setImgSrc('');
+    setTranscoding(false);
+  }, [selectedImage?.id]);
+
+  // Rebuild URL when web_path updates (without resetting transcoding)
+  useEffect(() => {
+    if (!selectedImage || !archivePath) { setImgSrc(''); return; }
+    if (selectedImage.media_type === 'video') {
+      if (!selectedImage.web_path) { setImgSrc(''); return; }
+      let cancelled = false;
+      makeVideoUrl(archivePath, selectedImage.web_path).then(url => {
+        if (!cancelled) setImgSrc(url);
+      });
+      return () => { cancelled = true; };
+    }
+    const url = selectedImage.file_path
+      ? convertFileSrc(`${archivePath}/${selectedImage.file_path}`)
       : '';
     const id = requestAnimationFrame(() => setImgSrc(url));
     return () => cancelAnimationFrame(id);
-  }, [selectedImage, archivePath]);
+  }, [selectedImage?.id, selectedImage?.web_path, selectedImage?.file_path, archivePath]);
+
+  // Auto-transcode when detail view opens for an untranscoded video
+  useEffect(() => {
+    if (!selectedImage || selectedImage.media_type !== 'video') return;
+    if (selectedImage.web_path) return;
+    if (!archivePath) return;
+
+    let cancelled = false;
+    setTranscoding(true);
+    toast.info(t('preview.transcoding'));
+
+    invoke<string>('transcode_video', {
+      imageId: selectedImage.id,
+      filePath: selectedImage.file_path,
+    }).then((webPath) => {
+      if (cancelled) return;
+      useTimelineStore.getState().updateImageWebPath(selectedImage.id, webPath);
+    }).catch((e) => {
+      if (cancelled) return;
+      console.error('[transcode] detail failed:', e);
+      toast.error(t('preview.transcodeError'));
+    }).finally(() => {
+      if (!cancelled) setTranscoding(false);
+    });
+
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedImage?.id]);
 
   if (!selectedImage) return null;
 
@@ -71,24 +114,38 @@ export function ImageDetail({ hideGroups, hideDetails, navImages }: {
               </svg>
             </div>
           )}
-          {selectedImage.media_type === 'video' ? (
+          {selectedImage.media_type === 'video' && transcoding && (
+            <div className="flex flex-col items-center gap-2 text-white/60 text-sm text-center px-6">
+              <svg className="animate-spin size-8 text-white/40" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+              <span>{t('preview.transcoding')}</span>
+            </div>
+          )}
+          {selectedImage.media_type === 'video' && !transcoding && (
             imgSrc ? (
               <video
-                src={imgSrc}
                 controls
-                preload="metadata"
+                autoPlay
+                onError={(e) => {
+                  const v = e.currentTarget;
+                  console.error('[video] detail error:', v.error?.code, v.error?.message, 'networkState:', v.networkState, 'src:', imgSrc);
+                }}
                 className="max-w-full max-h-[80vh] object-contain"
-              />
+              >
+                <source src={imgSrc} type="video/webm" />
+              </video>
             ) : (
               <div className="flex flex-col items-center gap-2 text-white/60 text-sm">
                 <svg className="animate-spin size-8 text-white/40" viewBox="0 0 24 24" fill="none">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                 </svg>
-                <span>{selectedImage.web_path === null ? 'Processing…' : ''}</span>
               </div>
             )
-          ) : (
+          )}
+          {selectedImage.media_type !== 'video' && (
             <img
               src={imgSrc}
               alt={selectedImage.filename}
