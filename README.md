@@ -11,9 +11,9 @@
   <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white">
 </p>
 
-<p align="center"><em>Your photos, organized locally. No cloud. No accounts. No subscription.</em></p>
+<p align="center"><em>Your media, organized locally. No cloud. No accounts. No subscription.</em></p>
 
-Archivist is a desktop photo archive organizer that imports, indexes, and browses your photos in a clean folder layout on disk — entirely offline, with no external services.
+Archivist is a desktop media archive organizer that imports, indexes, and browses your photos and videos in a clean folder layout on disk — entirely offline, with no external services.
 
 ## Screenshots
 
@@ -58,24 +58,34 @@ Grab the latest installer from [**GitHub Releases**](../../releases/latest).
 
 ### Import
 - **Drag-and-drop or button-pick** a source folder or individual file
-- **EXIF date extraction** — DateTimeOriginal, CreateDate, DateTime, with filesystem-date fallback for non-EXIF images
+- **EXIF date extraction** — DateTimeOriginal, CreateDate, DateTime, filename-pattern parsing, with original filesystem-mtime preserved as last fallback
 - **SHA-256 duplicate detection** — re-importing the same file is a no-op
 - **Conflict review UI** — keep existing, replace, or keep both side-by-side
 - **Optional source deletion** after import
-- **Thumbnail generation** at import time; thumbnails stored inside the archive
 
 ### Timeline
-- Browse all archived photos in chronological order with sticky month headers
+- Browse all archived media in chronological order with sticky month headers
+- **Media type filter** — All / Images / Videos toggle
 - Year-range slider and month filter for narrowing the view
-- **No Date** filter for images with no date metadata
+- **No Date** filter for media with no date metadata
 - Filter by group membership
-- Click any photo to open a detail panel with EXIF metadata, dimensions, file size, group membership, and a **Show in Folder** button that opens the OS file manager at the image location
+- Configurable thumbnail size (Small / Medium / Large)
+- Click any item to open a detail panel with metadata, dimensions, file size, group membership, and a **Show in Folder** button
+
+### Videos
+- Full video playback in the detail panel
+- Duration displayed on thumbnail
+- On-demand transcoding for formats not natively supported by the browser
+
+### Favourites
+- Mark any media as a favourite from the detail panel
+- Dedicated Favourites page for quick access
 
 ### Groups
 - Create named logical collections — no physical folders created on disk
-- Add photos from a full-screen picker that mirrors the timeline layout
-- Remove individual photos from a group
-- **Export a group** — copies all its photos to a chosen destination folder
+- Add media from a full-screen picker that mirrors the timeline layout
+- Remove individual items from a group
+- **Export a group** — copies all its files to a chosen destination folder
 
 ### Archive management
 - **Rescan** button in the navbar for quick re-indexing after external changes
@@ -167,7 +177,7 @@ Tag name and version in files must match.
 | Layer | Technologies |
 |-------|-------------|
 | Frontend | React 19, TypeScript 5, Tailwind CSS 4, shadcn/ui, Radix UI |
-| State | Zustand 5 (6 stores), React Router 7 |
+| State | Zustand 5 (7 stores), React Router 7 |
 | i18n | i18next + react-i18next (en / it) |
 | Backend | Rust, Tauri v2, rusqlite (SQLite bundled) |
-| Images | kamadak-exif, image crate, sha2, rayon |
+| Media | nom-exif, image crate, sha2, rayon, ffmpeg-sidecar |

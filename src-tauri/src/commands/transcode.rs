@@ -20,9 +20,6 @@ pub fn transcode_video_impl(
     let output_str = output.to_string_lossy().to_string();
     let input_str = input.to_string_lossy().to_string();
 
-    eprintln!("[transcode] start: {} → {}", input_str, output_str);
-    eprintln!("[transcode] ffmpeg binary: {:?}", ffmpeg_sidecar::paths::ffmpeg_path());
-
     // VP9/Opus WebM: open codec, no proprietary GStreamer plugins required on Linux
     let result = std::process::Command::new(ffmpeg_sidecar::paths::ffmpeg_path())
         .args([
@@ -39,17 +36,6 @@ pub fn transcode_video_impl(
             &output_str,
         ])
         .output();
-
-    match &result {
-        Ok(out) => {
-            eprintln!("[transcode] ffmpeg exit status: {:?}", out.status.code());
-            eprintln!("[transcode] ffmpeg stderr:\n{}", String::from_utf8_lossy(&out.stderr));
-            eprintln!("[transcode] output file exists: {}", output.exists());
-        }
-        Err(e) => {
-            eprintln!("[transcode] failed to spawn ffmpeg: {}", e);
-        }
-    }
 
     let success = result
         .map(|out| out.status.success() && output.exists())

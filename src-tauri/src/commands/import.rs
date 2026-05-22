@@ -166,8 +166,6 @@ pub fn analyze_image(scanned: &ScannedImage) -> Result<AnalyzedImage, AppError> 
 
     let (width, height, duration_ms, taken_at, date_source, codec, rotation) = if media_type == "video" {
         let vm = crate::video_meta::parse_video_meta(path);
-        eprintln!("[import] analyze {:?}: codec={:?} is_web_compatible={}", path, vm.codec,
-            crate::video_meta::is_web_compatible(&vm.codec, path));
         // Priority: filename pattern > atom/probe creation_time > mtime
         let exif_src = exif_result.date_source_label();
         let (final_taken_at, final_source) = match exif_src {
@@ -408,9 +406,6 @@ pub fn execute_import(
 
                     let web_path = if p.image.media_type == "video" {
                         let compat = crate::video_meta::is_web_compatible(&p.image.codec, &p.dest_path);
-                        eprintln!("[import] execute web_path for {:?}: codec={:?} compat={} → {:?}",
-                            p.dest_path, p.image.codec, compat,
-                            if compat { "set to file_path" } else { "null (needs transcode)" });
                         if compat { Some(relative_path.clone()) } else { None }
                     } else {
                         None
@@ -585,9 +580,6 @@ pub fn import_single_image(
 
             let web_path = if image.media_type == "video" {
                 let compat = crate::video_meta::is_web_compatible(&image.codec, &dest_path);
-                eprintln!("[import] single web_path for {:?}: codec={:?} compat={} → {:?}",
-                    dest_path, image.codec, compat,
-                    if compat { "set to file_path" } else { "null (needs transcode)" });
                 if compat { Some(relative_path.clone()) } else { None }
             } else {
                 None

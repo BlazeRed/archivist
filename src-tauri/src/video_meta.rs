@@ -16,12 +16,9 @@ pub struct VideoMeta {
 /// Parse metadata from a video file.
 /// Tries ffmpeg stderr probe first (all formats); falls back to MP4 atom parser.
 pub fn parse_video_meta(path: &Path) -> VideoMeta {
-    eprintln!("[video_meta] ffmpeg binary: {:?}", ffmpeg_sidecar::paths::ffmpeg_path());
-    eprintln!("[video_meta] probing: {:?}", path);
     if let Some(meta) = probe_via_ffmpeg(path) {
         return meta;
     }
-    eprintln!("[video_meta] ffmpeg probe failed, falling back to MP4 atom parser");
     parse_mp4_atoms(path).unwrap_or(VideoMeta {
         width: None,
         height: None,
@@ -73,7 +70,6 @@ fn probe_via_ffmpeg(path: &Path) -> Option<VideoMeta> {
     // ffmpeg exits non-zero when no output file is given — that is expected.
     // All relevant info is in stderr.
     let info = String::from_utf8_lossy(&output.stderr);
-    eprintln!("[video_meta] ffmpeg stderr:\n{}", info);
 
     // Duration: HH:MM:SS.cs  (cs = centiseconds, 2 digits)
     let duration_ms = {
@@ -104,8 +100,6 @@ fn probe_via_ffmpeg(path: &Path) -> Option<VideoMeta> {
             .and_then(|c| DateTime::parse_from_rfc3339(&c[1]).ok())
             .map(|dt| dt.with_timezone(&Utc))
     };
-
-    eprintln!("[video_meta] parsed → codec={:?} w={:?} h={:?} dur_ms={:?} rot={:?}", codec, width, height, duration_ms, rotation);
 
     Some(VideoMeta {
         width,

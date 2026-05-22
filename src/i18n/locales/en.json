@@ -90,7 +90,6 @@
     "empty": "Select an image to preview",
     "expand": "Open full preview",
     "favourite": "Toggle favourite",
-    "videoProcessing": "Processing video…",
     "play": "Play",
     "transcoding": "Transcoding video, this may take a while…",
     "transcodeError": "Video transcode failed"

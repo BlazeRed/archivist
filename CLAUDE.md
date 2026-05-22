@@ -58,6 +58,7 @@ Tauri v2 desktop app. Two runtimes communicate via `invoke()`:
 | `timelineStore` | Year-range filter (`yearFrom`/`yearTo`), month filter, media type filter, selected image |
 | `groupUIStore` | Multi-selection state for group assignment |
 | `notificationStore` | Toast queue |
+| `uiStore` | Settings panel open/close, rescan-in-progress flag |
 
 ### timelineStore filter shape
 

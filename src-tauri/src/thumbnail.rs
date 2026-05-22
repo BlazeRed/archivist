@@ -89,20 +89,12 @@ pub fn generate_video_thumbnail(
     let dest_str = dest_path.to_string_lossy();
     let src_str = source_path.to_string_lossy();
 
-    eprintln!("[thumbnail] input: {} → {}", src_str, dest_str);
-
     // First attempt: seek to 1s (good for long videos)
     let result1 = std::process::Command::new(ffmpeg_sidecar::paths::ffmpeg_path())
         .args(["-y", "-ss", "1", "-i", src_str.as_ref(),
                "-vframes", "1", "-vf", scale_filter.as_str(),
                "-q:v", "3", dest_str.as_ref()])
         .output();
-
-    match &result1 {
-        Ok(out) => eprintln!("[thumbnail] exit={:?} exists={} stderr:\n{}",
-            out.status.code(), dest_path.exists(), String::from_utf8_lossy(&out.stderr)),
-        Err(e) => eprintln!("[thumbnail] spawn failed: {}", e),
-    }
 
     if result1.map(|o| o.status.success() && dest_path.exists()).unwrap_or(false) {
         return Ok(());
@@ -114,11 +106,6 @@ pub fn generate_video_thumbnail(
                "-vframes", "1", "-vf", scale_filter.as_str(),
                "-q:v", "3", dest_str.as_ref()])
         .output();
-
-    match &result2 {
-        Ok(out) => eprintln!("[thumbnail] fallback exit={:?} exists={}", out.status.code(), dest_path.exists()),
-        Err(e) => eprintln!("[thumbnail] fallback spawn failed: {}", e),
-    }
 
     if result2.map(|o| o.status.success() && dest_path.exists()).unwrap_or(false) {
         Ok(())
