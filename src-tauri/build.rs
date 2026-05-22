@@ -10,7 +10,11 @@ fn main() {
     let binaries_dir = std::path::PathBuf::from(&manifest).join("binaries");
     std::fs::create_dir_all(&binaries_dir).ok();
 
-    let ffmpeg_dest = binaries_dir.join(format!("ffmpeg-{}", target));
+    // Windows auto_download places ffmpeg.exe; the suffix must match on both
+    // the source lookup and the Tauri-expected destination name.
+    let exe_suffix = if cfg!(windows) { ".exe" } else { "" };
+
+    let ffmpeg_dest = binaries_dir.join(format!("ffmpeg-{}{}", target, exe_suffix));
 
     if !ffmpeg_dest.exists() {
         match ffmpeg_sidecar::download::auto_download() {
@@ -18,7 +22,7 @@ fn main() {
                 // Binary was placed next to the build-script executable
                 if let Ok(exe) = std::env::current_exe() {
                     let dir = exe.parent().unwrap();
-                    let downloaded = dir.join("ffmpeg");
+                    let downloaded = dir.join(format!("ffmpeg{}", exe_suffix));
                     if downloaded.exists() {
                         if let Err(e) = std::fs::copy(&downloaded, &ffmpeg_dest) {
                             println!("cargo:warning=ffmpeg copy to binaries/ failed: {e}");
@@ -34,10 +38,10 @@ fn main() {
 
     // Copy ffprobe alongside ffmpeg if available (Linux/Windows builds include it).
     // macOS auto_download does not include ffprobe — absence is silently ignored.
-    let ffprobe_dest = binaries_dir.join(format!("ffprobe-{}", target));
+    let ffprobe_dest = binaries_dir.join(format!("ffprobe-{}{}", target, exe_suffix));
     if !ffprobe_dest.exists() {
         if let Ok(exe) = std::env::current_exe() {
-            let downloaded = exe.parent().unwrap().join("ffprobe");
+            let downloaded = exe.parent().unwrap().join(format!("ffprobe{}", exe_suffix));
             if downloaded.exists() {
                 if let Err(e) = std::fs::copy(&downloaded, &ffprobe_dest) {
                     println!("cargo:warning=ffprobe copy to binaries/ failed: {e}");
