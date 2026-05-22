@@ -367,6 +367,14 @@ pub fn execute_import(
 
             match std::fs::copy(&p.source_path, &p.dest_path) {
                 Ok(_) => {
+                    // Preserve original mtime so rescan yields the same date if DB is rebuilt
+                    if let Ok(src_meta) = std::fs::metadata(&p.source_path) {
+                        if let Ok(mtime) = src_meta.modified() {
+                            if let Ok(f) = std::fs::OpenOptions::new().write(true).open(&p.dest_path) {
+                                let _ = f.set_times(std::fs::FileTimes::new().set_modified(mtime));
+                            }
+                        }
+                    }
                     let stored_thumbnail = if p.thumbnail_abs.exists() {
                         Some(p.thumbnail_rel.clone())
                     } else if p.image.media_type == "video" {
@@ -524,6 +532,14 @@ pub fn import_single_image(
 
     match std::fs::copy(&image.path, &dest_path) {
         Ok(_) => {
+            // Preserve original mtime so rescan yields the same date if DB is rebuilt
+            if let Ok(src_meta) = std::fs::metadata(&image.path) {
+                if let Ok(mtime) = src_meta.modified() {
+                    if let Ok(f) = std::fs::OpenOptions::new().write(true).open(&dest_path) {
+                        let _ = f.set_times(std::fs::FileTimes::new().set_modified(mtime));
+                    }
+                }
+            }
             let thumbnail_abs = PathBuf::from(archive_path)
                 .join(".archivist/thumbnails")
                 .join(format!("{}.jpg", &image.hash));
