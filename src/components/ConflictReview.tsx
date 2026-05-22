@@ -186,7 +186,7 @@ export function ConflictReview({ onImport, onBack }: { onImport: () => void; onB
 
       <div className="flex items-center justify-between p-3 bg-muted rounded-lg mb-4 shrink-0">
         <span className="text-sm text-foreground">
-          {importPlan.images.length} {t('timeline.photos')}
+          {importPlan.images.length} {t('timeline.items')}
         </span>
         <span className="text-sm text-muted-foreground">{formatSize(importPlan.total_size)}</span>
       </div>
@@ -251,7 +251,7 @@ export function ConflictReview({ onImport, onBack }: { onImport: () => void; onB
           ← {t('common.back')}
         </Button>
         <Button onClick={onImport} disabled={isImporting}>
-          {isImporting ? t('import.importing') : t('import.importPhotos')}
+          {isImporting ? t('import.importing') : t('import.importMedia')}
         </Button>
       </div>
     </div>

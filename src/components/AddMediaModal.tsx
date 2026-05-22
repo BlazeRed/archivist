@@ -62,7 +62,7 @@ interface Props {
   onAdded: () => void;
 }
 
-export function AddPhotosModal({
+export function AddMediaModal({
   groupId,
   onClose,
   onAdded,
@@ -174,7 +174,7 @@ export function AddPhotosModal({
       <DialogContent className="w-[95vw] max-w-[95vw] sm:max-w-[95vw] h-[90vh] max-h-[90vh] p-0 flex flex-col overflow-hidden bg-background">
         <DialogHeader className="shrink-0 px-6 py-4 border-b border-border bg-card">
           <DialogTitle className="text-foreground">
-            {t("groups.addPhotosTitle")}
+            {t("groups.addMediaTitle")}
           </DialogTitle>
         </DialogHeader>
 
@@ -249,7 +249,7 @@ export function AddPhotosModal({
                 )}
 
               <p className="text-xs text-muted-foreground">
-                {filteredImages.length} {t("timeline.photos")}
+                {filteredImages.length} {t("timeline.items")}
               </p>
             </div>
           </aside>
@@ -259,7 +259,7 @@ export function AddPhotosModal({
             {filteredImages.length === 0 ? (
               <div className="flex items-center justify-center h-full">
                 <p className="text-muted-foreground text-sm">
-                  {t("groups.allPhotosAdded")}
+                  {t("groups.allMediaAdded")}
                 </p>
               </div>
             ) : (
@@ -355,8 +355,8 @@ export function AddPhotosModal({
               disabled={selectedIds.size === 0 || adding}
             >
               {selectedIds.size > 0
-                ? t("groups.addPhotosConfirm", { count: selectedIds.size })
-                : t("groups.addPhotosTitle")}
+                ? t("groups.addMediaConfirm", { count: selectedIds.size })
+                : t("groups.addMediaTitle")}
             </Button>
             <Button variant="secondary" onClick={onClose}>
               {t("common.cancel")}

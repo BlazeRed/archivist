@@ -55,7 +55,7 @@ Tauri v2 desktop app. Two runtimes communicate via `invoke()`:
 | `appConfigStore` | `AppConfig` (archive path, language, thumbnail_size) |
 | `dataStore` | Images + groups loaded from DB (`useImageStore`, `useGroupStore`) |
 | `importStore` | Import wizard state machine (scanning → analyzing → review → importing → complete) |
-| `timelineStore` | Year-range filter (`yearFrom`/`yearTo`), month filter, selected image |
+| `timelineStore` | Year-range filter (`yearFrom`/`yearTo`), month filter, media type filter, selected image |
 | `groupUIStore` | Multi-selection state for group assignment |
 | `notificationStore` | Toast queue |
 
@@ -63,11 +63,12 @@ Tauri v2 desktop app. Two runtimes communicate via `invoke()`:
 
 ```typescript
 interface TimelineFilter {
-  yearFrom: number | null;   // null = no lower bound
-  yearTo:   number | null;   // null = no upper bound
-  month:    number | null;   // 1–12; only active when yearFrom === yearTo
-  noDate:   boolean;
-  groupId:  number | null;
+  yearFrom:  number | null;              // null = no lower bound
+  yearTo:    number | null;              // null = no upper bound
+  month:     number | null;              // 1–12; only active when yearFrom === yearTo
+  noDate:    boolean;
+  groupId:   number | null;
+  mediaType: 'all' | 'images' | 'videos';
 }
 ```
 
@@ -112,9 +113,8 @@ Key components in `src/components/`:
 | Component | Purpose |
 |-----------|---------|
 | `Topbar.tsx` | Nav bar — logo, page links, rescan icon button, language toggle |
-| `FilterPanel.tsx` | Year-range slider + month select for timeline |
 | `ThumbnailGrid.tsx` | Virtualized image grid with sticky month headers |
-| `AddPhotosModal.tsx` | Full-screen group photo picker (same layout as timeline) |
+| `AddMediaModal.tsx` | Full-screen group media picker (same layout as timeline) |
 | `ImageDetail.tsx` | Full image view modal with metadata panel and Show in Folder button |
 | `ProgressBar.tsx` | Import progress indicator |
 | `ConflictReview.tsx` | Duplicate conflict resolution UI |

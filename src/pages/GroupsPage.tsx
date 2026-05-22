@@ -8,7 +8,7 @@ import { useGroupStore } from '../stores/dataStore';
 import { useGroupUIStore } from '../stores/groupUIStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { useTimelineStore } from '../stores/timelineStore';
-import { AddPhotosModal } from '../components/AddPhotosModal';
+import { AddMediaModal } from '../components/AddMediaModal';
 import { ImageDetail } from '../components/ImageDetail';
 import type { Image, GroupWithCount } from '../types';
 import { Button } from '@/components/ui/button';
@@ -35,7 +35,7 @@ export function GroupsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [deletingGroupId, setDeletingGroupId] = useState<number | null>(null);
-  const [showAddPhotos, setShowAddPhotos] = useState(false);
+  const [showAddMedia, setShowAddMedia] = useState(false);
   const [editingGroupId, setEditingGroupId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState('');
   const [exportingGroupId, setExportingGroupId] = useState<number | null>(null);
@@ -150,8 +150,8 @@ export function GroupsPage() {
     setDeletingGroupId(null);
   };
 
-  const handlePhotosAdded = async () => {
-    setShowAddPhotos(false);
+  const handleMediaAdded = async () => {
+    setShowAddMedia(false);
     if (selectedGroupId !== null) {
       await handleOpenGroup(selectedGroupId);
     }
@@ -226,8 +226,8 @@ export function GroupsPage() {
             <span className="text-border">|</span>
             <h2 className="font-semibold text-sm text-foreground truncate">{selectedGroup?.name}</h2>
             <div className="ml-auto flex items-center gap-2">
-              <Button size="sm" onClick={() => setShowAddPhotos(true)}>
-                {t('groups.addPhotosTitle')}
+              <Button size="sm" onClick={() => setShowAddMedia(true)}>
+                {t('groups.addMediaTitle')}
               </Button>
               <Button
                 size="sm"
@@ -339,7 +339,7 @@ export function GroupsPage() {
                         <p className="font-medium text-sm truncate text-foreground">{group.name}</p>
                       )}
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {t('groups.photosCount', { count: group.image_count })}
+                        {t('groups.mediaCount', { count: group.image_count })}
                       </p>
                     </div>
                   </div>
@@ -348,10 +348,10 @@ export function GroupsPage() {
             </div>
           )
         ) : (
-          /* Detail view: photos inside selected group */
+          /* Detail view: media inside selected group */
           <div className="p-4">
             {groupImages.length === 0 ? (
-              <p className="text-muted-foreground text-sm">{t('groups.noPhotos')}</p>
+              <p className="text-muted-foreground text-sm">{t('groups.noMedia')}</p>
             ) : (
               <div className="flex flex-wrap gap-3">
                 {groupImages.map(img => {
@@ -430,12 +430,12 @@ export function GroupsPage() {
 
       <ImageDetail hideGroups navImages={groupImages} />
 
-      {/* Add photos modal */}
-      {showAddPhotos && selectedGroupId !== null && (
-        <AddPhotosModal
+      {/* Add media modal */}
+      {showAddMedia && selectedGroupId !== null && (
+        <AddMediaModal
           groupId={selectedGroupId}
-          onClose={() => setShowAddPhotos(false)}
-          onAdded={handlePhotosAdded}
+          onClose={() => setShowAddMedia(false)}
+          onAdded={handleMediaAdded}
         />
       )}
 
@@ -449,7 +449,7 @@ export function GroupsPage() {
           {isSelectionMode && (
             <div className="p-3 bg-accent/12 rounded-lg">
               <p className="text-sm text-accent">
-                {t('groups.selectedPhotosInfo', { count: getSelectedCount() })}
+                {t('groups.selectedMediaInfo', { count: getSelectedCount() })}
               </p>
             </div>
           )}

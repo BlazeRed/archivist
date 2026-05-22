@@ -15,12 +15,12 @@ export function TimelineNavbar() {
   const { filter, setFilter, availableYears, availableGroups, images, allImages } = useTimelineStore();
   const [open, setOpen] = useState(false);
 
-  const isFiltered = filter.noDate || filter.yearFrom !== null || filter.yearTo !== null || filter.month !== null || filter.groupId !== null;
-  const clearFilter = () => setFilter({ yearFrom: null, yearTo: null, month: null, noDate: false, groupId: null });
+  const isFiltered = filter.noDate || filter.yearFrom !== null || filter.yearTo !== null || filter.month !== null || filter.groupId !== null || filter.mediaType !== 'all';
+  const clearFilter = () => setFilter({ yearFrom: null, yearTo: null, month: null, noDate: false, groupId: null, mediaType: 'all' });
 
-  const photoCountLabel = images.length !== allImages.length
-    ? `${images.length} / ${allImages.length} ${t('timeline.photos')}`
-    : `${allImages.length} ${t('timeline.photos')}`;
+  const mediaCountLabel = images.length !== allImages.length
+    ? `${images.length} / ${allImages.length} ${t('timeline.items')}`
+    : `${allImages.length} ${t('timeline.items')}`;
 
   const years = useMemo(() => !filter.noDate && availableYears.length > 1
     ? [...availableYears].reverse()
@@ -55,6 +55,9 @@ export function TimelineNavbar() {
 
   // Chips shown in topbar when panel is closed and filters are active
   const filterChips: string[] = [];
+  if (filter.mediaType !== 'all') {
+    filterChips.push(t(`timeline.media${filter.mediaType.charAt(0).toUpperCase() + filter.mediaType.slice(1)}`));
+  }
   if (filter.noDate) {
     filterChips.push(t('timeline.noDateFilter'));
   } else {
@@ -71,7 +74,7 @@ export function TimelineNavbar() {
       {/* Always-visible h-12 row */}
       <div className="h-12 px-4 flex items-center gap-3">
         <h2 className="font-semibold text-sm text-foreground whitespace-nowrap">{t('nav.timeline')}</h2>
-        <span className="text-xs text-muted-foreground whitespace-nowrap">{photoCountLabel}</span>
+        <span className="text-xs text-muted-foreground whitespace-nowrap">{mediaCountLabel}</span>
 
         <div className="ml-auto flex items-center gap-2">
           {/* Active filter chips — visible only when panel is closed */}
@@ -114,6 +117,24 @@ export function TimelineNavbar() {
       {/* Expansion panel */}
       {open && (
         <div className="px-4 py-5 border-t border-border flex items-center gap-6 flex-wrap">
+          {/* Media type toggle */}
+          <div className="flex rounded-md border border-border overflow-hidden shrink-0">
+            {(['all', 'images', 'videos'] as const).map(v => (
+              <button
+                key={v}
+                onClick={() => setFilter({ mediaType: v })}
+                className={cn(
+                  'px-3 py-1.5 text-xs font-medium transition-colors',
+                  filter.mediaType === v
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-card text-muted-foreground hover:text-foreground'
+                )}
+              >
+                {t(`timeline.media${v.charAt(0).toUpperCase() + v.slice(1)}`)}
+              </button>
+            ))}
+          </div>
+
           {/* Year range slider */}
           {!filter.noDate && years.length > 1 && (
             <div className="flex flex-col gap-1.5 w-[280px] shrink-0">

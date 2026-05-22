@@ -345,7 +345,7 @@ export function ThumbnailGrid() {
   if (images.length === 0) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-muted-foreground">{t('timeline.noPhotos')}</p>
+        <p className="text-muted-foreground">{t('timeline.noMedia')}</p>
       </div>
     );
   }

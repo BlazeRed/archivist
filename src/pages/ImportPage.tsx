@@ -425,7 +425,7 @@ export function ImportPage() {
         </div>
       )}
 
-      {/* Step 3 – Analyze photos */}
+      {/* Step 3 – Analyze media */}
       {step === 3 && (
         <div className="bg-card p-6 rounded-xl">
           <h3 className="text-base font-semibold text-foreground mb-1">{t('import.step3Title')}</h3>
