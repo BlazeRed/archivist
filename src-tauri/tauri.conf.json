@@ -46,6 +46,9 @@
       "deb": {
         "depends": ["gstreamer1.0-plugins-good"]
       }
+    },
+    "macOS": {
+      "signingIdentity": "-"
     }
   }
 }
