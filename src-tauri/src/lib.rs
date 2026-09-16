@@ -139,21 +139,6 @@ async fn execute_import(
 }
 
 #[tauri::command]
-async fn import_single_image(
-    state: tauri::State<'_, Arc<AppState>>,
-    image: commands::AnalyzedImage,
-    resolution: Option<commands::ImportResolution>,
-    archive_path: String,
-) -> Result<commands::ImportSingleResult, error::AppError> {
-    let db = state.db();
-    tauri::async_runtime::spawn_blocking(move || {
-        commands::import_single_image(image, resolution, &archive_path, &*db)
-    })
-    .await
-    .map_err(|e| error::AppError::Internal { message: e.to_string() })?
-}
-
-#[tauri::command]
 async fn generate_temp_thumbnail(source_path: String) -> Result<String, error::AppError> {
     tauri::async_runtime::spawn_blocking(move || commands::generate_temp_thumbnail(&source_path))
         .await
@@ -236,21 +221,31 @@ async fn rescan_archive(
     .map_err(|e| error::AppError::Internal { message: e.to_string() })?
 }
 
+#[derive(Debug, serde::Serialize)]
+struct DeleteFilesResult {
+    deleted: usize,
+    failed: Vec<String>,
+}
+
 #[tauri::command]
-fn delete_files(paths: Vec<String>) -> usize {
-    let mut count = 0;
+fn delete_files(paths: Vec<String>) -> DeleteFilesResult {
+    let mut deleted = 0;
+    let mut failed = Vec::new();
     let mut parent_dirs: Vec<std::path::PathBuf> = Vec::new();
 
     for path in &paths {
         let p = std::path::Path::new(path);
-        if std::fs::remove_file(p).is_ok() {
-            count += 1;
-            if let Some(parent) = p.parent() {
-                let pb = parent.to_path_buf();
-                if !parent_dirs.contains(&pb) {
-                    parent_dirs.push(pb);
+        match std::fs::remove_file(p) {
+            Ok(()) => {
+                deleted += 1;
+                if let Some(parent) = p.parent() {
+                    let pb = parent.to_path_buf();
+                    if !parent_dirs.contains(&pb) {
+                        parent_dirs.push(pb);
+                    }
                 }
             }
+            Err(_) => failed.push(path.clone()),
         }
     }
 
@@ -260,7 +255,20 @@ fn delete_files(paths: Vec<String>) -> usize {
         let _ = std::fs::remove_dir(&dir); // no-op if non-empty
     }
 
-    count
+    DeleteFilesResult { deleted, failed }
+}
+
+#[tauri::command]
+async fn remove_missing_images(
+    state: tauri::State<'_, Arc<AppState>>,
+    ids: Vec<String>,
+) -> Result<usize, error::AppError> {
+    let db = state.db();
+    tauri::async_runtime::spawn_blocking(move || {
+        commands::remove_missing_images(&ids, &*db)
+    })
+    .await
+    .map_err(|e| error::AppError::Internal { message: e.to_string() })?
 }
 
 #[tauri::command]
@@ -385,7 +393,6 @@ pub fn run() {
             analyze_images,
             create_import_plan,
             execute_import,
-            import_single_image,
             generate_temp_thumbnail,
             generate_temp_thumbnails_batch,
             pre_generate_all_thumbnails_batch,
@@ -393,6 +400,7 @@ pub fn run() {
             cleanup_unimported_thumbnails,
             export_group,
             rescan_archive,
+            remove_missing_images,
             delete_files,
             save_config,
             load_config,

@@ -17,7 +17,28 @@ fn main() {
     let ffmpeg_dest = binaries_dir.join(format!("ffmpeg-{}{}", target, exe_suffix));
 
     if !ffmpeg_dest.exists() {
-        match ffmpeg_sidecar::download::auto_download() {
+        // Build scripts always compile for the HOST triple, never the `--target` being
+        // cross-compiled. On GitHub's arm64 macos-latest runners this means
+        // ffmpeg-sidecar's `cfg!(target_arch)` picks the arm64 URL even for the
+        // `x86_64-apple-darwin` job. Resolve the download URL from `TARGET` explicitly
+        // for macOS instead of trusting auto_download() there.
+        let macos_url = match target.as_str() {
+            "x86_64-apple-darwin" => Some("https://evermeet.cx/ffmpeg/getrelease/zip"),
+            "aarch64-apple-darwin" => Some("https://www.osxexperts.net/ffmpeg80arm.zip"),
+            _ => None,
+        };
+
+        let download_result = if let Some(url) = macos_url {
+            ffmpeg_sidecar::paths::sidecar_dir()
+                .and_then(|dir| {
+                    let archive = ffmpeg_sidecar::download::download_ffmpeg_package(url, &dir)?;
+                    ffmpeg_sidecar::download::unpack_ffmpeg(&archive, &dir)
+                })
+        } else {
+            ffmpeg_sidecar::download::auto_download()
+        };
+
+        match download_result {
             Ok(()) => {
                 // Binary was placed next to the build-script executable
                 if let Ok(exe) = std::env::current_exe() {

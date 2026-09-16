@@ -3,11 +3,22 @@ pub mod group;
 
 use rusqlite::{Connection, Result};
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 use crate::error::AppError;
 
 pub struct Database {
     conn: Mutex<Connection>,
+}
+
+/// Recovers the guard instead of panicking on a poisoned mutex. A panic
+/// elsewhere while the lock was held doesn't corrupt the SQLite connection
+/// itself, so refusing to use it afterwards would only turn one isolated
+/// panic into a permanently unusable database for the rest of the session.
+fn lock_recover<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(|poisoned| {
+        eprintln!("warning: recovered from poisoned DB mutex");
+        poisoned.into_inner()
+    })
 }
 
 impl Database {
@@ -21,13 +32,14 @@ impl Database {
         }
 
         let conn = Connection::open(db_path)?;
+        conn.execute_batch("PRAGMA foreign_keys = ON;")?;
         let db = Self { conn: Mutex::new(conn) };
         db.init_schema()?;
         Ok(db)
     }
 
     fn init_schema(&self) -> Result<(), AppError> {
-        let conn = self.conn.lock().expect("mutex poisoned");
+        let conn = lock_recover(&self.conn);
         
         conn.execute_batch(
             "
@@ -103,7 +115,7 @@ impl Database {
     }
 
     pub fn get_setting(&self, key: &str) -> Result<Option<String>, AppError> {
-        let conn = self.conn.lock().expect("mutex poisoned");
+        let conn = lock_recover(&self.conn);
         let mut stmt = conn.prepare("SELECT value FROM settings WHERE key = ?1")?;
         match stmt.query_row([key], |row| row.get(0)) {
             Ok(v) => Ok(Some(v)),
@@ -113,7 +125,7 @@ impl Database {
     }
 
     pub fn set_setting(&self, key: &str, value: &str) -> Result<(), AppError> {
-        let conn = self.conn.lock().expect("mutex poisoned");
+        let conn = lock_recover(&self.conn);
         conn.execute(
             "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
             [key, value],
@@ -121,7 +133,7 @@ impl Database {
         Ok(())
     }
 
-    pub fn connection(&self) -> std::sync::MutexGuard<'_, Connection> {
-        self.conn.lock().expect("mutex poisoned")
+    pub fn connection(&self) -> MutexGuard<'_, Connection> {
+        lock_recover(&self.conn)
     }
 }

@@ -47,12 +47,6 @@ export interface ImportResult {
   imported_sources: string[];
 }
 
-export interface ImportSingleResult {
-  status: string;
-  error: string | null;
-  source_path: string | null;
-}
-
 export type ImportPhase = 'idle' | 'scanning' | 'analyzing' | 'thumbnailing' | 'review' | 'importing' | 'complete' | 'error';
 
 interface ImportState {

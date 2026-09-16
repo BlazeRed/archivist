@@ -13,11 +13,19 @@ use crate::thumbnail::{self, ThumbnailSize};
 #[derive(Debug, Serialize)]
 pub struct RescanResult {
     pub added: usize,
-    pub removed: usize,
+    pub missing: Vec<MissingImage>,
     pub repaired: usize,
     pub moved: usize,
     pub thumbnailed: usize,
     pub folders_removed: usize,
+}
+
+/// A DB record whose file could not be found on disk during rescan.
+/// Never deleted automatically — the caller must confirm via `remove_missing_images`.
+#[derive(Debug, Serialize)]
+pub struct MissingImage {
+    pub id: String,
+    pub filename: String,
 }
 
 struct DiscoveredFile {
@@ -147,14 +155,18 @@ pub fn rescan_archive(archive_path: &str, db: &Database) -> Result<RescanResult,
         added += 1;
     }
 
-    // Prune: remove DB entries for files no longer on disk
+    // Detect (but never auto-delete) DB entries whose file is gone from disk.
+    // Deletion requires explicit user confirmation via `remove_missing_images`.
     let all_paths = db.get_all_image_paths()?;
-    let mut removed = 0usize;
+    let mut missing = Vec::new();
     for (id, rel_path) in all_paths {
         let abs = Path::new(archive_path).join(&rel_path);
         if !abs.exists() {
-            db.delete_image(&id)?;
-            removed += 1;
+            let filename = Path::new(&rel_path)
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or(rel_path);
+            missing.push(MissingImage { id, filename });
         }
     }
 
@@ -169,7 +181,16 @@ pub fn rescan_archive(archive_path: &str, db: &Database) -> Result<RescanResult,
     backfill_video_metadata(archive_path, db)?;
 
     let folders_removed = remove_empty_dirs(root)?;
-    Ok(RescanResult { added, removed, repaired, moved, thumbnailed, folders_removed })
+    Ok(RescanResult { added, missing, repaired, moved, thumbnailed, folders_removed })
+}
+
+/// Deletes DB records for images the user has explicitly confirmed are gone.
+/// Called only after the frontend shows `RescanResult.missing` and the user confirms.
+pub fn remove_missing_images(ids: &[String], db: &Database) -> Result<usize, AppError> {
+    for id in ids {
+        db.delete_image(id)?;
+    }
+    Ok(ids.len())
 }
 
 pub fn run_migrations(archive_path: &str, db: &Database) -> Result<(), AppError> {
@@ -417,4 +438,64 @@ fn backfill_video_metadata(archive_path: &str, db: &Database) -> Result<(), AppE
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::image::NewImage;
+
+    fn ghost_image(id: &str) -> NewImage {
+        NewImage {
+            id: id.to_string(),
+            filename: format!("{id}.jpg"),
+            file_path: format!("2026/01 - January/{id}.jpg"),
+            taken_at: None,
+            width: None,
+            height: None,
+            file_size: None,
+            has_exif: false,
+            date_source: None,
+            thumbnail_path: None,
+            media_type: "image".to_string(),
+            duration_ms: None,
+            codec: None,
+            rotation: None,
+            web_path: None,
+        }
+    }
+
+    /// Regression test for the silent-deletion bug: a DB record whose file
+    /// is missing from disk must be reported, never deleted, by a plain
+    /// rescan. Deletion only happens via `remove_missing_images`, after the
+    /// frontend has shown the user an explicit confirmation.
+    #[test]
+    fn rescan_reports_missing_without_deleting() {
+        let archive_dir = tempfile::tempdir().unwrap();
+        let archive_path = archive_dir.path().to_str().unwrap().to_string();
+        let db = Database::new(&archive_dir.path().join(".archivist/archivist.db")).unwrap();
+
+        db.insert_image(&ghost_image("ghost")).unwrap();
+
+        let result = rescan_archive(&archive_path, &db).unwrap();
+
+        assert_eq!(result.missing.len(), 1);
+        assert_eq!(result.missing[0].id, "ghost");
+        assert!(db.get_image("ghost").unwrap().is_some(), "rescan must not delete without explicit confirmation");
+    }
+
+    #[test]
+    fn remove_missing_images_deletes_only_confirmed_ids() {
+        let archive_dir = tempfile::tempdir().unwrap();
+        let db = Database::new(&archive_dir.path().join(".archivist/archivist.db")).unwrap();
+
+        db.insert_image(&ghost_image("ghost")).unwrap();
+        db.insert_image(&ghost_image("keep")).unwrap();
+
+        let removed = remove_missing_images(&["ghost".to_string()], &db).unwrap();
+
+        assert_eq!(removed, 1);
+        assert!(db.get_image("ghost").unwrap().is_none());
+        assert!(db.get_image("keep").unwrap().is_some());
+    }
 }
