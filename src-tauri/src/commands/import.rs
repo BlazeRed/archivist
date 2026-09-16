@@ -74,13 +74,6 @@ pub struct ImportResult {
     pub imported_sources: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ImportSingleResult {
-    pub status: String,
-    pub error: Option<String>,
-    pub source_path: Option<String>,
-}
-
 #[derive(Debug, Clone, Serialize)]
 pub struct ProgressPayload {
     pub current: usize,
@@ -350,7 +343,10 @@ pub fn execute_import(
         });
     }
 
-    // Phase 2 — parallel: file copy + thumbnail generation
+    // Phase 2 — parallel: copy + thumbnail + DB insert, one item at a time.
+    // `import_one` is atomic per item (rolls back the copy if the DB insert
+    // fails), so running the insert here instead of in a later serial phase
+    // costs nothing — Database serializes writes internally via its own lock.
     let total = prepared.len();
     let counter = AtomicUsize::new(0);
     let app = app.clone();
@@ -359,110 +355,109 @@ pub fn execute_import(
     let results: Vec<Result<(NewImage, String), String>> = prepared
         .into_par_iter()
         .map(|p| {
-            if let Err(e) = std::fs::create_dir_all(&p.dest_dir) {
-                return Err(format!("Failed to create directory {}: {}", p.dest_dir, e));
-            }
-
-            match std::fs::copy(&p.source_path, &p.dest_path) {
-                Ok(_) => {
-                    // Preserve original mtime so rescan yields the same date if DB is rebuilt
-                    if let Ok(src_meta) = std::fs::metadata(&p.source_path) {
-                        if let Ok(mtime) = src_meta.modified() {
-                            if let Ok(f) = std::fs::OpenOptions::new().write(true).open(&p.dest_path) {
-                                let _ = f.set_times(std::fs::FileTimes::new().set_modified(mtime));
-                            }
-                        }
-                    }
-                    let stored_thumbnail = if p.thumbnail_abs.exists() {
-                        Some(p.thumbnail_rel.clone())
-                    } else if p.image.media_type == "video" {
-                        match crate::thumbnail::generate_video_thumbnail(
-                            &p.dest_path,
-                            &p.thumbnail_abs,
-                            &crate::thumbnail::ThumbnailSize::medium(),
-                        ) {
-                            Ok(_) => Some(p.thumbnail_rel),
-                            Err(_) => None,
-                        }
-                    } else {
-                        match crate::thumbnail::generate_thumbnail(
-                            &p.dest_path,
-                            &p.thumbnail_abs,
-                            &crate::thumbnail::ThumbnailSize::medium(),
-                        ) {
-                            Ok(_) => Some(p.thumbnail_rel),
-                            Err(_) => None,
-                        }
-                    };
-
-                    let relative_path = format!(
-                        "{}/{}",
-                        Path::new(&p.dest_dir)
-                            .strip_prefix(&archive_path_str)
-                            .map(|x| x.to_string_lossy().to_string())
-                            .unwrap_or_else(|_| p.dest_dir.clone()),
-                        &p.final_filename
-                    );
-
-                    let web_path = if p.image.media_type == "video" {
-                        let compat = crate::video_meta::is_web_compatible(&p.image.codec, &p.dest_path);
-                        if compat { Some(relative_path.clone()) } else { None }
-                    } else {
-                        None
-                    };
-
-                    let new_image = NewImage {
-                        id: p.entry_id,
-                        filename: p.final_filename.clone(),
-                        file_path: relative_path,
-                        taken_at: p.image.taken_at,
-                        width: p.image.width.map(|w| w as i32),
-                        height: p.image.height.map(|h| h as i32),
-                        file_size: Some(p.image.size as i64),
-                        has_exif: p.image.has_exif,
-                        date_source: p.image.date_source,
-                        thumbnail_path: stored_thumbnail,
-                        media_type: p.image.media_type.clone(),
-                        duration_ms: p.image.duration_ms,
-                        codec: p.image.codec.clone(),
-                        rotation: p.image.rotation,
-                        web_path,
-                    };
-
-                    let n = counter.fetch_add(1, Ordering::SeqCst) + 1;
-                    let _ = app.emit("import_progress", ProgressPayload {
-                        current: n,
-                        total,
-                        filename: p.final_filename.clone(),
-                    });
-
-                    Ok((new_image, p.source_path))
-                }
-                Err(e) => Err(format!("Failed to copy {}: {}", p.image.filename, e)),
-            }
+            let filename = p.final_filename.clone();
+            let result = import_one(p, &archive_path_str, db);
+            let n = counter.fetch_add(1, Ordering::SeqCst) + 1;
+            let _ = app.emit("import_progress", ProgressPayload { current: n, total, filename });
+            result
         })
         .collect();
 
-    // Phase 3 — serial: DB inserts
     let mut imported = 0usize;
     let mut errors: Vec<String> = Vec::new();
     let mut imported_sources: Vec<String> = Vec::new();
 
     for r in results {
         match r {
-            Ok((new_image, src)) => {
-                if let Err(e) = db.insert_image(&new_image) {
-                    errors.push(format!("DB insert error: {}", e));
-                } else {
-                    imported += 1;
-                    imported_sources.push(src);
-                }
+            Ok((_, src)) => {
+                imported += 1;
+                imported_sources.push(src);
             }
             Err(e) => errors.push(e),
         }
     }
 
     Ok(ImportResult { imported, skipped, errors, imported_sources })
+}
+
+/// Copies one prepared item into the archive and records it in the DB.
+///
+/// Copy and DB-insert are made atomic here: if the insert fails (disk full,
+/// DB locked), the just-copied file is deleted rather than left behind as an
+/// untracked orphan. Import dedup only checks the DB by hash, so an orphan
+/// would otherwise silently re-import as a "new" duplicate next time.
+fn import_one(
+    p: PreparedImport,
+    archive_path: &str,
+    db: &crate::db::Database,
+) -> Result<(NewImage, String), String> {
+    std::fs::create_dir_all(&p.dest_dir)
+        .map_err(|e| format!("Failed to create directory {}: {}", p.dest_dir, e))?;
+
+    std::fs::copy(&p.source_path, &p.dest_path)
+        .map_err(|e| format!("Failed to copy {}: {}", p.image.filename, e))?;
+
+    // Preserve original mtime so rescan yields the same date if DB is rebuilt
+    if let Ok(src_meta) = std::fs::metadata(&p.source_path) {
+        if let Ok(mtime) = src_meta.modified() {
+            if let Ok(f) = std::fs::OpenOptions::new().write(true).open(&p.dest_path) {
+                let _ = f.set_times(std::fs::FileTimes::new().set_modified(mtime));
+            }
+        }
+    }
+
+    let stored_thumbnail = if p.thumbnail_abs.exists() {
+        Some(p.thumbnail_rel.clone())
+    } else if p.image.media_type == "video" {
+        crate::thumbnail::generate_video_thumbnail(&p.dest_path, &p.thumbnail_abs, &crate::thumbnail::ThumbnailSize::medium())
+            .ok()
+            .map(|_| p.thumbnail_rel.clone())
+    } else {
+        crate::thumbnail::generate_thumbnail(&p.dest_path, &p.thumbnail_abs, &crate::thumbnail::ThumbnailSize::medium())
+            .ok()
+            .map(|_| p.thumbnail_rel.clone())
+    };
+
+    let relative_path = format!(
+        "{}/{}",
+        Path::new(&p.dest_dir)
+            .strip_prefix(archive_path)
+            .map(|x| x.to_string_lossy().to_string())
+            .unwrap_or_else(|_| p.dest_dir.clone()),
+        &p.final_filename
+    );
+
+    let web_path = if p.image.media_type == "video" {
+        let compat = crate::video_meta::is_web_compatible(&p.image.codec, &p.dest_path);
+        if compat { Some(relative_path.clone()) } else { None }
+    } else {
+        None
+    };
+
+    let new_image = NewImage {
+        id: p.entry_id,
+        filename: p.final_filename.clone(),
+        file_path: relative_path,
+        taken_at: p.image.taken_at.clone(),
+        width: p.image.width.map(|w| w as i32),
+        height: p.image.height.map(|h| h as i32),
+        file_size: Some(p.image.size as i64),
+        has_exif: p.image.has_exif,
+        date_source: p.image.date_source.clone(),
+        thumbnail_path: stored_thumbnail,
+        media_type: p.image.media_type.clone(),
+        duration_ms: p.image.duration_ms,
+        codec: p.image.codec.clone(),
+        rotation: p.image.rotation,
+        web_path,
+    };
+
+    if let Err(e) = db.insert_image(&new_image) {
+        let _ = std::fs::remove_file(&p.dest_path);
+        return Err(format!("DB insert error for {}: {}", new_image.filename, e));
+    }
+
+    Ok((new_image, p.source_path))
 }
 
 pub(crate) fn destination_path(archive_root: &str, taken_at: &Option<String>) -> String {
@@ -484,144 +479,6 @@ const MONTHS: &[&str] = &[
 fn month_label(month: u32) -> String {
     let month_name = MONTHS.get((month - 1) as usize).unwrap_or(&"Unknown");
     format!("{:02} - {}", month, month_name)
-}
-
-pub fn import_single_image(
-    image: AnalyzedImage,
-    resolution: Option<ImportResolution>,
-    archive_path: &str,
-    db: &crate::db::Database,
-) -> Result<ImportSingleResult, AppError> {
-    let source_path = image.path.clone();
-
-    let should_skip = match &resolution {
-        Some(r) => matches!(r.action, ImportAction::Skip),
-        None => image.conflict.is_some(),
-    };
-
-    if should_skip {
-        return Ok(ImportSingleResult { status: "skipped".to_string(), error: None, source_path: None });
-    }
-
-    let dest_dir = destination_path(archive_path, &image.taken_at);
-
-    let final_filename = match &resolution {
-        Some(res) => match res.action {
-            ImportAction::KeepBoth => generate_unique_filename(&dest_dir, &image.filename),
-            ImportAction::Replace => image.filename.clone(),
-            ImportAction::Skip => return Ok(ImportSingleResult { status: "skipped".to_string(), error: None, source_path: None }),
-        },
-        None => image.filename.clone(),
-    };
-
-    let is_keep_both = resolution.as_ref().map_or(false, |r| matches!(r.action, ImportAction::KeepBoth));
-    let dest_path = PathBuf::from(&dest_dir).join(&final_filename);
-
-    if let Err(e) = std::fs::create_dir_all(&dest_dir) {
-        return Ok(ImportSingleResult {
-            status: "error".to_string(),
-            error: Some(format!("Failed to create directory {}: {}", dest_dir, e)),
-            source_path: None,
-        });
-    }
-
-    match std::fs::copy(&image.path, &dest_path) {
-        Ok(_) => {
-            // Preserve original mtime so rescan yields the same date if DB is rebuilt
-            if let Ok(src_meta) = std::fs::metadata(&image.path) {
-                if let Ok(mtime) = src_meta.modified() {
-                    if let Ok(f) = std::fs::OpenOptions::new().write(true).open(&dest_path) {
-                        let _ = f.set_times(std::fs::FileTimes::new().set_modified(mtime));
-                    }
-                }
-            }
-            let thumbnail_abs = PathBuf::from(archive_path)
-                .join(".archivist/thumbnails")
-                .join(format!("{}.jpg", &image.hash));
-            let thumbnail_rel = format!(".archivist/thumbnails/{}.jpg", &image.hash);
-            let stored_thumbnail = if thumbnail_abs.exists() {
-                Some(thumbnail_rel.clone())
-            } else if image.media_type == "video" {
-                match crate::thumbnail::generate_video_thumbnail(
-                    &dest_path,
-                    &thumbnail_abs,
-                    &crate::thumbnail::ThumbnailSize::medium(),
-                ) {
-                    Ok(_) => Some(thumbnail_rel),
-                    Err(_) => None,
-                }
-            } else {
-                match crate::thumbnail::generate_thumbnail(
-                    &dest_path,
-                    &thumbnail_abs,
-                    &crate::thumbnail::ThumbnailSize::medium(),
-                ) {
-                    Ok(_) => Some(thumbnail_rel),
-                    Err(_) => None,
-                }
-            };
-
-            let relative_path = format!("{}/{}",
-                Path::new(&dest_dir).strip_prefix(archive_path)
-                    .map(|p| p.to_string_lossy().to_string())
-                    .unwrap_or_else(|_| dest_dir.clone()),
-                &final_filename
-            );
-
-            let entry_id = if is_keep_both {
-                let stem = Path::new(&final_filename)
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or(final_filename.as_str());
-                format!("{}_{}", image.hash, stem)
-            } else {
-                image.hash.clone()
-            };
-
-            let web_path = if image.media_type == "video" {
-                let compat = crate::video_meta::is_web_compatible(&image.codec, &dest_path);
-                if compat { Some(relative_path.clone()) } else { None }
-            } else {
-                None
-            };
-
-            let new_image = NewImage {
-                id: entry_id,
-                filename: final_filename,
-                file_path: relative_path,
-                taken_at: image.taken_at,
-                width: image.width.map(|w| w as i32),
-                height: image.height.map(|h| h as i32),
-                file_size: Some(image.size as i64),
-                has_exif: image.has_exif,
-                date_source: image.date_source,
-                thumbnail_path: stored_thumbnail,
-                media_type: image.media_type.clone(),
-                duration_ms: image.duration_ms,
-                codec: image.codec.clone(),
-                rotation: image.rotation,
-                web_path,
-            };
-
-            match db.insert_image(&new_image) {
-                Ok(_) => Ok(ImportSingleResult {
-                    status: "imported".to_string(),
-                    error: None,
-                    source_path: Some(source_path),
-                }),
-                Err(e) => Ok(ImportSingleResult {
-                    status: "error".to_string(),
-                    error: Some(format!("Failed to insert into database: {}", e)),
-                    source_path: None,
-                }),
-            }
-        },
-        Err(e) => Ok(ImportSingleResult {
-            status: "error".to_string(),
-            error: Some(format!("Failed to copy {}: {}", image.filename, e)),
-            source_path: None,
-        }),
-    }
 }
 
 pub fn generate_temp_thumbnail(source_path: &str) -> Result<String, AppError> {
@@ -768,4 +625,67 @@ pub fn generate_unique_filename(dir: &str, original: &str) -> String {
     }
 
     filename
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::Database;
+
+    fn sample_analyzed(hash: &str) -> AnalyzedImage {
+        AnalyzedImage {
+            path: String::new(),
+            filename: format!("{hash}.jpg"),
+            size: 3,
+            hash: hash.to_string(),
+            taken_at: None,
+            width: None,
+            height: None,
+            has_exif: false,
+            date_source: None,
+            conflict: None,
+            media_type: "image".to_string(),
+            duration_ms: None,
+            codec: None,
+            rotation: None,
+        }
+    }
+
+    /// Regression test for the orphan-file bug: if the DB insert fails after
+    /// the file has already been copied into the archive, the copy must be
+    /// rolled back — otherwise it becomes an untracked duplicate that dedup
+    /// (DB-hash-based) can never see again.
+    #[test]
+    fn import_one_rolls_back_copy_on_db_failure() {
+        let src_dir = tempfile::tempdir().unwrap();
+        let archive_dir = tempfile::tempdir().unwrap();
+        let archive_path = archive_dir.path().to_str().unwrap().to_string();
+
+        let source_path = src_dir.path().join("photo.jpg");
+        std::fs::write(&source_path, b"fake image bytes").unwrap();
+
+        let db = Database::new(&archive_dir.path().join(".archivist/archivist.db")).unwrap();
+        // Force every insert to fail, simulating a disk-full or locked-DB condition.
+        db.connection().execute("DROP TABLE images", []).unwrap();
+
+        let dest_dir = format!("{archive_path}/No Date");
+        let dest_path = PathBuf::from(&dest_dir).join("photo.jpg");
+
+        let prepared = PreparedImport {
+            source_path: source_path.to_string_lossy().to_string(),
+            dest_path: dest_path.clone(),
+            dest_dir,
+            final_filename: "photo.jpg".to_string(),
+            image: sample_analyzed("abc123"),
+            entry_id: "abc123".to_string(),
+            thumbnail_abs: archive_dir.path().join(".archivist/thumbnails/abc123.jpg"),
+            thumbnail_rel: ".archivist/thumbnails/abc123.jpg".to_string(),
+        };
+
+        let result = import_one(prepared, &archive_path, &db);
+
+        assert!(result.is_err());
+        assert!(!dest_path.exists(), "copied file must be rolled back when the DB insert fails");
+        assert!(source_path.exists(), "original source file must never be touched");
+    }
 }

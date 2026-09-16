@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
+import { toast } from 'sonner';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { useImportStore } from '../stores/importStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
@@ -201,7 +202,12 @@ export function ImportPage() {
 
   const handleDeleteSources = async () => {
     if (result?.imported_sources) {
-      await invoke('delete_files', { paths: result.imported_sources });
+      const res = await invoke<{ deleted: number; failed: string[] }>('delete_files', {
+        paths: result.imported_sources,
+      });
+      if (res.failed.length > 0) {
+        toast.error(t('import.deleteSourcesFailed', { count: res.failed.length }));
+      }
     }
     setCleanupDismissed(true);
   };

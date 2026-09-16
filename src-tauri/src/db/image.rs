@@ -146,6 +146,7 @@ impl super::Database {
 
     pub fn delete_image(&self, id: &str) -> Result<(), super::AppError> {
         let conn = self.connection();
+        conn.execute("DELETE FROM image_groups WHERE image_id = ?1", [id])?;
         conn.execute("DELETE FROM images WHERE id = ?1", [id])?;
         Ok(())
     }
@@ -246,21 +247,6 @@ impl super::Database {
         Ok(images)
     }
 
-    pub fn update_video_metadata(
-        &self,
-        id: &str,
-        width: u32,
-        height: u32,
-        duration_ms: i64,
-    ) -> Result<(), super::AppError> {
-        let conn = self.connection();
-        conn.execute(
-            "UPDATE images SET width=?1, height=?2, duration_ms=?3 WHERE id=?4",
-            params![width, height, duration_ms, id],
-        )?;
-        Ok(())
-    }
-
     pub fn update_video_meta_fields(
         &self,
         id: &str,
@@ -333,5 +319,51 @@ impl super::Database {
             })
         })?.collect::<Result<Vec<_>, _>>()?;
         Ok(rows)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::Database;
+
+    fn new_image(id: &str) -> NewImage {
+        NewImage {
+            id: id.to_string(),
+            filename: format!("{id}.jpg"),
+            file_path: format!("2026/01 - January/{id}.jpg"),
+            taken_at: None,
+            width: None,
+            height: None,
+            file_size: None,
+            has_exif: false,
+            date_source: None,
+            thumbnail_path: None,
+            media_type: "image".to_string(),
+            duration_ms: None,
+            codec: None,
+            rotation: None,
+            web_path: None,
+        }
+    }
+
+    /// Regression test for the dead-cascade bug: deleting an image must not
+    /// leave orphaned rows in `image_groups` behind (previously relied on an
+    /// `ON DELETE CASCADE` that SQLite ignores unless `PRAGMA foreign_keys`
+    /// is turned on, which the app never did).
+    #[test]
+    fn delete_image_cleans_up_group_membership() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = Database::new(&dir.path().join("archivist.db")).unwrap();
+
+        db.insert_image(&new_image("img1")).unwrap();
+        let group_id = db.create_group("Trip").unwrap();
+        db.add_image_to_group("img1", group_id).unwrap();
+        assert_eq!(db.get_images_in_group(group_id).unwrap(), vec!["img1".to_string()]);
+
+        db.delete_image("img1").unwrap();
+
+        assert!(db.get_image("img1").unwrap().is_none());
+        assert!(db.get_images_in_group(group_id).unwrap().is_empty());
     }
 }
