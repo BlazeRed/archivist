@@ -19,6 +19,7 @@ pub struct RescanResult {
     pub moved: usize,
     pub thumbnailed: usize,
     pub folders_removed: usize,
+    pub gps_repaired: usize,
 }
 
 /// A DB record whose file could not be found on disk during rescan.
@@ -41,6 +42,8 @@ struct DiscoveredFile {
     media_type: String,
     codec: Option<String>,
     rotation: Option<i32>,
+    latitude: Option<f64>,
+    longitude: Option<f64>,
 }
 
 pub fn rescan_archive(archive_path: &str, db: &Database) -> Result<RescanResult, AppError> {
@@ -71,7 +74,15 @@ pub fn rescan_archive(archive_path: &str, db: &Database) -> Result<RescanResult,
                 (get_image_dimensions(path).unwrap_or((None, None)), None, None, None, None)
             };
             let file_size = fs::metadata(path).ok().map(|m| m.len() as i64);
-            Some(DiscoveredFile { original_path: path.clone(), id, exif_result, dims, duration_ms, video_creation_time, file_size, filename, media_type, codec, rotation })
+            let (latitude, longitude) = if media_type == "video" {
+                (None, None)
+            } else {
+                match exif::extract_gps(path) {
+                    Some((lat, lon)) => (Some(lat), Some(lon)),
+                    None => (None, None),
+                }
+            };
+            Some(DiscoveredFile { original_path: path.clone(), id, exif_result, dims, duration_ms, video_creation_time, file_size, filename, media_type, codec, rotation, latitude, longitude })
         })
         .collect();
 
@@ -150,6 +161,8 @@ pub fn rescan_archive(archive_path: &str, db: &Database) -> Result<RescanResult,
             codec: disc.codec,
             rotation: disc.rotation,
             web_path,
+            latitude: disc.latitude,
+            longitude: disc.longitude,
         };
 
         db.insert_image(&new_image)?;
@@ -181,8 +194,11 @@ pub fn rescan_archive(archive_path: &str, db: &Database) -> Result<RescanResult,
     // Backfill: update metadata for existing videos that have null width (imported before video_meta support)
     backfill_video_metadata(archive_path, db)?;
 
+    // Backfill: extract GPS for images imported before this feature existed
+    let gps_repaired = repair_missing_gps(archive_path, db)?;
+
     let folders_removed = remove_empty_dirs(root)?;
-    Ok(RescanResult { added, missing, repaired, moved, thumbnailed, folders_removed })
+    Ok(RescanResult { added, missing, repaired, moved, thumbnailed, folders_removed, gps_repaired })
 }
 
 #[derive(Debug, Serialize)]
@@ -263,6 +279,7 @@ pub fn remove_missing_images(ids: &[String], db: &Database) -> Result<usize, App
 
 pub fn run_migrations(archive_path: &str, db: &Database) -> Result<(), AppError> {
     repair_missing_exif_dates(archive_path, db)?;
+    repair_missing_gps(archive_path, db)?;
     Ok(())
 }
 
@@ -382,6 +399,27 @@ fn repair_missing_exif_dates(archive_path: &str, db: &Database) -> Result<(usize
     }
 
     Ok((repaired, moved))
+}
+
+fn repair_missing_gps(archive_path: &str, db: &Database) -> Result<usize, AppError> {
+    let no_gps = db.get_images_without_gps()?;
+
+    let extracted: Vec<(String, f64, f64)> = no_gps
+        .par_iter()
+        .filter_map(|(id, rel_path)| {
+            let abs = Path::new(archive_path).join(rel_path);
+            if !abs.exists() { return None; }
+            let (lat, lon) = exif::extract_gps(&abs)?;
+            Some((id.clone(), lat, lon))
+        })
+        .collect();
+
+    let mut repaired = 0usize;
+    for (id, lat, lon) in extracted {
+        db.update_image_gps(&id, Some(lat), Some(lon))?;
+        repaired += 1;
+    }
+    Ok(repaired)
 }
 
 fn unique_dest(dir: &Path, filename: &str) -> PathBuf {
@@ -527,6 +565,8 @@ mod tests {
             codec: None,
             rotation: None,
             web_path: None,
+            latitude: None,
+            longitude: None,
         }
     }
 
@@ -562,5 +602,31 @@ mod tests {
         assert_eq!(removed, 1);
         assert!(db.get_image("ghost").unwrap().is_none());
         assert!(db.get_image("keep").unwrap().is_some());
+    }
+
+    /// A file with no parseable EXIF must leave `latitude`/`longitude` as
+    /// NULL rather than panicking or writing a bogus value — the repair pass
+    /// safely no-ops for images it can't extract anything from.
+    #[test]
+    fn repair_missing_gps_safely_no_ops_without_exif() {
+        let archive_dir = tempfile::tempdir().unwrap();
+        let archive_path = archive_dir.path().to_str().unwrap().to_string();
+        let db = Database::new(&archive_dir.path().join(".archivist/archivist.db")).unwrap();
+
+        let rel = "2026/01 - January/no_gps.jpg";
+        let abs = archive_dir.path().join(rel);
+        std::fs::create_dir_all(abs.parent().unwrap()).unwrap();
+        std::fs::write(&abs, b"not a real image, no exif here").unwrap();
+
+        let mut img = ghost_image("no_gps");
+        img.file_path = rel.to_string();
+        db.insert_image(&img).unwrap();
+
+        let repaired = repair_missing_gps(&archive_path, &db).unwrap();
+
+        assert_eq!(repaired, 0);
+        let stored = db.get_image("no_gps").unwrap().unwrap();
+        assert!(stored.latitude.is_none());
+        assert!(stored.longitude.is_none());
     }
 }

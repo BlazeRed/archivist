@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { useImportStore } from '../stores/importStore';
 import { useTimelineStore } from '../stores/timelineStore';
+import { useMapStore } from '../stores/mapStore';
 import { useUIStore } from '../stores/uiStore';
 
 type MissingImage = { id: string; filename: string };
@@ -15,6 +16,7 @@ type RescanResult = {
   moved: number;
   thumbnailed: number;
   folders_removed: number;
+  gps_repaired: number;
 };
 
 export function useRescan() {
@@ -38,8 +40,10 @@ export function useRescan() {
       if (result.moved > 0)           msg += ` · ${t('settings.rescanMoved',          { count: result.moved })}`;
       if (result.thumbnailed > 0)     msg += ` · ${t('settings.rescanThumbnailed',    { count: result.thumbnailed })}`;
       if (result.folders_removed > 0) msg += ` · ${t('settings.rescanFoldersRemoved', { count: result.folders_removed })}`;
+      if (result.gps_repaired > 0)    msg += ` · ${t('settings.rescanGpsRepaired',    { count: result.gps_repaired })}`;
       toast.success(t('settings.rescanArchive'), { description: msg });
       fetchImages();
+      useMapStore.getState().fetchLocations();
 
       if (result.missing.length > 0) {
         const missingIds = result.missing.map((m) => m.id);

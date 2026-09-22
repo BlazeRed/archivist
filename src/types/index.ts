@@ -18,6 +18,8 @@ export interface Image {
   codec: string | null;
   rotation: number | null;
   web_path: string | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 export interface Group {

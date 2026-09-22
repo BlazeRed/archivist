@@ -4,6 +4,7 @@
   },
   "nav": {
     "timeline": "Timeline",
+    "map": "Map",
     "groups": "Groups",
     "favourites": "Favourites",
     "import": "Import",
@@ -99,6 +100,14 @@
     "title": "Favourites",
     "empty": "No favourites yet. Add to favourites from the timeline preview."
   },
+  "map": {
+    "offlineTitle": "No internet connection",
+    "offlineBody": "The map needs an internet connection to load its background. Your photos and their location data stay on this device either way.",
+    "retry": "Retry",
+    "tileLoadError": "Could not load the map — check your connection.",
+    "noLocations": "No photos with location data in this archive yet.",
+    "noLocationsHint": "Photos already in the archive may not have had their location extracted yet — try a rescan."
+  },
   "groups": {
     "title": "Groups",
     "create": "Create Group",
@@ -129,11 +138,13 @@
     "sizeLarge": "Large (280px)",
     "archiveManagement": "Archive Management",
     "rescanArchive": "Rescan archive",
+    "rescanArchiveDesc": "Finds new files, fixes missing dates and thumbnails, and tries to recover GPS location for photos imported before the Map feature existed",
     "rescanFound": "Found {{count}} new images",
     "rescanRepaired": "Fixed dates for {{count}} images",
     "rescanMoved": "Relocated {{count}} misplaced images",
     "rescanThumbnailed": "Generated {{count}} missing thumbnails",
     "rescanFoldersRemoved": "Deleted {{count}} empty folders",
+    "rescanGpsRepaired": "Recovered location data for {{count}} images",
     "rescanError": "Error: {{error}}",
     "rescanMissingTitle": "{{count}} file(s) missing from archive",
     "rescanMissingDesc": "These files could not be found on disk (moved, renamed, or on an unmounted drive?). Their records will stay until you confirm removal.",
@@ -168,7 +179,8 @@
     "removeFromGroup": "Remove from group",
     "noGroups": "—",
     "showInFolder": "Show in Folder",
-    "duration": "Duration"
+    "duration": "Duration",
+    "location": "Location"
   },
   "conflicts": {
     "title": "Review Conflicts",

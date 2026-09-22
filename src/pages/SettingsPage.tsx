@@ -6,6 +6,7 @@ import { getVersion } from '@tauri-apps/api/app';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useGroupStore } from '../stores/dataStore';
+import { useMapStore } from '../stores/mapStore';
 import { useImportStore } from '../stores/importStore';
 import { useRescan } from '../hooks/useRescan';
 import { useRegenerateThumbnails } from '../hooks/useRegenerateThumbnails';
@@ -21,6 +22,7 @@ export function SettingsPage() {
   const { config, setConfig } = useAppConfigStore();
   const { clearImages, selectImage } = useTimelineStore();
   const clearGroups = useGroupStore((s) => s.clearGroups);
+  const clearLocations = useMapStore((s) => s.clearLocations);
   const phase = useImportStore((s) => s.phase);
   const isImportActive = phase === 'scanning' || phase === 'analyzing' || phase === 'thumbnailing' || phase === 'importing';
   const { isRescanning, handleRescan } = useRescan();
@@ -40,6 +42,7 @@ export function SettingsPage() {
       clearImages();
       selectImage(null);
       clearGroups();
+      clearLocations();
       try {
         await invoke('init_archive', { archivePath: selected });
       } catch (e) {
@@ -54,6 +57,7 @@ export function SettingsPage() {
     clearImages();
     selectImage(null);
     clearGroups();
+    clearLocations();
     setConfig({ archive_path: '' });
   };
 
@@ -140,20 +144,23 @@ export function SettingsPage() {
           <h3 className="text-sm font-medium text-foreground mb-4">{t('settings.archiveManagement')}</h3>
 
           <div className="flex flex-col gap-3">
-            <Button
-              onClick={handleRescan}
-              disabled={isRescanning || isImportActive || !config.archive_path}
-              variant="default"
-              className="gap-2 w-full"
-            >
-              {isRescanning && (
-                <svg className="animate-spin size-4" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                </svg>
-              )}
-              {isRescanning ? t('common.loading') : t('settings.rescanArchive')}
-            </Button>
+            <div>
+              <Button
+                onClick={handleRescan}
+                disabled={isRescanning || isImportActive || !config.archive_path}
+                variant="default"
+                className="gap-2 w-full"
+              >
+                {isRescanning && (
+                  <svg className="animate-spin size-4" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                  </svg>
+                )}
+                {isRescanning ? t('common.loading') : t('settings.rescanArchive')}
+              </Button>
+              <p className="mt-1 text-[11px] text-muted-foreground">{t('settings.rescanArchiveDesc')}</p>
+            </div>
 
             <div>
               <Button
