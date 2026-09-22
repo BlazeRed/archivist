@@ -145,7 +145,14 @@
     "coverSizeLarge": "Grande (220px)",
     "closeArchive": "Chiudi archivio",
     "closeArchiveDesc": "Disconnettiti dall'archivio corrente",
-    "selectArchiveFolder": "Seleziona cartella archivio"
+    "selectArchiveFolder": "Seleziona cartella archivio",
+    "regenerateThumbnails": "Rigenera tutte le miniature",
+    "regenerateThumbnailsDesc": "Ricrea tutte le miniature dai file originali (corregge le miniature vecchie ruotate o errate)",
+    "regenConfirmTitle": "Rigenerare tutte le miniature?",
+    "regenConfirmBody": "Questa operazione ricrea tutte le miniature dell'archivio dai file originali. Per archivi grandi può richiedere tempo e non è annullabile, ma nessuna foto o video viene modificata o eliminata.",
+    "regenThumbnailsDone": "Rigenerate {{count}} miniature",
+    "regenThumbnailsFailed": "{{count}} non rigenerabili",
+    "regenThumbnailsError": "Errore: {{error}}"
   },
   "detail": {
     "title": "Dettagli",

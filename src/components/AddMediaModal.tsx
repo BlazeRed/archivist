@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getThumbnailUrl } from "@/lib/archivePath";
 import { yearMonthKey, parseYearMonth } from "@/lib/dateKeys";
 import { useAppConfigStore } from "../stores/appConfigStore";
+import { useUIStore } from "../stores/uiStore";
 import type { Image } from "../types";
 import {
   Dialog,
@@ -70,6 +71,7 @@ export function AddMediaModal({
   const { t } = useTranslation();
   const monthNames = useMonthNames();
   const { config } = useAppConfigStore();
+  const thumbnailCacheBust = useUIStore((s) => s.thumbnailCacheBust);
   const [allImages, setAllImages] = useState<Image[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [yearFrom, setYearFrom] = useState<number | null>(null);
@@ -272,7 +274,7 @@ export function AddMediaModal({
                   </div>
                   <div className="flex flex-wrap gap-2 px-6 py-3">
                     {group.images.map((img) => {
-                      const thumbnailUrl = getThumbnailUrl(archivePath, img.thumbnail_path);
+                      const thumbnailUrl = getThumbnailUrl(archivePath, img.thumbnail_path, thumbnailCacheBust);
                       const isSelected = selectedIds.has(img.id);
                       return (
                         <div

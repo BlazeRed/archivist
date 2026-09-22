@@ -221,6 +221,22 @@ async fn rescan_archive(
     .map_err(|e| error::AppError::Internal { message: e.to_string() })?
 }
 
+#[tauri::command]
+async fn regenerate_thumbnails(
+    state: tauri::State<'_, Arc<AppState>>,
+    app: tauri::AppHandle,
+) -> Result<commands::RegenerateThumbnailsResult, error::AppError> {
+    let archive_path = state.get_archive_path().ok_or_else(|| error::AppError::ArchiveNotFound {
+        path: "No archive path set".to_string(),
+    })?;
+    let db = state.db();
+    tauri::async_runtime::spawn_blocking(move || {
+        commands::regenerate_thumbnails(&archive_path, &*db, &app)
+    })
+    .await
+    .map_err(|e| error::AppError::Internal { message: e.to_string() })?
+}
+
 #[derive(Debug, serde::Serialize)]
 struct DeleteFilesResult {
     deleted: usize,
@@ -400,6 +416,7 @@ pub fn run() {
             cleanup_unimported_thumbnails,
             export_group,
             rescan_archive,
+            regenerate_thumbnails,
             remove_missing_images,
             delete_files,
             save_config,

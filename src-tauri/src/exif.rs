@@ -273,6 +273,27 @@ fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     haystack.windows(needle.len()).position(|w| w == needle)
 }
 
+/// EXIF Orientation tag value (1-8, default 1 = normal). Cameras/phones write
+/// this instead of rotating pixels; viewers that ignore it (image::open, ffmpeg
+/// frame grabs) render sideways/upside-down even though the file "looks fine"
+/// in EXIF-aware viewers (browsers, OS preview).
+pub fn extract_orientation(path: &Path) -> u16 {
+    if let Ok(exif) = nom_exif::read_exif(path) {
+        if let Some(val) = exif.get(nom_exif::ExifTag::Orientation) {
+            if let Some(o) = val.as_u16() {
+                return o;
+            }
+            if let Some(o) = val.as_u32() {
+                return o as u16;
+            }
+            if let Some(o) = val.as_u8() {
+                return o as u16;
+            }
+        }
+    }
+    1
+}
+
 fn mtime_fallback(path: &Path) -> ExifResult {
     if let Ok(m) = std::fs::metadata(path) {
         if let Ok(mtime) = m.modified() {

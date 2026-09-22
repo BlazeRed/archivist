@@ -1,8 +1,9 @@
 use std::path::{Path, PathBuf};
 use std::fs;
-use image::GenericImageView;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use serde::Serialize;
 use rayon::prelude::*;
+use tauri::Emitter;
 use crate::error::AppError;
 use crate::db::Database;
 use crate::exif::{self, ExifResult};
@@ -182,6 +183,73 @@ pub fn rescan_archive(archive_path: &str, db: &Database) -> Result<RescanResult,
 
     let folders_removed = remove_empty_dirs(root)?;
     Ok(RescanResult { added, missing, repaired, moved, thumbnailed, folders_removed })
+}
+
+#[derive(Debug, Serialize)]
+pub struct RegenerateThumbnailsResult {
+    pub regenerated: usize,
+    pub failed: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct RegenProgressPayload {
+    current: usize,
+    total: usize,
+}
+
+/// Force-rebuilds every image thumbnail from its source file, overwriting
+/// the existing JPEG in place. Used after a thumbnail-generation bugfix
+/// (e.g. EXIF orientation) to fix thumbnails that already exist on disk —
+/// `rescan_archive`'s own thumbnail repair only fills in *missing* ones.
+/// Thumbnail paths are deterministic (`.archivist/thumbnails/{id}.jpg`), so
+/// this never touches the DB. Videos are skipped: their thumbnails are
+/// ffmpeg frame grabs, unaffected by EXIF-orientation bugs.
+// ponytail: no isolated unit test here (needs a `tauri::AppHandle` for the
+// progress emit, which means enabling tauri's "test"/mock_app feature just
+// for this) — matches this file's existing convention of not unit-testing
+// batch helpers (`ensure_thumbnail`, `repair_missing_thumbnails`,
+// `backfill_video_metadata` have none either). The per-item logic it calls
+// (`generate_thumbnail` + `apply_exif_orientation`) is unit-tested directly
+// in thumbnail.rs. Add a mock_app-based test if this function grows real
+// branching logic beyond "loop, overwrite, count".
+pub fn regenerate_thumbnails(
+    archive_path: &str,
+    db: &Database,
+    app: &tauri::AppHandle,
+) -> Result<RegenerateThumbnailsResult, AppError> {
+    let images: Vec<_> = db.get_all_images()?
+        .into_iter()
+        .filter(|img| img.media_type == "image")
+        .collect();
+
+    let thumb_dir = Path::new(archive_path).join(".archivist/thumbnails");
+    fs::create_dir_all(&thumb_dir).map_err(|e| AppError::FileWrite {
+        path: thumb_dir.to_string_lossy().to_string(),
+        message: e.to_string(),
+    })?;
+
+    let total = images.len();
+    let counter = AtomicUsize::new(0);
+    let size = ThumbnailSize::medium();
+
+    let results: Vec<bool> = images
+        .par_iter()
+        .map(|img| {
+            let source = Path::new(archive_path).join(&img.file_path);
+            let dest = thumb_dir.join(format!("{}.jpg", img.id));
+            let ok = thumbnail::generate_thumbnail(&source, &dest, &size).is_ok();
+
+            let current = counter.fetch_add(1, Ordering::Relaxed) + 1;
+            let _ = app.emit("regen_thumbnails_progress", RegenProgressPayload { current, total });
+
+            ok
+        })
+        .collect();
+
+    let regenerated = results.iter().filter(|ok| **ok).count();
+    let failed = results.len() - regenerated;
+
+    Ok(RegenerateThumbnailsResult { regenerated, failed })
 }
 
 /// Deletes DB records for images the user has explicitly confirmed are gone.
@@ -404,11 +472,8 @@ fn compute_image_id(path: &Path) -> Result<String, AppError> {
 }
 
 fn get_image_dimensions(path: &Path) -> Result<(Option<u32>, Option<u32>), AppError> {
-    match image::open(path) {
-        Ok(img) => {
-            let (w, h) = img.dimensions();
-            Ok((Some(w), Some(h)))
-        }
+    match thumbnail::get_image_dimensions(path) {
+        Ok((w, h)) => Ok((Some(w), Some(h))),
         Err(_) => Ok((None, None)),
     }
 }

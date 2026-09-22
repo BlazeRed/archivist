@@ -2,16 +2,18 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { toast } from 'sonner';
-import { trimArchivePath } from '@/lib/archivePath';
+import { trimArchivePath, getThumbnailUrl } from '@/lib/archivePath';
 import { makeVideoUrl } from '@/lib/mediaServer';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
+import { useUIStore } from '../stores/uiStore';
 import { ImageMetadata } from './ImageMetadata';
 
 export function ImagePreview({ width }: { width: number }) {
   const { t } = useTranslation();
   const { previewImage, selectImage, setPreviewImage, updateImageFavourite, updateImageWebPath, images } = useTimelineStore();
   const { config } = useAppConfigStore();
+  const thumbnailCacheBust = useUIStore((s) => s.thumbnailCacheBust);
 
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imgSrc, setImgSrc] = useState('');
@@ -46,9 +48,7 @@ export function ImagePreview({ width }: { width: number }) {
     return () => cancelAnimationFrame(id);
   }, [previewImage?.id, previewImage?.web_path, previewImage?.file_path, archivePath]);
 
-  const thumbSrc = previewImage?.thumbnail_path && archivePath
-    ? convertFileSrc(`${archivePath}/${previewImage.thumbnail_path}`)
-    : '';
+  const thumbSrc = getThumbnailUrl(archivePath, previewImage?.thumbnail_path, thumbnailCacheBust);
 
   const handlePlay = async () => {
     if (!previewImage || !archivePath) return;

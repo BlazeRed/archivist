@@ -145,7 +145,14 @@
     "coverSizeLarge": "Large (220px)",
     "closeArchive": "Close archive",
     "closeArchiveDesc": "Disconnect from the current archive",
-    "selectArchiveFolder": "Select archive folder"
+    "selectArchiveFolder": "Select archive folder",
+    "regenerateThumbnails": "Regenerate all thumbnails",
+    "regenerateThumbnailsDesc": "Rebuild every thumbnail from the original files (fixes old rotated/incorrect thumbnails)",
+    "regenConfirmTitle": "Regenerate all thumbnails?",
+    "regenConfirmBody": "This rebuilds every thumbnail in the archive from the original files. It can take a while for large archives and can't be undone, but no photos or videos are modified or deleted.",
+    "regenThumbnailsDone": "Regenerated {{count}} thumbnails",
+    "regenThumbnailsFailed": "{{count}} could not be regenerated",
+    "regenThumbnailsError": "Error: {{error}}"
   },
   "detail": {
     "title": "Details",

@@ -8,11 +8,13 @@ import { useTimelineStore } from '../stores/timelineStore';
 import { useGroupStore } from '../stores/dataStore';
 import { useImportStore } from '../stores/importStore';
 import { useRescan } from '../hooks/useRescan';
+import { useRegenerateThumbnails } from '../hooks/useRegenerateThumbnails';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ProgressBar } from '@/components/ProgressBar';
 
 export function SettingsPage() {
   const { t, i18n } = useTranslation();
@@ -22,8 +24,10 @@ export function SettingsPage() {
   const phase = useImportStore((s) => s.phase);
   const isImportActive = phase === 'scanning' || phase === 'analyzing' || phase === 'thumbnailing' || phase === 'importing';
   const { isRescanning, handleRescan } = useRescan();
+  const { isRegenerating, progress: regenProgress, handleRegenerate } = useRegenerateThumbnails();
   const [appVersion, setAppVersion] = useState<string>('');
   const [showImportWarning, setShowImportWarning] = useState(false);
+  const [showRegenConfirm, setShowRegenConfirm] = useState(false);
 
   useEffect(() => {
     getVersion().then(setAppVersion).catch(() => {});
@@ -135,12 +139,12 @@ export function SettingsPage() {
         <div className="border-t border-border pt-6">
           <h3 className="text-sm font-medium text-foreground mb-4">{t('settings.archiveManagement')}</h3>
 
-          <div className="flex items-start gap-3 flex-wrap">
+          <div className="flex flex-col gap-3">
             <Button
               onClick={handleRescan}
               disabled={isRescanning || isImportActive || !config.archive_path}
               variant="default"
-              className="gap-2"
+              className="gap-2 w-full"
             >
               {isRescanning && (
                 <svg className="animate-spin size-4" viewBox="0 0 24 24" fill="none">
@@ -151,11 +155,24 @@ export function SettingsPage() {
               {isRescanning ? t('common.loading') : t('settings.rescanArchive')}
             </Button>
 
+            <div>
+              <Button
+                onClick={() => setShowRegenConfirm(true)}
+                disabled={isRegenerating || isImportActive || isRescanning || !config.archive_path}
+                variant="default"
+                className="gap-2 w-full"
+              >
+                {isRegenerating ? t('common.loading') : t('settings.regenerateThumbnails')}
+              </Button>
+              <p className="mt-1 text-[11px] text-muted-foreground">{t('settings.regenerateThumbnailsDesc')}</p>
+            </div>
+
             {config.archive_path && (
               <div>
                 <Button
                   onClick={handleCloseArchive}
                   variant="destructive"
+                  className="w-full"
                 >
                   {t('settings.closeArchive')}
                 </Button>
@@ -163,6 +180,12 @@ export function SettingsPage() {
               </div>
             )}
           </div>
+
+          {isRegenerating && (
+            <div className="mt-4 max-w-md">
+              <ProgressBar current={regenProgress.current} total={regenProgress.total} currentFile="" phase="thumbnailing" />
+            </div>
+          )}
 
         </div>
 
@@ -183,6 +206,27 @@ export function SettingsPage() {
           <div className="flex justify-end">
             <Button onClick={() => setShowImportWarning(false)} variant="outline" size="sm">
               {t('common.cancel')}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showRegenConfirm} onOpenChange={(open) => { if (!open) setShowRegenConfirm(false); }}>
+        <DialogContent className="w-96">
+          <DialogHeader>
+            <DialogTitle>{t('settings.regenConfirmTitle')}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">{t('settings.regenConfirmBody')}</p>
+          <div className="flex justify-end gap-2">
+            <Button onClick={() => setShowRegenConfirm(false)} variant="outline" size="sm">
+              {t('common.cancel')}
+            </Button>
+            <Button
+              onClick={() => { setShowRegenConfirm(false); handleRegenerate(); }}
+              variant="default"
+              size="sm"
+            >
+              {t('settings.regenerateThumbnails')}
             </Button>
           </div>
         </DialogContent>

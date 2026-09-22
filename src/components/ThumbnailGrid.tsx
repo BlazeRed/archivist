@@ -6,6 +6,7 @@ import { yearMonthKey, parseYearMonth } from '@/lib/dateKeys';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { useGroupUIStore } from '../stores/groupUIStore';
+import { useUIStore } from '../stores/uiStore';
 import type { Image } from '../types';
 import { useMonthNames } from '../lib/months';
 import { cn } from '@/lib/utils';
@@ -65,6 +66,7 @@ type RowProps = {
   rows: TimelineRow[];
   sizeKey: SizeKey;
   archivePath: string;
+  cacheBust: number;
   isSelectionMode: boolean;
   selectedImageIds: Set<string>;
   previewImageId: string | null;
@@ -75,6 +77,7 @@ type RowProps = {
 const ThumbnailCell = memo(function ThumbnailCell({
   image,
   archivePath,
+  cacheBust,
   sizeKey,
   isSelectionMode,
   isSelected,
@@ -84,6 +87,7 @@ const ThumbnailCell = memo(function ThumbnailCell({
 }: {
   image: Image;
   archivePath: string;
+  cacheBust: number;
   sizeKey: SizeKey;
   isSelectionMode: boolean;
   isSelected: boolean;
@@ -93,7 +97,7 @@ const ThumbnailCell = memo(function ThumbnailCell({
 }) {
   const { t } = useTranslation();
   const { px } = SIZES[sizeKey];
-  const thumbnailUrl = getThumbnailUrl(archivePath, image.thumbnail_path);
+  const thumbnailUrl = getThumbnailUrl(archivePath, image.thumbnail_path, cacheBust);
 
   return (
     <div
@@ -198,6 +202,7 @@ function TimelineRowComponent({
   rows,
   sizeKey,
   archivePath,
+  cacheBust,
   isSelectionMode,
   selectedImageIds,
   previewImageId,
@@ -223,6 +228,7 @@ function TimelineRowComponent({
             key={img.id}
             image={img}
             archivePath={archivePath}
+            cacheBust={cacheBust}
             sizeKey={sizeKey}
             isSelectionMode={isSelectionMode}
             isSelected={selectedImageIds.has(img.id)}
@@ -241,6 +247,7 @@ export function ThumbnailGrid() {
   const { images, setPreviewImage, previewImage, loading } = useTimelineStore();
   const { config } = useAppConfigStore();
   const { isSelectionMode, selectedImageIds, toggleSelection } = useGroupUIStore();
+  const thumbnailCacheBust = useUIStore((s) => s.thumbnailCacheBust);
   const [stickyLabel, setStickyLabel] = useState('');
   const [scrollVisible, setScrollVisible] = useState(false);
   const [scrollFraction, setScrollFraction] = useState(0);
@@ -313,13 +320,14 @@ export function ThumbnailGrid() {
       rows,
       sizeKey,
       archivePath: config.archive_path,
+      cacheBust: thumbnailCacheBust,
       isSelectionMode,
       selectedImageIds,
       previewImageId: previewImage?.id ?? null,
       onImageClick: handleImageClick,
       onToggleSelect: toggleSelection,
     }),
-    [rows, sizeKey, config.archive_path, isSelectionMode, selectedImageIds, previewImage?.id, handleImageClick, toggleSelection]
+    [rows, sizeKey, config.archive_path, thumbnailCacheBust, isSelectionMode, selectedImageIds, previewImage?.id, handleImageClick, toggleSelection]
   );
 
   const handleRowsRendered = useCallback(

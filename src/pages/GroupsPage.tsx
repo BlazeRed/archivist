@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
-import { convertFileSrc } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { toast } from 'sonner';
+import { getThumbnailUrl } from '@/lib/archivePath';
 import { useGroupStore } from '../stores/dataStore';
 import { useGroupUIStore } from '../stores/groupUIStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { useTimelineStore } from '../stores/timelineStore';
+import { useUIStore } from '../stores/uiStore';
 import { AddMediaModal } from '../components/AddMediaModal';
 import { ImageDetail } from '../components/ImageDetail';
 import type { Image, GroupWithCount } from '../types';
@@ -48,6 +49,7 @@ export function GroupsPage() {
   const thumbPx = config.thumbnail_size === 'small' ? 120 : config.thumbnail_size === 'large' ? 280 : 180;
   const coverPx = config.group_cover_size === 'small' ? 140 : config.group_cover_size === 'large' ? 220 : 176;
   const archivePath = config.archive_path ? config.archive_path.replace(/\/+$/, '') : '';
+  const thumbnailCacheBust = useUIStore((s) => s.thumbnailCacheBust);
 
   useEffect(() => {
     fetchGroups();
@@ -268,9 +270,7 @@ export function GroupsPage() {
           ) : (
             <div className="flex flex-wrap gap-4 p-6">
               {groups.map(group => {
-                const coverUrl = group.cover_thumbnail_path && archivePath
-                  ? convertFileSrc(`${archivePath}/${group.cover_thumbnail_path}`)
-                  : null;
+                const coverUrl = getThumbnailUrl(archivePath, group.cover_thumbnail_path, thumbnailCacheBust) || null;
                 return (
                   <div
                     key={group.id}
@@ -355,9 +355,7 @@ export function GroupsPage() {
             ) : (
               <div className="flex flex-wrap gap-3">
                 {groupImages.map(img => {
-                  const thumbnailUrl = archivePath && img.thumbnail_path
-                    ? convertFileSrc(`${archivePath}/${img.thumbnail_path}`)
-                    : '';
+                  const thumbnailUrl = getThumbnailUrl(archivePath, img.thumbnail_path, thumbnailCacheBust);
                   const isCover = selectedGroup?.cover_image_id === img.id;
                   return (
                     <div

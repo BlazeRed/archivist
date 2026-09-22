@@ -8,12 +8,13 @@ import { useGroupStore } from '../stores/dataStore';
 import { ImageDetail } from '../components/ImageDetail';
 import { Button } from '@/components/ui/button';
 import { getThumbnailUrl } from '@/lib/archivePath';
+import { useUIStore } from '../stores/uiStore';
 import type { Image } from '../types';
 
-function FavouriteThumb({ image, archivePath }: { image: Image; archivePath: string }) {
+function FavouriteThumb({ image, archivePath, cacheBust }: { image: Image; archivePath: string; cacheBust: number }) {
   const { t } = useTranslation();
   const { selectImage, updateImageFavourite } = useTimelineStore();
-  const thumbnailUrl = getThumbnailUrl(archivePath, image.thumbnail_path);
+  const thumbnailUrl = getThumbnailUrl(archivePath, image.thumbnail_path, cacheBust);
 
   const handleRemove = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -64,6 +65,7 @@ export function FavouritesPage() {
   const { allImages, clearImages, selectImage, selectedImage } = useTimelineStore();
   const { config, setConfig } = useAppConfigStore();
   const clearGroups = useGroupStore((s) => s.clearGroups);
+  const thumbnailCacheBust = useUIStore((s) => s.thumbnailCacheBust);
 
   const handleOpenArchive = async () => {
     const selected = await open({ directory: true });
@@ -130,7 +132,7 @@ export function FavouritesPage() {
         ) : (
           <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
             {favourites.map(img => (
-              <FavouriteThumb key={img.id} image={img} archivePath={config.archive_path} />
+              <FavouriteThumb key={img.id} image={img} archivePath={config.archive_path} cacheBust={thumbnailCacheBust} />
             ))}
           </div>
         )}

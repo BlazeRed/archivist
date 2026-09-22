@@ -1,6 +1,23 @@
 use image::{DynamicImage, ImageFormat, GenericImageView};
 use std::path::Path;
 use crate::error::AppError;
+use crate::exif::extract_orientation;
+
+/// Rotate/flip pixels to match the EXIF Orientation tag, so downstream
+/// consumers (thumbnail files, stored width/height) agree with what
+/// EXIF-aware viewers (browsers, OS preview) already show.
+fn apply_exif_orientation(img: DynamicImage, orientation: u16) -> DynamicImage {
+    match orientation {
+        2 => img.fliph(),
+        3 => img.rotate180(),
+        4 => img.flipv(),
+        5 => img.rotate90().fliph(),
+        6 => img.rotate90(),
+        7 => img.rotate270().fliph(),
+        8 => img.rotate270(),
+        _ => img,
+    }
+}
 
 pub struct ThumbnailSize {
     pub width: u32,
@@ -38,6 +55,7 @@ pub fn generate_thumbnail(
         path: source_path.to_string_lossy().to_string(),
         message: format!("Failed to open image: {}", e),
     })?;
+    let img = apply_exif_orientation(img, extract_orientation(source_path));
 
     let thumbnail = resize_image(&img, size.width, size.height);
 
@@ -124,7 +142,13 @@ pub fn get_image_dimensions(path: &Path) -> Result<(u32, u32), AppError> {
     })?;
     
     let (width, height) = img.dimensions();
-    Ok((width, height))
+
+    // Orientations 5-8 involve a 90/270 rotation, so on-disk width/height are
+    // swapped relative to how the image actually displays.
+    match extract_orientation(path) {
+        5..=8 => Ok((height, width)),
+        _ => Ok((width, height)),
+    }
 }
 
 #[cfg(test)]
@@ -161,6 +185,19 @@ mod tests {
         
         assert!(resized.width() <= 300);
         assert!(resized.height() <= 300);
+    }
+
+    #[test]
+    fn test_apply_exif_orientation_swaps_dims_on_90_270() {
+        let img = DynamicImage::new_rgba8(200, 100);
+        for o in [6, 8] {
+            let rotated = apply_exif_orientation(img.clone(), o);
+            assert_eq!((rotated.width(), rotated.height()), (100, 200), "orientation {o}");
+        }
+        for o in [1, 3, 2, 4] {
+            let same = apply_exif_orientation(img.clone(), o);
+            assert_eq!((same.width(), same.height()), (200, 100), "orientation {o}");
+        }
     }
 
     #[test]
