@@ -7,6 +7,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { useImportStore } from '../stores/importStore';
 import { useTimelineStore } from '../stores/timelineStore';
+import { useMapStore } from '../stores/mapStore';
 import { useGroupStore } from '../stores/dataStore';
 import { useUIStore } from '../stores/uiStore';
 import { useRescan } from '../hooks/useRescan';
@@ -22,6 +23,7 @@ export function Topbar() {
   const { phase } = useImportStore();
   const { clearImages, selectImage } = useTimelineStore();
   const clearGroups = useGroupStore((s) => s.clearGroups);
+  const clearLocations = useMapStore((s) => s.clearLocations);
   const { settingsOpen, toggleSettings } = useUIStore();
   const { isRescanning, handleRescan } = useRescan();
   const [pendingPath, setPendingPath] = useState<string | null>(null);
@@ -44,6 +46,7 @@ export function Topbar() {
       clearImages();
       selectImage(null);
       clearGroups();
+      clearLocations();
       try { await invoke('init_archive', { archivePath: selected }); } catch {}
       setConfig({ archive_path: selected as string });
     }
@@ -83,6 +86,7 @@ export function Topbar() {
       <nav className="flex items-center bg-muted rounded-lg p-0.5">
         {[
           { to: '/', label: t('nav.timeline') },
+          { to: '/map', label: t('nav.map') },
           { to: '/groups', label: t('nav.groups') },
           { to: '/favourites', label: t('nav.favourites') },
         ].map(({ to, label }) => (

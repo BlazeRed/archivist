@@ -21,6 +21,8 @@ pub struct Image {
     pub codec: Option<String>,
     pub rotation: Option<i32>,
     pub web_path: Option<String>,
+    pub latitude: Option<f64>,
+    pub longitude: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,6 +42,8 @@ pub struct NewImage {
     pub codec: Option<String>,
     pub rotation: Option<i32>,
     pub web_path: Option<String>,
+    pub latitude: Option<f64>,
+    pub longitude: Option<f64>,
 }
 
 fn map_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Image> {
@@ -61,11 +65,13 @@ fn map_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Image> {
         codec:         row.get(14)?,
         rotation:      row.get(15)?,
         web_path:      row.get(16)?,
+        latitude:      row.get(17)?,
+        longitude:     row.get(18)?,
     })
 }
 
 const SELECT_COLS: &str =
-    "id, filename, file_path, taken_at, imported_at, width, height, file_size, has_exif, date_source, thumbnail_path, is_favourite, media_type, duration_ms, codec, rotation, web_path";
+    "id, filename, file_path, taken_at, imported_at, width, height, file_size, has_exif, date_source, thumbnail_path, is_favourite, media_type, duration_ms, codec, rotation, web_path, latitude, longitude";
 
 impl super::Database {
     pub fn insert_image(&self, image: &NewImage) -> Result<(), super::AppError> {
@@ -74,8 +80,8 @@ impl super::Database {
 
         conn.execute(
             "INSERT OR REPLACE INTO images \
-             (id, filename, file_path, taken_at, imported_at, width, height, file_size, has_exif, date_source, thumbnail_path, media_type, duration_ms, codec, rotation, web_path) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+             (id, filename, file_path, taken_at, imported_at, width, height, file_size, has_exif, date_source, thumbnail_path, media_type, duration_ms, codec, rotation, web_path, latitude, longitude) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
             params![
                 image.id,
                 image.filename,
@@ -93,6 +99,8 @@ impl super::Database {
                 image.codec,
                 image.rotation,
                 image.web_path,
+                image.latitude,
+                image.longitude,
             ],
         )?;
 
@@ -307,6 +315,41 @@ impl super::Database {
         Ok(())
     }
 
+    pub fn get_images_without_gps(&self) -> Result<Vec<(String, String)>, super::AppError> {
+        let conn = self.connection();
+        let mut stmt = conn.prepare(
+            "SELECT id, file_path FROM images WHERE latitude IS NULL AND media_type = 'image'"
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?.collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    pub fn update_image_gps(&self, id: &str, latitude: Option<f64>, longitude: Option<f64>) -> Result<(), super::AppError> {
+        let conn = self.connection();
+        conn.execute(
+            "UPDATE images SET latitude = ?1, longitude = ?2 WHERE id = ?3",
+            params![latitude, longitude, id],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_image_locations(&self) -> Result<Vec<crate::commands::locations::ImageLocation>, super::AppError> {
+        let conn = self.connection();
+        let mut stmt = conn.prepare(
+            "SELECT id, latitude, longitude FROM images WHERE latitude IS NOT NULL AND longitude IS NOT NULL"
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(crate::commands::locations::ImageLocation {
+                id: row.get(0)?,
+                latitude: row.get(1)?,
+                longitude: row.get(2)?,
+            })
+        })?.collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
     pub fn get_videos_needing_transcode(&self) -> Result<Vec<crate::commands::video::VideoStub>, super::AppError> {
         let conn = self.connection();
         let mut stmt = conn.prepare(
@@ -344,6 +387,8 @@ mod tests {
             codec: None,
             rotation: None,
             web_path: None,
+            latitude: None,
+            longitude: None,
         }
     }
 
@@ -365,5 +410,27 @@ mod tests {
 
         assert!(db.get_image("img1").unwrap().is_none());
         assert!(db.get_images_in_group(group_id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn gps_round_trips_through_repair_and_location_queries() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = Database::new(&dir.path().join("archivist.db")).unwrap();
+
+        db.insert_image(&new_image("img1")).unwrap();
+        assert_eq!(
+            db.get_images_without_gps().unwrap(),
+            vec![("img1".to_string(), "2026/01 - January/img1.jpg".to_string())]
+        );
+        assert!(db.get_image_locations().unwrap().is_empty());
+
+        db.update_image_gps("img1", Some(41.9), Some(12.5)).unwrap();
+
+        let locations = db.get_image_locations().unwrap();
+        assert_eq!(locations.len(), 1);
+        assert_eq!(locations[0].id, "img1");
+        assert_eq!(locations[0].latitude, 41.9);
+        assert_eq!(locations[0].longitude, 12.5);
+        assert!(db.get_images_without_gps().unwrap().is_empty());
     }
 }

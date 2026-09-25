@@ -4,6 +4,7 @@
   },
   "nav": {
     "timeline": "Cronologia",
+    "map": "Mappa",
     "groups": "Gruppi",
     "favourites": "Preferiti",
     "import": "Importa",
@@ -99,6 +100,14 @@
     "title": "Preferiti",
     "empty": "Nessun preferito. Aggiungi ai preferiti dall'anteprima nella cronologia."
   },
+  "map": {
+    "offlineTitle": "Nessuna connessione internet",
+    "offlineBody": "La mappa richiede una connessione internet per caricare lo sfondo cartografico. Le tue foto e i loro dati di posizione restano comunque solo su questo dispositivo.",
+    "retry": "Riprova",
+    "tileLoadError": "Impossibile caricare la mappa — controlla la connessione.",
+    "noLocations": "Nessuna foto con dati di posizione in questo archivio.",
+    "noLocationsHint": "Le foto già in archivio potrebbero non avere ancora i dati di posizione estratti — prova una riscansione."
+  },
   "groups": {
     "title": "Gruppi",
     "create": "Crea gruppo",
@@ -129,11 +138,13 @@
     "sizeLarge": "Grande (280px)",
     "archiveManagement": "Gestione archivio",
     "rescanArchive": "Riscansiona archivio",
+    "rescanArchiveDesc": "Trova nuovi file, corregge date e miniature mancanti, e prova a recuperare la posizione GPS delle foto importate prima che esistesse la funzione Mappa",
     "rescanFound": "Trovate {{count}} nuove immagini",
     "rescanRepaired": "Date corrette per {{count}} immagini",
     "rescanMoved": "Spostate {{count}} immagini fuori posto",
     "rescanThumbnailed": "Generate {{count}} miniature mancanti",
     "rescanFoldersRemoved": "Eliminate {{count}} cartelle vuote",
+    "rescanGpsRepaired": "Recuperata posizione per {{count}} immagini",
     "rescanError": "Errore: {{error}}",
     "rescanMissingTitle": "{{count}} file mancanti nell'archivio",
     "rescanMissingDesc": "Questi file non sono stati trovati sul disco (spostati, rinominati o su un'unità non montata?). I relativi dati resteranno finché non confermi la rimozione.",
@@ -168,7 +179,8 @@
     "removeFromGroup": "Rimuovi dal gruppo",
     "noGroups": "—",
     "showInFolder": "Mostra nella cartella",
-    "duration": "Durata"
+    "duration": "Durata",
+    "location": "Posizione"
   },
   "conflicts": {
     "title": "Rivedi conflitti",

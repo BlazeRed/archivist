@@ -379,6 +379,11 @@ fn get_media_server_port(state: tauri::State<'_, Arc<AppState>>) -> u16 {
     state.media_port()
 }
 
+#[tauri::command]
+fn get_image_locations(state: tauri::State<'_, Arc<AppState>>) -> Result<Vec<commands::locations::ImageLocation>, error::AppError> {
+    state.db().get_image_locations()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let media_port = tauri::async_runtime::block_on(media_server::start());
@@ -429,6 +434,7 @@ pub fn run() {
             get_videos_needing_transcode,
             transcode_video,
             get_media_server_port,
+            get_image_locations,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -294,6 +294,27 @@ pub fn extract_orientation(path: &Path) -> u16 {
     1
 }
 
+/// Camera GPS is unreliable at the edges: a failed GPS lock is sometimes
+/// written as exact (0,0) ("Null Island") instead of omitting the tag, and
+/// malformed EXIF can in principle produce out-of-range values. Both are
+/// treated as "no GPS" rather than plotted as real coordinates.
+fn valid_gps_coords(lat: f64, lon: f64) -> Option<(f64, f64)> {
+    if !lat.is_finite() || !lon.is_finite() { return None; }
+    if lat.abs() > 90.0 || lon.abs() > 180.0 { return None; }
+    if lat == 0.0 && lon == 0.0 { return None; }
+    Some((lat, lon))
+}
+
+/// Decimal-degree GPS coordinates from EXIF GpsLatitude/GpsLongitude(+Ref).
+/// Returns None if absent, corrupted, or a known "no fix" sentinel.
+pub fn extract_gps(path: &Path) -> Option<(f64, f64)> {
+    let exif = nom_exif::read_exif(path).ok()?;
+    let gps = exif.gps_info()?;
+    let lat = gps.latitude_decimal()?;
+    let lon = gps.longitude_decimal()?;
+    valid_gps_coords(lat, lon)
+}
+
 fn mtime_fallback(path: &Path) -> ExifResult {
     if let Ok(m) = std::fs::metadata(path) {
         if let Ok(mtime) = m.modified() {
@@ -368,5 +389,29 @@ mod tests {
     fn test_filename_no_date() {
         let p = std::path::Path::new("random_vacation_photo.jpg");
         assert!(try_filename_date(p).is_none());
+    }
+
+    #[test]
+    fn test_valid_gps_coords_rejects_null_island() {
+        assert!(valid_gps_coords(0.0, 0.0).is_none());
+    }
+
+    #[test]
+    fn test_valid_gps_coords_rejects_out_of_range() {
+        assert!(valid_gps_coords(91.0, 0.0).is_none());
+        assert!(valid_gps_coords(0.0, 181.0).is_none());
+        assert!(valid_gps_coords(f64::NAN, 0.0).is_none());
+    }
+
+    #[test]
+    fn test_valid_gps_coords_accepts_normal_pair() {
+        assert_eq!(valid_gps_coords(41.9, 12.5), Some((41.9, 12.5)));
+    }
+
+    #[test]
+    fn test_extract_gps_returns_none_for_garbage_file() {
+        let mut file = NamedTempFile::new().unwrap();
+        file.write_all(b"not an image").unwrap();
+        assert!(extract_gps(file.path()).is_none());
     }
 }

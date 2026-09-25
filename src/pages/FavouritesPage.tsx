@@ -5,6 +5,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { useGroupStore } from '../stores/dataStore';
+import { useMapStore } from '../stores/mapStore';
 import { ImageDetail } from '../components/ImageDetail';
 import { Button } from '@/components/ui/button';
 import { getThumbnailUrl } from '@/lib/archivePath';
@@ -65,6 +66,7 @@ export function FavouritesPage() {
   const { allImages, clearImages, selectImage, selectedImage } = useTimelineStore();
   const { config, setConfig } = useAppConfigStore();
   const clearGroups = useGroupStore((s) => s.clearGroups);
+  const clearLocations = useMapStore((s) => s.clearLocations);
   const thumbnailCacheBust = useUIStore((s) => s.thumbnailCacheBust);
 
   const handleOpenArchive = async () => {
@@ -73,6 +75,7 @@ export function FavouritesPage() {
       clearImages();
       selectImage(null);
       clearGroups();
+      clearLocations();
       try { await invoke('init_archive', { archivePath: selected }); } catch {}
       setConfig({ archive_path: selected as string });
     }

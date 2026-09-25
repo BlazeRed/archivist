@@ -37,6 +37,8 @@ pub struct AnalyzedImage {
     pub duration_ms: Option<i64>,
     pub codec: Option<String>,
     pub rotation: Option<i32>,
+    pub latitude: Option<f64>,
+    pub longitude: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -186,6 +188,16 @@ pub fn analyze_image(scanned: &ScannedImage) -> Result<AnalyzedImage, AppError> 
         (w, h, None, exif_result.datetime().map(|dt| dt.to_rfc3339()), exif_result.date_source_label().map(|s| s.to_string()), None, None)
     };
 
+    // GPS is photo-only for now (video GPS extraction is out of scope).
+    let (latitude, longitude) = if media_type == "video" {
+        (None, None)
+    } else {
+        match exif::extract_gps(path) {
+            Some((lat, lon)) => (Some(lat), Some(lon)),
+            None => (None, None),
+        }
+    };
+
     Ok(AnalyzedImage {
         path: scanned.path.clone(),
         filename: scanned.filename.clone(),
@@ -201,6 +213,8 @@ pub fn analyze_image(scanned: &ScannedImage) -> Result<AnalyzedImage, AppError> 
         duration_ms,
         codec,
         rotation,
+        latitude,
+        longitude,
     })
 }
 
@@ -450,6 +464,8 @@ fn import_one(
         codec: p.image.codec.clone(),
         rotation: p.image.rotation,
         web_path,
+        latitude: p.image.latitude,
+        longitude: p.image.longitude,
     };
 
     if let Err(e) = db.insert_image(&new_image) {
@@ -648,6 +664,8 @@ mod tests {
             duration_ms: None,
             codec: None,
             rotation: None,
+            latitude: None,
+            longitude: None,
         }
     }
 

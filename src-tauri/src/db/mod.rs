@@ -92,6 +92,15 @@ impl Database {
         let _ = conn.execute("ALTER TABLE images ADD COLUMN codec TEXT", []);
         let _ = conn.execute("ALTER TABLE images ADD COLUMN rotation INTEGER DEFAULT 0", []);
         let _ = conn.execute("ALTER TABLE images ADD COLUMN web_path TEXT", []);
+        let _ = conn.execute("ALTER TABLE images ADD COLUMN latitude REAL", []);
+        let _ = conn.execute("ALTER TABLE images ADD COLUMN longitude REAL", []);
+
+        // Must run after the ALTER TABLEs above: on a fresh DB, latitude/longitude
+        // don't exist until this point (the base CREATE TABLE predates this feature).
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_images_latlon ON images(latitude, longitude)",
+            [],
+        );
 
         // On Linux, h264 videos previously marked web_compatible can't play in
         // WebKitGTK without gstreamer-libav. Reset them so the transcode queue

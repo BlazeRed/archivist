@@ -114,6 +114,10 @@ export function ImageMetadata({ image, hideGroups }: { image: Image; hideGroups?
           <Field label={t('detail.fileSize')} value={formatSize(image.file_size)} />
         )}
 
+        {image.latitude != null && image.longitude != null && (
+          <Field label={t('detail.location')} value={`${image.latitude.toFixed(5)}, ${image.longitude.toFixed(5)}`} />
+        )}
+
         <Field label={t('detail.imported')} value={formatDate(image.imported_at, '—')} />
 
         <div>

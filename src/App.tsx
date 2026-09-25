@@ -5,6 +5,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { Topbar } from './components/Topbar';
 import { Toaster } from './components/ui/sonner';
 import { TimelinePage } from './pages/TimelinePage';
+import { MapPage } from './pages/MapPage';
 import { GroupsPage } from './pages/GroupsPage';
 import { ImportPage } from './pages/ImportPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -53,6 +54,7 @@ function App() {
       <main className="flex-1 relative">
         <Routes>
           <Route path="/" element={<TimelinePage />} />
+          <Route path="/map" element={<MapPage />} />
           <Route path="/groups" element={<GroupsPage />} />
           <Route path="/import" element={<ImportPage />} />
           <Route path="/favourites" element={<FavouritesPage />} />
