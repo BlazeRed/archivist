@@ -29,7 +29,7 @@ function PopoverContent({
         align={align}
         sideOffset={sideOffset}
         className={cn(
-          "z-50 flex w-72 origin-(--radix-popover-content-transform-origin) flex-col gap-2.5 rounded-lg bg-popover p-2.5 text-sm text-popover-foreground shadow-overlay ring-1 ring-border outline-hidden duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fill-mode-forwards data-closed:fade-out-0 data-closed:zoom-out-95",
+          "z-50 flex w-72 origin-(--radix-popover-content-transform-origin) flex-col gap-2.5 rounded-lg bg-popover p-2.5 text-sm text-popover-foreground shadow-overlay ring-1 ring-border outline-hidden data-[side=bottom]:slide-in-from-top-8 data-[side=left]:slide-in-from-right-8 data-[side=right]:slide-in-from-left-8 data-[side=top]:slide-in-from-bottom-8 data-closed:data-[side=bottom]:slide-out-to-top-8 data-closed:data-[side=left]:slide-out-to-right-8 data-closed:data-[side=right]:slide-out-to-left-8 data-closed:data-[side=top]:slide-out-to-bottom-8 data-open:animate-in data-open:fade-in-0 data-open:duration-300 data-open:ease-[cubic-bezier(.2,.8,.2,1)] data-closed:animate-out data-closed:fill-mode-forwards data-closed:fade-out-0 data-closed:duration-200 data-closed:ease-[cubic-bezier(.4,0,1,1)]",
           className
         )}
         {...props}

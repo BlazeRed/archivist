@@ -200,7 +200,7 @@ export function ImageMetadataView({ image, groups, hideGroups, readOnly }: {
 
         {!readOnly && addableGroups.length > 0 && (
           <Select value="" onValueChange={(v) => groups.add(Number(v))}>
-            <SelectTrigger size="sm" className="w-full rounded-full text-xs">
+            <SelectTrigger size="sm" className="w-full">
               <SelectValue placeholder={t('detail.addToGroup')} />
             </SelectTrigger>
             <SelectContent>

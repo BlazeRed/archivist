@@ -2,6 +2,9 @@
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
+/* shadcn radix-nova classes use data-open/data-closed; Radix only sets data-state (normally shipped by shadcn/tailwind.css) */
+@custom-variant data-open (&:where([data-state="open"], [data-open]:not([data-open="false"])));
+@custom-variant data-closed (&:where([data-state="closed"], [data-closed]:not([data-closed="false"])));
 
 /* Design System v2.0 — see Archivist_Design_System.md */
 :root {

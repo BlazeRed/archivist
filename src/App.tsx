@@ -80,17 +80,19 @@ function App() {
       {/* Settings backdrop */}
       <div
         className={cn(
-          'fixed inset-0 z-40 bg-black/30 transition-opacity duration-200',
+          'fixed inset-0 z-40 bg-foreground/20 dark:bg-black/50 transition-opacity duration-200',
           settingsOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         )}
         onClick={closeSettings}
       />
 
-      {/* Settings slide-over panel */}
+      {/* Settings floating panel: detached card, same 12px inset as the topbar */}
       <div
         className={cn(
-          'fixed top-[var(--topbar-offset)] right-0 bottom-0 z-50 w-80 bg-card border-l border-border shadow-xl transition-transform duration-200',
-          settingsOpen ? 'translate-x-0' : 'translate-x-full'
+          'squircle fixed top-[calc(var(--topbar-offset)+8px)] right-3 bottom-3 z-50 w-80 rounded-xl bg-popover shadow-overlay ring-1 ring-frame overflow-hidden transition-[translate,opacity]',
+          settingsOpen
+            ? 'translate-x-0 opacity-100 duration-300 ease-[cubic-bezier(.2,.8,.2,1)]'
+            : 'translate-x-[calc(100%+12px)] opacity-0 pointer-events-none duration-200 ease-[cubic-bezier(.4,0,1,1)]'
         )}
       >
         <SettingsPage />

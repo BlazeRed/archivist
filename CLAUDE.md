@@ -178,7 +178,7 @@ Spec: `../Archivist_Design_System.md` (v2.0) — single source of truth. All col
 - Radius: `--radius: 1rem` → `rounded-sm` 10 (thumbs), `md` 12, `lg` 16 (cards), `xl` 24 (floating panels), `full` (buttons, chips)
 - `.squircle` = superellipse corners where supported (progressive enhancement)
 - Topbar is `fixed`; `<main>` has `pt-[var(--topbar-offset)]`. Page heights: `h-[calc(100vh-var(--topbar-offset))]`, never a hardcoded topbar height. Timeline opts out (`h-screen -mt-[var(--topbar-offset)]`) so the grid scrolls under the floating chrome
-- Animations: `tw-animate-css` (`animate-in fade-in slide-in-from-*`); every `animate-out` needs `fill-mode-forwards` (else 1-frame flash before unmount); animate only transform/opacity, never the width of anything beside the grid
+- Animations: `tw-animate-css` (`animate-in fade-in slide-in-from-*`). shadcn `data-open:`/`data-closed:` classes work only through the `@custom-variant`s in `index.css` (Radix sets `data-state`); keep them when re-adding components. Panels (Popover, DropdownMenu, Select, Settings, preview card) share one motion: slide + fade, 300ms `cubic-bezier(.2,.8,.2,1)` in, 200ms `cubic-bezier(.4,0,1,1)` out; every `animate-out` needs `fill-mode-forwards` (else 1-frame flash before unmount); animate only transform/opacity, never the width of anything beside the grid
 
 Theme: `AppConfig.theme` (`system` | `light` | `dark`) toggles `.dark` on `<html>` in `App.tsx`.
 

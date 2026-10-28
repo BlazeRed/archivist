@@ -77,7 +77,7 @@ export function TimelineNavbar() {
     <PopoverTrigger asChild>
       <Button
         variant={isFiltered ? 'secondary' : 'outline'}
-        className={cn('h-9 pl-3.5 pr-3 text-xs shadow-float', !isFiltered && 'bg-popover hover:bg-card')}
+        className={cn('h-9 pl-3.5 pr-3 text-xs shadow-float', !isFiltered && 'bg-popover hover:bg-card aria-expanded:bg-card')}
       >
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h18M7 9h10M10 14h4" />
@@ -163,7 +163,7 @@ export function TimelineNavbar() {
                 }
               }}
             >
-              <SelectTrigger className="w-36 rounded-full bg-muted border-0">
+              <SelectTrigger className="w-36">
                 <SelectValue placeholder={t('timeline.allMonths')} />
               </SelectTrigger>
               <SelectContent>
@@ -181,7 +181,7 @@ export function TimelineNavbar() {
               value={filter.groupId?.toString() ?? 'all'}
               onValueChange={(v) => setFilter({ groupId: v === 'all' ? null : Number(v) })}
             >
-              <SelectTrigger className="w-44 rounded-full bg-muted border-0">
+              <SelectTrigger className="w-44">
                 <SelectValue placeholder={t('timeline.allGroups')} />
               </SelectTrigger>
               <SelectContent>

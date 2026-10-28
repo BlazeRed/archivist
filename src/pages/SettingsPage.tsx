@@ -63,8 +63,14 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="relative p-6 h-full overflow-y-auto">
-      <h1 className="text-[22px] font-medium text-foreground mb-6">{t('settings.title')}</h1>
+    // Scrollbar track kept clear of the panel's rounded corners
+    <div className="scroll-inset relative p-5 h-full overflow-y-auto [--scroll-inset-top:20px] [--scroll-inset-bottom:20px]">
+      <div className="flex items-baseline justify-between gap-2 mb-6">
+        <h1 className="text-[22px] font-medium text-foreground">{t('settings.title')}</h1>
+        {appVersion && (
+          <span className="text-xs text-muted-foreground tabular-nums select-none">v{appVersion}</span>
+        )}
+      </div>
 
       <div className="space-y-6">
         {/* Archive Path */}
@@ -78,7 +84,7 @@ export function SettingsPage() {
               placeholder="/path/to/archive"
               className="flex-1"
             />
-            <Button variant="default" onClick={selectArchiveFolder}>
+            <Button variant="default" size="lg" onClick={selectArchiveFolder}>
               {t('common.browse')}
             </Button>
           </div>
@@ -168,7 +174,7 @@ export function SettingsPage() {
               <Button
                 onClick={handleRescan}
                 disabled={isRescanning || isImportActive || !config.archive_path}
-                variant="default"
+                variant="secondary"
                 className="gap-2 w-full"
               >
                 {isRescanning && (
@@ -182,29 +188,20 @@ export function SettingsPage() {
               <p className="mt-1 text-[11px] text-muted-foreground">{t('settings.rescanArchiveDesc')}</p>
             </div>
 
-            <div>
-              <Button
-                onClick={() => setShowRegenConfirm(true)}
-                disabled={isRegenerating || isImportActive || isRescanning || !config.archive_path}
-                variant="default"
-                className="gap-2 w-full"
-              >
-                {isRegenerating ? t('common.loading') : t('settings.regenerateThumbnails')}
-              </Button>
-              <p className="mt-1 text-[11px] text-muted-foreground">{t('settings.regenerateThumbnailsDesc')}</p>
-            </div>
+            <Button
+              onClick={() => setShowRegenConfirm(true)}
+              disabled={isRegenerating || isImportActive || isRescanning || !config.archive_path}
+              variant="secondary"
+              className="gap-2 w-full"
+            >
+              {isRegenerating ? t('common.loading') : t('settings.regenerateThumbnails')}
+            </Button>
 
+            {/* Not destructive: only disconnects, no file or DB record is touched */}
             {config.archive_path && (
-              <div>
-                <Button
-                  onClick={handleCloseArchive}
-                  variant="destructive"
-                  className="w-full"
-                >
-                  {t('settings.closeArchive')}
-                </Button>
-                <p className="mt-1 text-[11px] text-muted-foreground">{t('settings.closeArchiveDesc')}</p>
-              </div>
+              <Button onClick={handleCloseArchive} variant="outline" className="w-full">
+                {t('settings.closeArchive')}
+              </Button>
             )}
           </div>
 
@@ -217,12 +214,6 @@ export function SettingsPage() {
         </div>
 
       </div>
-
-      {appVersion && (
-        <p className="absolute bottom-4 right-6 text-xs text-muted-foreground select-none">
-          v{appVersion}
-        </p>
-      )}
 
       <Dialog open={showImportWarning} onOpenChange={(open) => { if (!open) setShowImportWarning(false); }}>
         <DialogContent className="w-96">

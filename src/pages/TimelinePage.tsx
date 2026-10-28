@@ -77,7 +77,7 @@ function SelectionActionBar() {
   };
 
   return (
-    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 h-12 max-w-[calc(100%-1.5rem)] flex items-center gap-3 pl-5 pr-1.5 rounded-full bg-popover shadow-float ring-1 ring-frame animate-in fade-in slide-in-from-bottom-4 duration-300 ease-out">
+    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 h-12 max-w-[calc(100%-1.5rem)] flex items-center gap-3 pl-5 pr-1.5 rounded-full bg-popover shadow-float ring-1 ring-frame animate-in fade-in slide-in-from-bottom-8 duration-300 ease-[cubic-bezier(.2,.8,.2,1)]">
       <span className="text-sm font-medium tabular-nums whitespace-nowrap">
         {t('timeline.selected', { count: getSelectedCount() })}
       </span>
@@ -85,7 +85,7 @@ function SelectionActionBar() {
       {availableGroups.length > 0 && (
         <div className="flex items-center gap-2">
           <Select value={addToGroupId} onValueChange={setAddToGroupId}>
-            <SelectTrigger className="w-48 rounded-full bg-card border-0">
+            <SelectTrigger className="w-48">
               <SelectValue placeholder={`${t('timeline.filterGroups')}…`} />
             </SelectTrigger>
             <SelectContent>
@@ -205,8 +205,8 @@ export function TimelinePage() {
             className={cn(
               'shrink-0 flex h-full pt-[calc(var(--topbar-offset)+8px)] fill-mode-forwards',
               previewOpen
-                ? 'animate-in fade-in slide-in-from-right-8 duration-300 ease-[cubic-bezier(.2,.8,.2,1)]'
-                : 'animate-out fade-out slide-out-to-right-8 duration-200 ease-[cubic-bezier(.4,0,1,1)]'
+                ? 'animate-in fade-in slide-in-from-right-full duration-300 ease-[cubic-bezier(.2,.8,.2,1)]'
+                : 'animate-out fade-out slide-out-to-right-full duration-200 ease-[cubic-bezier(.4,0,1,1)]'
             )}
             style={{ width: previewWidth + RESIZE_HANDLE_W }}
             onAnimationEnd={(e) => {
