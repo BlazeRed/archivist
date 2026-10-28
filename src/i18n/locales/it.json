@@ -94,7 +94,9 @@
     "favourite": "Aggiungi ai preferiti",
     "play": "Riproduci",
     "transcoding": "Conversione video in corso, potrebbe richiedere qualche minuto…",
-    "transcodeError": "Conversione video fallita"
+    "transcodeError": "Conversione video fallita",
+    "folder": "Cartella",
+    "group": "Gruppo"
   },
   "favourites": {
     "title": "Preferiti",
@@ -163,7 +165,11 @@
     "regenConfirmBody": "Questa operazione ricrea tutte le miniature dell'archivio dai file originali. Per archivi grandi può richiedere tempo e non è annullabile, ma nessuna foto o video viene modificata o eliminata.",
     "regenThumbnailsDone": "Rigenerate {{count}} miniature",
     "regenThumbnailsFailed": "{{count}} non rigenerabili",
-    "regenThumbnailsError": "Errore: {{error}}"
+    "regenThumbnailsError": "Errore: {{error}}",
+    "theme": "Tema",
+    "themeSystem": "Sistema",
+    "themeLight": "Chiaro",
+    "themeDark": "Scuro"
   },
   "detail": {
     "title": "Dettagli",

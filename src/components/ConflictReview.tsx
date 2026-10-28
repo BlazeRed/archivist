@@ -193,15 +193,15 @@ export function ConflictReview({ onImport, onBack }: { onImport: () => void; onB
 
       {conflicts.length === 0 ? (
         <div className="flex-1 mb-5 flex items-start">
-          <div className="p-4 bg-accent/10 rounded-xl w-full">
-            <p className="text-sm text-accent">
+          <div className="p-4 bg-success/12 rounded-xl w-full">
+            <p className="text-sm text-success-ink">
               {t('conflicts.noConflicts', { count: importPlan.images.length })}
             </p>
           </div>
         </div>
       ) : (
         <div className="flex flex-col flex-1 min-h-0 mb-5">
-          <p className="text-sm text-[var(--color-warning)] mb-3 shrink-0">
+          <p className="text-sm text-warning-ink mb-3 shrink-0">
             {t('conflicts.conflictsFound', { count: conflicts.length })}
           </p>
 

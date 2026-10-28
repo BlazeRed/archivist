@@ -1,56 +1,126 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
+/* Design System v2.0 — see Archivist_Design_System.md */
 :root {
-  /* Project design tokens */
-  --color-text: #002D58;
-  --color-accent: #0084C5;
-  --color-tertiary: #2A9EAD;
-  --color-border-medium: rgba(0, 45, 88, 0.28);
-  --color-label: rgba(0, 45, 88, 0.45);
-  --color-warning: #E6A817;
-  --color-success: #2A9EAD;
-  --color-info: #0084C5;
-
-  /* shadcn theme — mapped to project colors */
   --background: #D2E8F7;
   --foreground: #002D58;
   --card: #E8F3FB;
   --card-foreground: #002D58;
-  --popover: #F4F9FD;
+  --popover: #F7FBFE;
   --popover-foreground: #002D58;
+  --muted: #E8F3FB;
+  --muted-foreground: rgba(0, 45, 88, 0.58);
+  --accent: rgba(0, 45, 88, 0.07);
+  --accent-foreground: #002D58;
+  --border: rgba(0, 45, 88, 0.14);
+  --input: rgba(0, 45, 88, 0.14);
+  --ring: #0084C5;
+
   --primary: #0084C5;
   --primary-foreground: #FFFFFF;
-  --secondary: #E8F3FB;
-  --secondary-foreground: #002D58;
-  --muted: #F4F9FD;
-  --muted-foreground: rgba(0, 45, 88, 0.55);
-  --accent: #2A9EAD;
-  --accent-foreground: #FFFFFF;
-  --destructive: #C0392B;
+  --primary-ink: #005E92;
+  --secondary: #002D58;
+  --secondary-foreground: #D2E8F7;
+  --gold: #C9962B;
+  --gold-foreground: #2B1E03;
+  --gold-ink: #85600F;
+  --gold-soft: rgba(201, 150, 43, 0.18);
+  /* Gold "picture frame" around floating chrome. Opaque on purpose: a translucent ring lets the
+     downward shadow show through, so the bottom edge would look darker than the top. */
+  --frame: #CDB77D;
+  --violet: #5B3F99;
+  --violet-foreground: #FFFFFF;
+  --violet-ink: #4A3182;
+  --violet-soft: rgba(91, 63, 153, 0.13);
+
+  --success: #2A9EAD;
+  --success-ink: #1B6F7A;
+  --warning: #D9701C;
+  --warning-ink: #9A4D0C;
+  --destructive: #B5322A;
   --destructive-foreground: #FFFFFF;
-  --border: rgba(0, 45, 88, 0.15);
-  --input: rgba(0, 45, 88, 0.15);
-  --ring: #0084C5;
-  --chart-1: #0084C5;
-  --chart-2: #2A9EAD;
-  --chart-3: #002D58;
-  --chart-4: #E6A817;
-  --chart-5: #C0392B;
-  --radius: 0.5rem;
-  --sidebar: #E8F3FB;
-  --sidebar-foreground: #002D58;
-  --sidebar-primary: #0084C5;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #2A9EAD;
-  --sidebar-accent-foreground: #FFFFFF;
-  --sidebar-border: rgba(0, 45, 88, 0.15);
-  --sidebar-ring: #0084C5;
+
+  --media: #001A36;
+
+  --shadow-1: 0 1px 2px rgba(0, 45, 88, 0.06), 0 2px 8px rgba(0, 45, 88, 0.06);
+  --shadow-2: 0 2px 6px rgba(0, 45, 88, 0.08), 0 10px 28px rgba(0, 45, 88, 0.12);
+  --shadow-3: 0 4px 12px rgba(0, 45, 88, 0.10), 0 24px 56px rgba(0, 45, 88, 0.18);
+
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 300ms;
+
+  --radius: 1rem;
+  --topbar-offset: 64px;
+
+  --chart-1: var(--primary);
+  --chart-2: var(--violet);
+  --chart-3: var(--gold);
+  --chart-4: var(--success);
+  --chart-5: var(--destructive);
+  --sidebar: var(--card);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--accent-foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+}
+
+.dark {
+  --background: #0D1430;
+  --foreground: #D8E9F7;
+  --card: #151E3F;
+  --card-foreground: #D8E9F7;
+  --popover: #1C2650;
+  --popover-foreground: #D8E9F7;
+  --muted: #151E3F;
+  --muted-foreground: rgba(216, 233, 247, 0.60);
+  --accent: rgba(216, 233, 247, 0.08);
+  --accent-foreground: #D8E9F7;
+  --border: rgba(216, 233, 247, 0.12);
+  --input: rgba(216, 233, 247, 0.12);
+  --ring: #3BA9E3;
+
+  --primary: #3BA9E3;
+  --primary-foreground: #04172E;
+  --primary-ink: #3BA9E3;
+  --secondary: #D8E9F7;
+  --secondary-foreground: #0D1430;
+  --gold: #E2B353;
+  --gold-foreground: #2B1E03;
+  --gold-ink: #E8BE63;
+  --gold-soft: rgba(226, 179, 83, 0.16);
+  --frame: #8D7345;
+  --violet: #9D86E3;
+  --violet-foreground: #0D1430;
+  --violet-ink: #B8A6EE;
+  --violet-soft: rgba(157, 134, 227, 0.18);
+
+  --success: #44BCCB;
+  --success-ink: #44BCCB;
+  --warning: #F0944A;
+  --warning-ink: #F0944A;
+  --destructive: #E5675B;
+  --destructive-foreground: #FFFFFF;
+
+  --media: #060A1A;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.30), 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.35), 0 12px 32px rgba(0, 0, 0, 0.45);
+  --shadow-3: 0 4px 12px rgba(0, 0, 0, 0.40), 0 24px 56px rgba(0, 0, 0, 0.55);
+
+  color-scheme: dark;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   margin: 0;
   min-height: 100vh;
 }
@@ -63,7 +133,7 @@ body {
 
 @theme inline {
   --font-heading: var(--font-sans);
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -81,6 +151,7 @@ body {
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -88,22 +159,51 @@ body {
   --color-secondary-foreground: var(--secondary-foreground);
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-ink: var(--primary-ink);
   --color-primary: var(--primary);
+  --color-gold: var(--gold);
+  --color-gold-foreground: var(--gold-foreground);
+  --color-gold-ink: var(--gold-ink);
+  --color-gold-soft: var(--gold-soft);
+  --color-frame: var(--frame);
+  --color-violet: var(--violet);
+  --color-violet-foreground: var(--violet-foreground);
+  --color-violet-ink: var(--violet-ink);
+  --color-violet-soft: var(--violet-soft);
+  --color-success: var(--success);
+  --color-success-ink: var(--success-ink);
+  --color-warning: var(--warning);
+  --color-warning-ink: var(--warning-ink);
+  --color-media: var(--media);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
   --color-foreground: var(--foreground);
   --color-background: var(--background);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
+  --shadow-raised: var(--shadow-1);
+  --shadow-float: var(--shadow-2);
+  --shadow-overlay: var(--shadow-3);
+  --radius-sm: calc(var(--radius) * 0.625);
+  --radius-md: calc(var(--radius) * 0.75);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  --radius-xl: calc(var(--radius) * 1.5);
+  --radius-2xl: calc(var(--radius) * 1.75);
+  --radius-3xl: calc(var(--radius) * 2);
+  --radius-4xl: calc(var(--radius) * 2.5);
 }
 
+/* Squircle corners where the webview supports it (WebView2); rounded corners elsewhere */
+@supports (corner-shape: squircle) {
+  .squircle { corner-shape: squircle; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}
 
 @layer base {
   * {
@@ -114,5 +214,31 @@ body {
   }
   html {
     @apply font-sans;
+  }
+  /* Everything pressable shows a hand cursor; disabled controls say so. Tailwind's preflight resets
+     buttons to the default arrow. Utility classes (cursor-*) still override these base rules. */
+  button,
+  [role="button"],
+  [role="option"],
+  [role="tab"],
+  [role="checkbox"],
+  [role="radio"],
+  [role="switch"],
+  [role="slider"],
+  [role="menuitem"],
+  a[href],
+  select,
+  summary,
+  label[for],
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="range"],
+  input[type="file"] {
+    cursor: pointer;
+  }
+  :disabled,
+  [aria-disabled="true"],
+  [data-disabled] {
+    cursor: not-allowed;
   }
 }

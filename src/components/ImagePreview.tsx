@@ -7,11 +7,30 @@ import { makeVideoUrl } from '@/lib/mediaServer';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { useUIStore } from '../stores/uiStore';
-import { ImageMetadata } from './ImageMetadata';
+import { ImageMetadataView, useImageGroups, useShowInFolder } from './ImageMetadata';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import type { Image } from '../types';
 
 export function ImagePreview({ width }: { width: number }) {
+  const previewImage = useTimelineStore((s) => s.previewImage);
+  // While the column animates closed, keep showing the last image instead of an empty card
+  const [shownImage, setShownImage] = useState(previewImage);
+  if (previewImage && previewImage !== shownImage) setShownImage(previewImage);
+  if (!shownImage) return null;
+  return <PreviewCard image={shownImage} width={width} />;
+}
+
+function PreviewCard({ image: previewImage, width }: { image: Image; width: number }) {
   const { t } = useTranslation();
-  const { previewImage, selectImage, setPreviewImage, updateImageFavourite, updateImageWebPath, images } = useTimelineStore();
+  const { selectImage, setPreviewImage, updateImageFavourite, updateImageWebPath, images } = useTimelineStore();
+  const groups = useImageGroups(previewImage.id);
+  const handleShowInFolder = useShowInFolder(previewImage);
   const { config } = useAppConfigStore();
   const thumbnailCacheBust = useUIStore((s) => s.thumbnailCacheBust);
 
@@ -21,6 +40,18 @@ export function ImagePreview({ width }: { width: number }) {
   const [transcoding, setTranscoding] = useState(false);
 
   const archivePath = trimArchivePath(config.archive_path);
+
+  // Esc closes the preview — unless an overlay on top of it (detail view, settings, open dropdown) owns the key
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      if (useTimelineStore.getState().selectedImage || useUIStore.getState().settingsOpen) return;
+      if ((e.target as Element | null)?.closest?.('[role="listbox"], [role="dialog"], [role="menu"]')) return;
+      setPreviewImage(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [setPreviewImage]);
 
   // Reset all state when selected image changes
   useEffect(() => {
@@ -74,22 +105,6 @@ export function ImagePreview({ width }: { width: number }) {
     }
   };
 
-  if (!previewImage) {
-    return (
-      <aside
-        style={{ width }}
-        className="shrink-0 flex flex-col items-center justify-center gap-2 border-l border-border bg-card text-muted-foreground"
-      >
-        <svg className="w-10 h-10 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" strokeWidth={1.5} />
-          <circle cx="8.5" cy="8.5" r="1.5" strokeWidth={1.5} />
-          <polyline points="21 15 16 10 5 21" strokeWidth={1.5} />
-        </svg>
-        <p className="text-sm">{t('preview.empty')}</p>
-      </aside>
-    );
-  }
-
   const currentIdx = images.findIndex(img => img.id === previewImage.id);
   const hasNav = currentIdx > -1 && images.length > 1;
 
@@ -103,12 +118,10 @@ export function ImagePreview({ width }: { width: number }) {
   };
 
   return (
-    <aside
-      style={{ width }}
-      className="shrink-0 flex flex-col border-l border-border bg-card overflow-hidden"
-    >
+    <aside style={{ width }} className="shrink-0 h-full pr-3 pb-3">
+    <div className="squircle relative h-full flex flex-col gap-3 p-3 rounded-xl bg-popover shadow-float ring-1 ring-frame overflow-hidden">
       {/* Sticky image pane */}
-      <div className="relative shrink-0 bg-[#001A36]" style={{ aspectRatio: '1 / 1' }}>
+      <div className="relative shrink-0 rounded-md overflow-hidden bg-media" style={{ aspectRatio: '1 / 1' }}>
         {/* Image: loading spinner */}
         {previewImage.media_type !== 'video' && !imageLoaded && (
           <div className="absolute inset-0 flex items-center justify-center">
@@ -139,20 +152,21 @@ export function ImagePreview({ width }: { width: number }) {
         )}
         {/* Video: not transcoding, not playing — thumbnail + play button */}
         {previewImage.media_type === 'video' && !transcoding && !playing && (
-          <button
-            onClick={handlePlay}
-            className="absolute inset-0 flex items-center justify-center group"
-            title={t('preview.play')}
-          >
+          <div className="absolute inset-0 flex items-center justify-center">
             {thumbSrc && (
               <img src={thumbSrc} alt="" className="absolute inset-0 w-full h-full object-contain" />
             )}
-            <div className="relative z-10 w-14 h-14 rounded-full bg-black/60 group-hover:bg-black/80 flex items-center justify-center transition-colors">
-              <svg className="w-6 h-6 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            </div>
-          </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="onMedia" onClick={handlePlay} aria-label={t('preview.play')} className="relative size-14 [&_svg]:size-6!">
+                  <svg className="ml-1" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">{t('preview.play')}</TooltipContent>
+            </Tooltip>
+          </div>
         )}
         {/* Video: playing */}
         {previewImage.media_type === 'video' && playing && imgSrc && (
@@ -168,71 +182,138 @@ export function ImagePreview({ width }: { width: number }) {
             <source src={imgSrc} type="video/webm" />
           </video>
         )}
-        {/* Close button */}
-        <button
-          onClick={() => setPreviewImage(null)}
-          className="absolute top-2 left-2 w-8 h-8 rounded-full bg-black/55 hover:bg-black/80 text-white flex items-center justify-center transition-colors"
-          title={t('common.close')}
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-        {/* Favourite toggle */}
-        <button
-          onClick={async () => {
-            const next = !previewImage.is_favourite;
-            await invoke('toggle_favourite', { imageId: previewImage.id, isFavourite: next });
-            updateImageFavourite(previewImage.id, next);
-          }}
-          className="absolute top-2 left-12 w-8 h-8 rounded-full bg-black/55 hover:bg-black/80 text-white flex items-center justify-center transition-colors"
-          title={t('preview.favourite')}
-        >
-          <svg className="w-4 h-4" fill={previewImage.is_favourite ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-          </svg>
-        </button>
-        {/* Expand button */}
-        <button
-          onClick={() => selectImage(previewImage)}
-          className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/55 hover:bg-black/80 text-white flex items-center justify-center transition-colors"
-          title={t('preview.expand')}
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-          </svg>
-        </button>
-        {/* Prev / Next navigation */}
+        {/* Overlay controls (Button `onMedia`) */}
+        <MediaButton label={t('common.close')} onClick={() => setPreviewImage(null)} className="absolute top-2 left-2">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </MediaButton>
+        {/* Favourite toggle — top-right like the star on grid thumbnails */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="onMedia"
+              size="icon"
+              aria-label={t('preview.favourite')}
+              aria-pressed={previewImage.is_favourite}
+              onClick={async () => {
+                const next = !previewImage.is_favourite;
+                await invoke('toggle_favourite', { imageId: previewImage.id, isFavourite: next });
+                updateImageFavourite(previewImage.id, next);
+              }}
+              className={cn('absolute top-2 right-12', previewImage.is_favourite && 'bg-gold text-gold-foreground hover:bg-gold')}
+            >
+              <StarIcon filled={previewImage.is_favourite} className={cn(previewImage.is_favourite && 'animate-in zoom-in-50 duration-200')} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">{t('preview.favourite')}</TooltipContent>
+        </Tooltip>
+        <MediaButton label={t('preview.expand')} onClick={() => selectImage(previewImage)} className="absolute top-2 right-2">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+            d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+        </MediaButton>
         {hasNav && (
           <>
-            <button
-              onClick={handlePrev}
-              className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/55 hover:bg-black/80 text-white flex items-center justify-center transition-colors"
-              title={t('common.previous')}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            <button
-              onClick={handleNext}
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/55 hover:bg-black/80 text-white flex items-center justify-center transition-colors"
-              title={t('common.next')}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
+            <MediaButton label={t('common.previous')} onClick={handlePrev} className="absolute left-2 top-1/2 -translate-y-1/2">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </MediaButton>
+            <MediaButton label={t('common.next')} onClick={handleNext} className="absolute right-2 top-1/2 -translate-y-1/2">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </MediaButton>
           </>
         )}
       </div>
 
-      {/* Scrollable metadata */}
-      <div className="flex-1 overflow-y-auto px-4 py-3">
-        <ImageMetadata image={previewImage} />
+      {/* Scrollable metadata — bottom padding keeps the last rows clear of the floating bar */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-1 pb-14">
+        <ImageMetadataView image={previewImage} groups={groups} readOnly />
       </div>
+
+      {/* Floating actions: two separate pills, each styled by its role (DS §7) */}
+      <div className="pointer-events-none absolute bottom-3 inset-x-3 flex items-center justify-end gap-2">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="secondary"
+              onClick={handleShowInFolder}
+              className="pointer-events-auto h-9 min-w-0 px-4 shadow-float"
+            >
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+                  d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+              </svg>
+              <span className="truncate">{t('preview.folder')}</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">{t('detail.showInFolder')}</TooltipContent>
+        </Tooltip>
+
+        {/* Group membership: checkbox list in a popover — several groups can be toggled in one go */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="violet" className="pointer-events-auto h-9 min-w-0 pl-3.5 pr-3 shadow-float">
+              <span className="truncate">{t('nav.groups')}</span>
+              {groups.currentGroups.length > 0 && (
+                <Badge variant="outline" className="h-4.5 min-w-4.5 px-1 border-0 bg-violet-foreground text-violet text-[10px] font-semibold tabular-nums">
+                  {groups.currentGroups.length}
+                </Badge>
+              )}
+              <svg className="opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+              </svg>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent side="top" align="end" sideOffset={8} className="w-auto min-w-60 gap-0.5 p-1.5">
+            <p className="px-2.5 pt-1 pb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-violet-ink">
+              {t('nav.groups')}
+            </p>
+            {groups.allGroups.length === 0 ? (
+              <p className="px-2.5 pb-2 text-muted-foreground">{t('groups.noGroups')}</p>
+            ) : groups.allGroups.map(g => (
+              <Label
+                key={g.id}
+                htmlFor={`preview-group-${g.id}`}
+                className="cursor-pointer gap-2.5 rounded-lg px-2.5 py-2 font-normal hover:bg-violet-soft hover:text-violet-ink"
+              >
+                <Checkbox
+                  id={`preview-group-${g.id}`}
+                  checked={groups.isMember(g.id)}
+                  onCheckedChange={() => groups.toggle(g.id)}
+                  className="data-checked:border-violet data-checked:bg-violet data-checked:text-violet-foreground dark:data-checked:bg-violet"
+                />
+                <span className="truncate">{g.name}</span>
+                <span className="ml-auto pl-3 text-xs text-muted-foreground tabular-nums">{g.image_count}</span>
+              </Label>
+            ))}
+          </PopoverContent>
+        </Popover>
+      </div>
+    </div>
     </aside>
+  );
+}
+
+function StarIcon({ filled, className }: { filled: boolean; className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} strokeLinejoin="round">
+      <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />
+    </svg>
+  );
+}
+
+/** Icon button laid over the photo, with its tooltip. */
+function MediaButton({ label, onClick, className, children }: {
+  label: string;
+  onClick: () => void;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button variant="onMedia" size="icon" aria-label={label} onClick={onClick} className={className}>
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">{children}</svg>
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">{label}</TooltipContent>
+    </Tooltip>
   );
 }

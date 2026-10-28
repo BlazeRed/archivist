@@ -198,7 +198,7 @@ export function GroupsPage() {
 
   if (!config.archive_path) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-52px)]">
+      <div className="flex items-center justify-center h-[calc(100vh-var(--topbar-offset))]">
         <div className="bg-card px-8 py-6 rounded-xl text-center max-w-sm">
           <p className="text-muted-foreground text-sm mb-4">{t('timeline.archiveNotSet')}</p>
           <Button onClick={handleOpenArchive}>{t('timeline.openArchive')}</Button>
@@ -211,7 +211,7 @@ export function GroupsPage() {
   const deletingGroup = groups.find(g => g.id === deletingGroupId);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-52px)]">
+    <div className="flex flex-col h-[calc(100vh-var(--topbar-offset))]">
       {/* Mini top navbar */}
       <div className="h-12 px-4 flex items-center gap-3 border-b border-border bg-card shrink-0">
         {view === 'detail' ? (
@@ -364,7 +364,7 @@ export function GroupsPage() {
                       onClick={() => selectImage(img)}
                       className="group/img relative bg-card rounded-lg overflow-hidden border border-border cursor-pointer"
                     >
-                      <div className="aspect-square bg-[#001A36] overflow-hidden">
+                      <div className="aspect-square bg-media overflow-hidden">
                         {thumbnailUrl ? (
                           <img
                             src={thumbnailUrl}
@@ -445,8 +445,8 @@ export function GroupsPage() {
           </DialogHeader>
 
           {isSelectionMode && (
-            <div className="p-3 bg-accent/12 rounded-lg">
-              <p className="text-sm text-accent">
+            <div className="p-3 bg-violet-soft rounded-lg">
+              <p className="text-sm text-violet-ink">
                 {t('groups.selectedMediaInfo', { count: getSelectedCount() })}
               </p>
             </div>

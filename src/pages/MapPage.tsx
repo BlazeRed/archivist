@@ -207,7 +207,7 @@ export function MapPage() {
 
   if (!config.archive_path) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-52px)]">
+      <div className="flex items-center justify-center h-[calc(100vh-var(--topbar-offset))]">
         <div className="bg-card px-8 py-6 rounded-xl text-center max-w-sm">
           <p className="text-muted-foreground text-sm mb-4">{t('timeline.archiveNotSet')}</p>
           <Button onClick={handleOpenArchive}>{t('timeline.openArchive')}</Button>
@@ -218,7 +218,7 @@ export function MapPage() {
 
   if (!isOnline) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-52px)]">
+      <div className="flex items-center justify-center h-[calc(100vh-var(--topbar-offset))]">
         <div className="bg-card px-8 py-6 rounded-xl text-center max-w-md">
           <p className="text-foreground font-medium mb-2">{t('map.offlineTitle')}</p>
           <p className="text-muted-foreground text-sm mb-4">{t('map.offlineBody')}</p>
@@ -230,7 +230,7 @@ export function MapPage() {
 
   if (locations.length === 0) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-52px)]">
+      <div className="flex items-center justify-center h-[calc(100vh-var(--topbar-offset))]">
         <div className="bg-card px-8 py-6 rounded-xl text-center max-w-sm">
           <p className="text-muted-foreground text-sm mb-2">{t('map.noLocations')}</p>
           <p className="text-muted-foreground text-xs mb-4">{t('map.noLocationsHint')}</p>
@@ -242,5 +242,5 @@ export function MapPage() {
     );
   }
 
-  return <div ref={mapContainerRef} className="h-[calc(100vh-52px)] w-full" />;
+  return <div ref={mapContainerRef} className="h-[calc(100vh-var(--topbar-offset))] w-full" />;
 }

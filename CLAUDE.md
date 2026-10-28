@@ -113,7 +113,7 @@ Key components in `src/components/`:
 
 | Component | Purpose |
 |-----------|---------|
-| `Topbar.tsx` | Nav bar — logo, page links, rescan icon button, language toggle |
+| `Topbar.tsx` | Floating pill nav bar — logo, page links, import/rescan/settings icon buttons |
 | `ThumbnailGrid.tsx` | Virtualized image grid with sticky month headers |
 | `AddMediaModal.tsx` | Full-screen group media picker (same layout as timeline) |
 | `ImageDetail.tsx` | Full image view modal with metadata panel and Show in Folder button |
@@ -125,16 +125,23 @@ UI primitives in `src/components/ui/` are shadcn/ui components (Button, Dialog, 
 
 ### Button variants (shadcn CVA)
 
-All variants use `hover:brightness-90/95` for consistent tone-shift hover — no `[a]:hover:` prefix.
+All buttons are pills (`rounded-full`), press = `scale(.97)`, hover = `brightness-95`.
 
 | Variant | Use |
 |---------|-----|
-| `default` | Primary action (accent blue) |
-| `secondary` | Secondary actions (navy bg) |
-| `outline` | Tertiary/ghost actions |
-| `destructive` | Delete/remove actions |
+| `default` | Primary action (archive blue) |
+| `secondary` | Secondary actions (navy fill; light fill in dark theme) |
+| `violet` | Group-related actions |
+| `gold` | Favourite actions |
+| `outline` | Cancel / back (transparent + inset border) |
+| `destructive` | Delete/remove (solid red) — always paired with an `outline` Cancel |
 | `ghost` | Icon buttons, inline controls |
+| `onMedia` | Icon buttons laid over a photo (dark translucent circle, white icon) |
 | `link` | Text links |
+
+**Framework first:** build UI only from `src/components/ui/` (shadcn, style `radix-nova`). Missing component → `npx shadcn@latest add <name>` (then switch its `cn` import to `@/lib/utils`; do not add the `cn` npm package). Customize only with token classes / CVA variants, and ask the user before customizing or creating a component.
+
+Project variants on shadcn components: `Badge` `gold` / `violet`; `Toggle`/`ToggleGroup` `segmented` (pill segments, active = primary — topbar nav, media filter, theme); `Button` `violet` / `gold` / `onMedia`. Tooltips: `TooltipProvider delayDuration={400}` in `App.tsx`; icon-only buttons get a `Tooltip` + `aria-label`, not `title`.
 
 ## Critical Rules
 
@@ -161,20 +168,19 @@ All variants use `hover:brightness-90/95` for consistent tone-shift hover — no
 
 ## Design Tokens
 
-All colors defined as CSS vars in `src/index.css`. Never hardcode hex elsewhere:
+Spec: `../Archivist_Design_System.md` (v2.0) — single source of truth. All colors are CSS vars in `src/index.css` (`:root` = light, `.dark` = dark). Never hardcode hex in components; use the Tailwind token classes:
 
-```
---color-background: #D2E8F7   (page background)
---color-text:       #002D58   (foreground / deep navy)
---color-accent:     #0084C5   (primary — buttons, active states)
---color-tertiary:   #2A9EAD   (success / teal / sparingly)
---color-card:       #E8F3FB   (card backgrounds)
---color-surface:    #F4F9FD   (inputs, dropdowns, popover)
---color-warning:    #E6A817
---color-error:      #C0392B
-```
+- Surfaces: `bg-background`, `bg-card` (static panels), `bg-popover` (floating: topbar, preview card, menus, dialogs), `bg-media` (letterbox behind photos)
+- Brand: `primary` / `text-primary-ink` (blue text), `gold` / `gold-ink` / `gold-soft` (favourites), `violet` / `violet-ink` / `violet-soft` (groups)
+- Status: `success(-ink)`, `warning(-ink)`, `destructive`. Use `-ink` variants for text, never the fill color
+- `accent` = neutral hover fill (shadcn convention), not a brand color
+- Elevation: `shadow-raised`, `shadow-float`, `shadow-overlay`. Primary floating chrome gets the gold frame `ring-1 ring-frame` (opaque color, whole-pixel width) (no regular border); selected thumbnails a solid gold ring
+- Radius: `--radius: 1rem` → `rounded-sm` 10 (thumbs), `md` 12, `lg` 16 (cards), `xl` 24 (floating panels), `full` (buttons, chips)
+- `.squircle` = superellipse corners where supported (progressive enhancement)
+- Topbar is `fixed`; `<main>` has `pt-[var(--topbar-offset)]`. Page heights: `h-[calc(100vh-var(--topbar-offset))]`, never a hardcoded topbar height. Timeline opts out (`h-screen -mt-[var(--topbar-offset)]`) so the grid scrolls under the floating chrome
+- Animations: `tw-animate-css` (`animate-in fade-in slide-in-from-*`); every `animate-out` needs `fill-mode-forwards` (else 1-frame flash before unmount); animate only transform/opacity, never the width of anything beside the grid
 
-These map to Tailwind semantic tokens (`bg-background`, `text-foreground`, `bg-primary`, etc.) via `@theme` in `index.css`.
+Theme: `AppConfig.theme` (`system` | `light` | `dark`) toggles `.dark` on `<html>` in `App.tsx`.
 
 ## i18n
 

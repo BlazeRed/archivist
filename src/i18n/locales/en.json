@@ -94,7 +94,9 @@
     "favourite": "Toggle favourite",
     "play": "Play",
     "transcoding": "Transcoding video, this may take a while…",
-    "transcodeError": "Video transcode failed"
+    "transcodeError": "Video transcode failed",
+    "folder": "Folder",
+    "group": "Group"
   },
   "favourites": {
     "title": "Favourites",
@@ -163,7 +165,11 @@
     "regenConfirmBody": "This rebuilds every thumbnail in the archive from the original files. It can take a while for large archives and can't be undone, but no photos or videos are modified or deleted.",
     "regenThumbnailsDone": "Regenerated {{count}} thumbnails",
     "regenThumbnailsFailed": "{{count}} could not be regenerated",
-    "regenThumbnailsError": "Error: {{error}}"
+    "regenThumbnailsError": "Error: {{error}}",
+    "theme": "Theme",
+    "themeSystem": "System",
+    "themeLight": "Light",
+    "themeDark": "Dark"
   },
   "detail": {
     "title": "Details",

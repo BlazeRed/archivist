@@ -105,7 +105,7 @@ export function ImageDetail({ hideGroups, hideDetails, navImages }: {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Image */}
-        <div className="flex-1 bg-[#001A36] flex items-center justify-center p-4 min-w-0 relative">
+        <div className="flex-1 bg-media flex items-center justify-center p-4 min-w-0 relative">
           {selectedImage.media_type !== 'video' && !imageLoaded && (
             <div className="absolute inset-0 flex items-center justify-center">
               <svg className="animate-spin size-8 text-white/40" viewBox="0 0 24 24" fill="none">

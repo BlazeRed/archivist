@@ -14,9 +14,11 @@ import { ImagePreview } from '../components/ImagePreview';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 
 const PREVIEW_MIN = 280;
 const PREVIEW_MAX = 720;
+const RESIZE_HANDLE_W = 8; // w-2
 
 function ResizeHandle({ onResize }: { onResize: (w: number) => void }) {
   const dragging = useRef(false);
@@ -45,8 +47,10 @@ function ResizeHandle({ onResize }: { onResize: (w: number) => void }) {
         dragging.current = true;
         document.body.style.cursor = 'col-resize';
       }}
-      className="w-1 shrink-0 cursor-col-resize bg-border hover:bg-primary transition-colors"
-    />
+      className="group/handle w-2 shrink-0 cursor-col-resize flex justify-center py-6"
+    >
+      <div className="w-0.5 h-full rounded-full bg-transparent group-hover/handle:bg-primary transition-colors" />
+    </div>
   );
 }
 
@@ -73,15 +77,15 @@ function SelectionActionBar() {
   };
 
   return (
-    <div className="flex-shrink-0 h-14 bg-foreground flex items-center px-6 gap-4 shadow-lg">
-      <span className="text-background text-sm font-medium">
+    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 h-12 max-w-[calc(100%-1.5rem)] flex items-center gap-3 pl-5 pr-1.5 rounded-full bg-popover shadow-float ring-1 ring-frame animate-in fade-in slide-in-from-bottom-4 duration-300 ease-out">
+      <span className="text-sm font-medium tabular-nums whitespace-nowrap">
         {t('timeline.selected', { count: getSelectedCount() })}
       </span>
 
       {availableGroups.length > 0 && (
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="flex items-center gap-2">
           <Select value={addToGroupId} onValueChange={setAddToGroupId}>
-            <SelectTrigger className="w-48 bg-white/12 border-white/25 text-white">
+            <SelectTrigger className="w-48 rounded-full bg-card border-0">
               <SelectValue placeholder={`${t('timeline.filterGroups')}…`} />
             </SelectTrigger>
             <SelectContent>
@@ -91,6 +95,7 @@ function SelectionActionBar() {
             </SelectContent>
           </Select>
           <Button
+            variant="violet"
             onClick={handleAddToGroup}
             disabled={!addToGroupId || addingToGroup || getSelectedCount() === 0}
           >
@@ -99,11 +104,7 @@ function SelectionActionBar() {
         </div>
       )}
 
-      <Button
-        variant="outline"
-        onClick={clearSelection}
-        className="border-white/30 text-background hover:text-foreground"
-      >
+      <Button variant="ghost" onClick={clearSelection}>
         {t('timeline.cancelSelection')}
       </Button>
     </div>
@@ -116,6 +117,11 @@ export function TimelinePage() {
   const clearGroups = useGroupStore((s) => s.clearGroups);
   const { config, setConfig } = useAppConfigStore();
   const { isSelectionMode } = useGroupUIStore();
+  const hasPreview = useTimelineStore((s) => s.previewImage !== null);
+  const previewOpen = hasPreview && !isSelectionMode;
+  // Keep the card mounted while it animates out; the column collapses after the exit animation
+  const [previewMounted, setPreviewMounted] = useState(previewOpen);
+  if (previewOpen && !previewMounted) setPreviewMounted(true);
   const phase = useImportStore((s) => s.phase);
   const isImportActive = phase === 'scanning' || phase === 'analyzing' || phase === 'thumbnailing' || phase === 'importing';
 
@@ -160,7 +166,7 @@ export function TimelinePage() {
 
   if (!config.archive_path) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-52px)]">
+      <div className="flex items-center justify-center h-[calc(100vh-var(--topbar-offset))]">
         <div className="bg-card px-8 py-6 rounded-xl text-center max-w-sm">
           <p className="text-muted-foreground text-sm mb-4">{t('timeline.archiveNotSet')}</p>
           <Button onClick={handleOpenArchive}>{t('timeline.openArchive')}</Button>
@@ -183,25 +189,33 @@ export function TimelinePage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-52px)]">
-      <TimelineNavbar />
-
+    // Full-height, pulled up under the fixed topbar so the grid scrolls beneath the floating chrome
+    <div className="flex flex-col h-screen -mt-[var(--topbar-offset)]">
       <div className="flex-1 flex min-h-0">
-        {isSelectionMode ? (
-          <main className="flex-1 flex flex-col min-w-0">
-            <div className="flex-1 min-h-0">
-              <ThumbnailGrid />
-            </div>
-            <SelectionActionBar />
-          </main>
-        ) : (
-          <>
-            <main className="flex-1 min-w-0 overflow-hidden">
-              <ThumbnailGrid />
-            </main>
+        <main className="relative flex-1 min-w-0 overflow-hidden">
+          <ThumbnailGrid toolbar={<TimelineNavbar />} />
+          {isSelectionMode && <SelectionActionBar />}
+        </main>
+
+        {/* Preview column. The grid reflows once (the column takes its final width at once), then the card
+            slides into the freed space; on close the card slides out first, then the column collapses.
+            Only transform/opacity animate, so the grid never re-lays out mid-animation. */}
+        {previewMounted && (
+          <div
+            className={cn(
+              'shrink-0 flex h-full pt-[calc(var(--topbar-offset)+8px)] fill-mode-forwards',
+              previewOpen
+                ? 'animate-in fade-in slide-in-from-right-8 duration-300 ease-[cubic-bezier(.2,.8,.2,1)]'
+                : 'animate-out fade-out slide-out-to-right-8 duration-200 ease-[cubic-bezier(.4,0,1,1)]'
+            )}
+            style={{ width: previewWidth + RESIZE_HANDLE_W }}
+            onAnimationEnd={(e) => {
+              if (e.target === e.currentTarget && !previewOpen) setPreviewMounted(false);
+            }}
+          >
             <ResizeHandle onResize={handleResize} />
             <ImagePreview width={previewWidth} />
-          </>
+          </div>
         )}
       </div>
 

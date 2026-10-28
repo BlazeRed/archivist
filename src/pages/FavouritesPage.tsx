@@ -28,7 +28,7 @@ function FavouriteThumb({ image, archivePath, cacheBust }: { image: Image; archi
       onClick={() => selectImage(image)}
       className="group/img bg-card rounded-lg border border-border overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
     >
-      <div className="aspect-square bg-[#001A36] overflow-hidden relative">
+      <div className="aspect-square bg-media overflow-hidden relative">
         {thumbnailUrl ? (
           <img src={thumbnailUrl} alt={image.filename} className="w-full h-full object-cover" loading="lazy" />
         ) : (
@@ -83,7 +83,7 @@ export function FavouritesPage() {
 
   if (!config.archive_path) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-52px)]">
+      <div className="flex items-center justify-center h-[calc(100vh-var(--topbar-offset))]">
         <div className="bg-card px-8 py-6 rounded-xl text-center max-w-sm">
           <p className="text-muted-foreground text-sm mb-4">{t('timeline.archiveNotSet')}</p>
           <Button onClick={handleOpenArchive}>{t('timeline.openArchive')}</Button>
@@ -119,7 +119,7 @@ export function FavouritesPage() {
   }, [selectedImage, selectImage]);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-52px)]">
+    <div className="flex flex-col h-[calc(100vh-var(--topbar-offset))]">
       <div className="shrink-0 h-12 px-4 flex items-center border-b border-border bg-card">
         <h2 className="font-semibold text-sm text-foreground">{t('favourites.title')}</h2>
         {favourites.length > 0 && (

@@ -221,11 +221,11 @@ export function ImportPage() {
       <>
       <div className="p-6 max-w-2xl mx-auto">
         <div className="bg-card p-8 rounded-xl text-center">
-          <div className="w-12 h-12 rounded-full bg-accent/15 flex items-center justify-center mx-auto mb-4">
+          <div className="w-12 h-12 rounded-full bg-success/15 flex items-center justify-center mx-auto mb-4">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
               <path
                 d="M3 10.5L8 15.5L17 5"
-                stroke="var(--accent)"
+                stroke="var(--success-ink)"
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -334,7 +334,7 @@ export function ImportPage() {
     return (
       <div
         className="flex flex-col overflow-hidden px-6 pt-4 pb-6 max-w-2xl mx-auto w-full"
-        style={{ height: 'calc(100vh - 52px)' }}
+        style={{ height: 'calc(100vh - var(--topbar-offset))' }}
       >
         <h1 className="text-[22px] font-medium text-foreground mb-3 shrink-0">{t('import.title')}</h1>
         <div className="shrink-0">
@@ -478,12 +478,12 @@ export function ImportPage() {
 
           {phase === 'review' && importPlan && (
             <>
-              <div className="p-4 bg-accent/10 rounded-xl mb-4">
-                <p className="text-sm font-medium text-accent">
+              <div className="p-4 bg-success/12 rounded-xl mb-4">
+                <p className="text-sm font-medium text-success-ink">
                   {t('import.analysisComplete', { count: importPlan.images.length })}
                 </p>
                 {importPlan.conflicts_count > 0 && (
-                  <p className="text-xs text-[var(--color-warning)] mt-1">
+                  <p className="text-xs text-warning-ink mt-1">
                     {t('import.conflicts', { count: importPlan.conflicts_count })}
                   </p>
                 )}

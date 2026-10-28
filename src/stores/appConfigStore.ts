@@ -7,6 +7,7 @@ interface AppConfig {
   thumbnail_size: 'small' | 'medium' | 'large';
   group_cover_size: 'small' | 'medium' | 'large';
   timeline_preview_width: number;
+  theme: 'system' | 'light' | 'dark';
 }
 
 interface AppConfigStore {
@@ -21,6 +22,7 @@ export const useAppConfigStore = create<AppConfigStore>((set) => ({
     thumbnail_size: 'medium',
     group_cover_size: 'medium',
     timeline_preview_width: 380,
+    theme: 'system',
   },
   setConfig: (newConfig) => set((state) => {
     const config = { ...state.config, ...newConfig };

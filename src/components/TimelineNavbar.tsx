@@ -8,6 +8,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useMonthNames } from '@/lib/months';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 export function TimelineNavbar() {
   const { t } = useTranslation();
@@ -69,71 +73,63 @@ export function TimelineNavbar() {
     }
   }
 
+  const filterButton = (
+    <PopoverTrigger asChild>
+      <Button
+        variant={isFiltered ? 'secondary' : 'outline'}
+        className={cn('h-9 pl-3.5 pr-3 text-xs shadow-float', !isFiltered && 'bg-popover hover:bg-card')}
+      >
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h18M7 9h10M10 14h4" />
+        </svg>
+        {t('timeline.filter')}
+        {isFiltered && (
+          <Badge variant="outline" className="h-4 min-w-4 px-1 border-0 bg-secondary-foreground text-secondary text-[10px] font-semibold tabular-nums">
+            {filterChips.length}
+          </Badge>
+        )}
+        <svg className={cn('size-3! transition-transform duration-150', open && 'rotate-180')} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </Button>
+    </PopoverTrigger>
+  );
+
   return (
-    <div className="shrink-0 border-b border-border bg-card">
-      {/* Always-visible h-12 row */}
-      <div className="h-12 px-4 flex items-center gap-3">
-        <h2 className="font-semibold text-sm text-foreground whitespace-nowrap">{t('nav.timeline')}</h2>
-        <span className="text-xs text-muted-foreground whitespace-nowrap">{mediaCountLabel}</span>
+    <div className="flex items-center gap-2">
+      <Badge variant="outline" className="h-9 px-4 border-0 bg-popover shadow-float text-xs font-normal text-muted-foreground tabular-nums">
+        {mediaCountLabel}
+      </Badge>
 
-        <div className="ml-auto flex items-center gap-2">
-          {/* Active filter chips — visible only when panel is closed */}
-          {isFiltered && !open && filterChips.map((chip, i) => (
-            <span
-              key={i}
-              className="text-xs px-2 py-0.5 rounded-full bg-primary/12 text-primary font-medium whitespace-nowrap"
-            >
-              {chip}
-            </span>
-          ))}
+      <Popover open={open} onOpenChange={setOpen}>
+        {/* Tooltip lists the active filters */}
+        {isFiltered ? (
+          <Tooltip>
+            <TooltipTrigger asChild>{filterButton}</TooltipTrigger>
+            <TooltipContent side="bottom">{filterChips.join(' · ')}</TooltipContent>
+          </Tooltip>
+        ) : filterButton}
 
-          {/* Filters toggle button */}
-          <button
-            onClick={() => setOpen(v => !v)}
-            className={cn(
-              'h-8 px-3 rounded-md border text-xs font-medium flex items-center gap-1.5 transition-colors',
-              isFiltered
-                ? 'bg-primary border-primary text-primary-foreground hover:brightness-90'
-                : 'border-border text-foreground hover:bg-muted'
-            )}
+        <PopoverContent
+          align="end"
+          sideOffset={8}
+          className="squircle w-max max-w-[min(720px,calc(100vw-2rem))] flex-row flex-wrap items-center gap-6 px-5 py-4 rounded-xl ring-frame"
+        >
+          {/* Media type */}
+          <ToggleGroup
+            type="single"
+            variant="segmented"
+            spacing={0.5}
+            value={filter.mediaType}
+            onValueChange={(v) => { if (v) setFilter({ mediaType: v as typeof filter.mediaType }); }}
+            className="bg-muted rounded-full p-[3px] shrink-0"
           >
-            {/* Funnel icon */}
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M3 4h18M7 9h10M10 14h4" />
-            </svg>
-            {t('timeline.filter')}
-            {/* Chevron */}
-            <svg
-              className={cn('w-3 h-3 transition-transform duration-150', open && 'rotate-180')}
-              fill="none" stroke="currentColor" viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      {/* Expansion panel */}
-      {open && (
-        <div className="px-4 py-5 border-t border-border flex items-center gap-6 flex-wrap">
-          {/* Media type toggle */}
-          <div className="flex rounded-md border border-border overflow-hidden shrink-0">
             {(['all', 'images', 'videos'] as const).map(v => (
-              <button
-                key={v}
-                onClick={() => setFilter({ mediaType: v })}
-                className={cn(
-                  'px-3 py-1.5 text-xs font-medium transition-colors',
-                  filter.mediaType === v
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-card text-muted-foreground hover:text-foreground'
-                )}
-              >
+              <ToggleGroupItem key={v} value={v} className="px-3 text-xs">
                 {t(`timeline.media${v.charAt(0).toUpperCase() + v.slice(1)}`)}
-              </button>
+              </ToggleGroupItem>
             ))}
-          </div>
+          </ToggleGroup>
 
           {/* Year range slider */}
           {!filter.noDate && years.length > 1 && (
@@ -167,7 +163,7 @@ export function TimelineNavbar() {
                 }
               }}
             >
-              <SelectTrigger className="w-36">
+              <SelectTrigger className="w-36 rounded-full bg-muted border-0">
                 <SelectValue placeholder={t('timeline.allMonths')} />
               </SelectTrigger>
               <SelectContent>
@@ -185,7 +181,7 @@ export function TimelineNavbar() {
               value={filter.groupId?.toString() ?? 'all'}
               onValueChange={(v) => setFilter({ groupId: v === 'all' ? null : Number(v) })}
             >
-              <SelectTrigger className="w-44">
+              <SelectTrigger className="w-44 rounded-full bg-muted border-0">
                 <SelectValue placeholder={t('timeline.allGroups')} />
               </SelectTrigger>
               <SelectContent>
@@ -215,8 +211,8 @@ export function TimelineNavbar() {
               {t('timeline.clearFilter')}
             </Button>
           )}
-        </div>
-      )}
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }

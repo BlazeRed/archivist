@@ -1,5 +1,6 @@
-import { useMemo, useCallback, useState, useRef, useEffect, memo } from 'react';
+import { useMemo, useCallback, useState, useRef, useEffect, memo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { flushSync } from 'react-dom';
 import { List, RowComponentProps } from 'react-window';
 import { getThumbnailUrl } from '@/lib/archivePath';
 import { yearMonthKey, parseYearMonth } from '@/lib/dateKeys';
@@ -10,6 +11,8 @@ import { useUIStore } from '../stores/uiStore';
 import type { Image } from '../types';
 import { useMonthNames } from '../lib/months';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { formatDuration } from '@/lib/formatDuration';
 
 const SIZES = {
@@ -20,9 +23,19 @@ const SIZES = {
 
 type SizeKey = keyof typeof SIZES;
 
+// The grid scrolls under the floating chrome: topbar (--topbar-offset 64) + 8 gap + 36 pill row + 8 gap
+const FLOATING_TOP = 116;
+// Thumbnails that already faded in once. Cells remount when the column count changes (images move
+// between rows); without this they would all fade in again and the grid would flash.
+const loadedThumbs = new Set<string>();
+
+// Room at the end so the last row clears the floating selection bar
+const FLOATING_BOTTOM = 76;
+
 type HeaderRow = { type: 'header'; label: string };
 type ImagesRow = { type: 'images'; images: Image[] };
-type TimelineRow = HeaderRow | ImagesRow;
+type SpacerRow = { type: 'spacer'; height: number };
+type TimelineRow = HeaderRow | ImagesRow | SpacerRow;
 
 function buildRows(images: Image[], cols: number, noDateLabel: string, monthNames: string[]): TimelineRow[] {
   const groups = new Map<string, Image[]>();
@@ -65,6 +78,8 @@ function buildRows(images: Image[], cols: number, noDateLabel: string, monthName
 type RowProps = {
   rows: TimelineRow[];
   sizeKey: SizeKey;
+  cols: number;
+  cellPx: number;
   archivePath: string;
   cacheBust: number;
   isSelectionMode: boolean;
@@ -78,7 +93,6 @@ const ThumbnailCell = memo(function ThumbnailCell({
   image,
   archivePath,
   cacheBust,
-  sizeKey,
   isSelectionMode,
   isSelected,
   isPreviewed,
@@ -88,7 +102,6 @@ const ThumbnailCell = memo(function ThumbnailCell({
   image: Image;
   archivePath: string;
   cacheBust: number;
-  sizeKey: SizeKey;
   isSelectionMode: boolean;
   isSelected: boolean;
   isPreviewed: boolean;
@@ -96,28 +109,26 @@ const ThumbnailCell = memo(function ThumbnailCell({
   onToggleSelect: (id: string) => void;
 }) {
   const { t } = useTranslation();
-  const { px } = SIZES[sizeKey];
   const thumbnailUrl = getThumbnailUrl(archivePath, image.thumbnail_path, cacheBust);
 
   return (
     <div
-      style={{ width: px, height: px }}
       onClick={() => onImageClick(image)}
       className={cn(
-        'group/thumb relative bg-card border rounded-md overflow-hidden cursor-pointer flex-shrink-0 transition-shadow hover:shadow-lg',
-        isSelected
-          ? 'ring-2 ring-primary border-primary'
-          : isPreviewed
-            ? 'ring-2 ring-primary/60 border-primary/60'
-            : 'border-border'
+        'group/thumb relative w-full aspect-square bg-card rounded-sm overflow-hidden cursor-pointer flex-shrink-0 transition-[transform,box-shadow] duration-150 active:scale-[.97]',
+        (isSelected || isPreviewed) && 'shadow-[0_0_0_2px_var(--background),0_0_0_5px_var(--gold)]'
       )}
     >
       {thumbnailUrl ? (
         <img
           src={thumbnailUrl}
           alt={image.filename}
-          className="w-full h-full object-cover"
+          className={cn('w-full h-full object-cover transition-opacity duration-200', !loadedThumbs.has(thumbnailUrl) && 'opacity-0')}
           loading="lazy"
+          onLoad={(e) => {
+            loadedThumbs.add(thumbnailUrl);
+            e.currentTarget.classList.remove('opacity-0');
+          }}
         />
       ) : image.media_type === 'video' ? (
         <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-foreground/40">
@@ -141,57 +152,35 @@ const ThumbnailCell = memo(function ThumbnailCell({
       )}
 
       {/* Hover dark overlay */}
-      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/thumb:opacity-100 transition-opacity pointer-events-none" />
+      <div className="absolute inset-0 bg-black/15 opacity-0 group-hover/thumb:opacity-100 transition-opacity pointer-events-none" />
 
 
-      {/* Video badge + duration */}
+      {/* Video: duration pill (play glyph when duration is unknown) */}
       {image.media_type === 'video' && (
-        <div className="absolute bottom-6 left-1 w-5 h-5 rounded-full bg-black/50 flex items-center justify-center pointer-events-none">
-          <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M8 5v14l11-7z" />
-          </svg>
-        </div>
-      )}
-      {image.media_type === 'video' && image.duration_ms != null && (
-        <span className="absolute bottom-1 right-1 text-[9px] font-mono text-white bg-black/60 rounded px-1 leading-tight pointer-events-none">
-          {formatDuration(image.duration_ms)}
+        <span className="absolute bottom-1.5 left-1.5 flex items-center gap-0.5 text-[10px] font-semibold tabular-nums text-white bg-[rgba(0,20,45,.55)] rounded-full px-1.5 leading-4 pointer-events-none">
+          <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+          {image.duration_ms != null && formatDuration(image.duration_ms)}
         </span>
       )}
 
       {/* Favourite indicator */}
       {image.is_favourite && (
-        <div className="absolute bottom-6 right-1 w-5 h-5 rounded-full bg-black/50 flex items-center justify-center pointer-events-none">
-          <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-          </svg>
-        </div>
+        <svg className="absolute top-1.5 right-1.5 w-3.5 h-3.5 text-gold drop-shadow-[0_1px_1px_rgba(0,0,0,.45)] pointer-events-none" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />
+        </svg>
       )}
 
       {/* Selection checkbox */}
       {isSelectionMode && (
-        <div
-          className="absolute top-1 left-1"
-          onClick={(e) => { e.stopPropagation(); onToggleSelect(image.id); }}
-        >
-          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-            isSelected ? 'bg-primary border-primary' : 'bg-white/80 border-foreground/40'
-          }`}>
-            {isSelected && (
-              <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-            )}
-          </div>
-        </div>
+        <Checkbox
+          checked={isSelected}
+          onClick={(e) => e.stopPropagation()}
+          onCheckedChange={() => onToggleSelect(image.id)}
+          aria-label={image.filename}
+          className="absolute top-1.5 left-1.5 size-5 border-white bg-black/25 shadow-[0_1px_2px_rgba(0,0,0,.3)] dark:bg-black/25"
+        />
       )}
 
-      {/* Filename bar — always visible when previewed, hover only otherwise */}
-      <div className={cn(
-        'absolute bottom-0 left-0 right-0 bg-foreground px-1 py-0.5 transition-opacity pointer-events-none',
-        isPreviewed ? 'opacity-100' : 'opacity-0 group-hover/thumb:opacity-100'
-      )}>
-        <p className="text-[10px] text-white truncate">{image.filename}</p>
-      </div>
     </div>
   );
 });
@@ -201,6 +190,8 @@ function TimelineRowComponent({
   style,
   rows,
   sizeKey,
+  cols,
+  cellPx,
   archivePath,
   cacheBust,
   isSelectionMode,
@@ -212,24 +203,25 @@ function TimelineRowComponent({
   const row = rows[index];
   const size = SIZES[sizeKey];
 
+  if (row.type === 'spacer') return <div style={style} />;
+
   if (row.type === 'header') {
     return (
-      <div style={style} className="flex items-center px-6 bg-background border-b border-foreground/12">
-        <span className="text-[13px] font-semibold text-foreground tracking-wide">{row.label}</span>
+      <div style={style} className="flex items-end pb-1 px-6 bg-background">
+        <span className="text-xs font-semibold text-muted-foreground tracking-[0.02em]">{row.label}</span>
       </div>
     );
   }
 
   return (
     <div style={style} className="flex items-start px-6 pt-2">
-      <div className="flex flex-wrap" style={{ gap: size.gap }}>
+      <div className="grid w-full" style={{ gap: size.gap, gridTemplateColumns: `repeat(${cols}, ${cellPx}px)` }}>
         {row.images.map(img => (
           <ThumbnailCell
             key={img.id}
             image={img}
             archivePath={archivePath}
             cacheBust={cacheBust}
-            sizeKey={sizeKey}
             isSelectionMode={isSelectionMode}
             isSelected={selectedImageIds.has(img.id)}
             isPreviewed={previewImageId === img.id}
@@ -242,35 +234,14 @@ function TimelineRowComponent({
   );
 }
 
-export function ThumbnailGrid() {
+/** Virtualized timeline grid. Scrolls under the floating topbar; renders the floating month pill and `toolbar` above it. */
+export function ThumbnailGrid({ toolbar }: { toolbar?: ReactNode }) {
   const { t } = useTranslation();
   const { images, setPreviewImage, previewImage, loading } = useTimelineStore();
   const { config } = useAppConfigStore();
   const { isSelectionMode, selectedImageIds, toggleSelection } = useGroupUIStore();
   const thumbnailCacheBust = useUIStore((s) => s.thumbnailCacheBust);
   const [stickyLabel, setStickyLabel] = useState('');
-  const [scrollVisible, setScrollVisible] = useState(false);
-  const [scrollFraction, setScrollFraction] = useState(0);
-  const scrollHideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    const el = e.target as HTMLElement;
-    const max = el.scrollHeight - el.clientHeight;
-    if (max <= 0) return;
-    setScrollFraction(el.scrollTop / max);
-    setScrollVisible(true);
-    clearTimeout(scrollHideTimer.current);
-    scrollHideTimer.current = setTimeout(() => setScrollVisible(false), 1500);
-  }, []);
-
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    if (e.clientX >= rect.right - 20) {
-      setScrollVisible(true);
-      clearTimeout(scrollHideTimer.current);
-      scrollHideTimer.current = setTimeout(() => setScrollVisible(false), 1500);
-    }
-  }, []);
 
   const monthNames = useMonthNames();
   const sizeKey = config.thumbnail_size as SizeKey;
@@ -282,26 +253,42 @@ export function ThumbnailGrid() {
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+    // flushSync: re-layout before the browser paints. Otherwise one frame shows the old columns
+    // stretched to the new width (visible size jump when the preview card closes).
     const ro = new ResizeObserver(entries => {
-      setContainerWidth(entries[0].contentRect.width);
+      flushSync(() => setContainerWidth(entries[0].contentRect.width));
     });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
   const PADDING = 48; // px-6 both sides
+  // size.px is the minimum cell size: cells stretch so the row always fills the width
+  const innerWidth = containerWidth - PADDING;
   const dynamicCols = containerWidth > 0
-    ? Math.max(1, Math.floor((containerWidth - PADDING) / (size.px + size.gap)))
+    ? Math.max(1, Math.floor((innerWidth + size.gap) / (size.px + size.gap)))
     : size.cols;
+  const cellPx = containerWidth > 0
+    ? (innerWidth - size.gap * (dynamicCols - 1)) / dynamicCols
+    : size.px;
+  const rowH = Math.ceil(cellPx) + (size.rowH - size.px);
 
-  const rows = useMemo(
-    () => buildRows(images, dynamicCols, t('timeline.noDateHeader'), monthNames),
+  const rows = useMemo<TimelineRow[]>(
+    () => [
+      { type: 'spacer', height: FLOATING_TOP },
+      ...buildRows(images, dynamicCols, t('timeline.noDateHeader'), monthNames),
+      { type: 'spacer', height: FLOATING_BOTTOM },
+    ],
     [images, dynamicCols, t, monthNames]
   );
 
   const getRowHeight = useCallback(
-    (index: number) => (rows[index]?.type === 'header' ? 40 : size.rowH),
-    [rows, size.rowH]
+    (index: number) => {
+      const row = rows[index];
+      if (row?.type === 'spacer') return row.height;
+      return row?.type === 'header' ? 40 : rowH;
+    },
+    [rows, rowH]
   );
 
   const handleImageClick = useCallback(
@@ -309,16 +296,19 @@ export function ThumbnailGrid() {
       if (isSelectionMode) {
         toggleSelection(img.id);
       } else {
-        setPreviewImage(img);
+        // Clicking the previewed image again closes the preview
+        setPreviewImage(img.id === previewImage?.id ? null : img);
       }
     },
-    [isSelectionMode, toggleSelection, setPreviewImage]
+    [isSelectionMode, toggleSelection, setPreviewImage, previewImage?.id]
   );
 
   const rowProps = useMemo<RowProps>(
     () => ({
       rows,
       sizeKey,
+      cols: dynamicCols,
+      cellPx: Math.floor(cellPx),
       archivePath: config.archive_path,
       cacheBust: thumbnailCacheBust,
       isSelectionMode,
@@ -327,7 +317,7 @@ export function ThumbnailGrid() {
       onImageClick: handleImageClick,
       onToggleSelect: toggleSelection,
     }),
-    [rows, sizeKey, config.archive_path, thumbnailCacheBust, isSelectionMode, selectedImageIds, previewImage?.id, handleImageClick, toggleSelection]
+    [rows, sizeKey, dynamicCols, cellPx, config.archive_path, thumbnailCacheBust, isSelectionMode, selectedImageIds, previewImage?.id, handleImageClick, toggleSelection]
   );
 
   const handleRowsRendered = useCallback(
@@ -338,44 +328,22 @@ export function ThumbnailGrid() {
           return;
         }
       }
+      // At the very top only the spacer precedes the first month
+      const first = rows.find((r): r is HeaderRow => r.type === 'header');
+      setStickyLabel(first?.label ?? '');
     },
     [rows]
   );
 
-  if (loading) {
-    return (
+  let body: ReactNode;
+  if (loading || images.length === 0) {
+    body = (
       <div className="flex items-center justify-center h-full">
-        <p className="text-muted-foreground">{t('common.loading')}</p>
+        <p className="text-muted-foreground">{t(loading ? 'common.loading' : 'timeline.noMedia')}</p>
       </div>
     );
-  }
-
-  if (images.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <p className="text-muted-foreground">{t('timeline.noMedia')}</p>
-      </div>
-    );
-  }
-
-  const containerH = containerRef.current?.clientHeight ?? 0;
-  const thumbH = Math.max(40, containerH * 0.05);
-  const labelTop = scrollFraction * (containerH - thumbH) + thumbH / 2;
-
-  return (
-    <div
-      ref={containerRef}
-      className="relative h-full"
-      onScrollCapture={handleScroll}
-      onMouseMove={handleMouseMove}
-    >
-      {/* Sticky header overlay */}
-      {stickyLabel && (
-        <div className="absolute top-0 left-0 right-0 z-10 h-10 flex items-center px-6 bg-background/95 backdrop-blur-sm border-b border-foreground/12 pointer-events-none">
-          <span className="text-[13px] font-semibold text-foreground tracking-wide">{stickyLabel}</span>
-        </div>
-      )}
-
+  } else {
+    body = (
       <List
         rowComponent={TimelineRowComponent}
         rowCount={rows.length}
@@ -385,21 +353,28 @@ export function ThumbnailGrid() {
         className="h-full"
         style={{ height: '100%' }}
       />
+    );
+  }
 
-      {/* Scrollbar date label */}
-      {stickyLabel && (
-        <div
-          className={cn(
-            'pointer-events-none absolute right-5 z-20 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap',
-            'bg-foreground/80 text-background shadow-sm',
-            'transition-opacity duration-150',
-            scrollVisible ? 'opacity-100' : 'opacity-0'
-          )}
-          style={{ top: labelTop, transform: 'translateY(-50%)' }}
-        >
-          {stickyLabel}
-        </div>
-      )}
+  return (
+    <div ref={containerRef} className="relative h-full">
+      {body}
+
+      {/* Scroll-edge fade: photos dissolve as they pass under the floating chrome */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-linear-to-b from-background from-55% to-transparent"
+        style={{ height: FLOATING_TOP + 8 }}
+      />
+
+      {/* Floating row: current month (left), toolbar (right) */}
+      <div className="pointer-events-none absolute inset-x-0 z-20 flex items-start justify-between gap-3 px-4 top-[calc(var(--topbar-offset)+8px)]">
+        {stickyLabel && !loading && images.length > 0 ? (
+          <Badge variant="outline" className="h-9 px-4 border-0 bg-popover text-popover-foreground shadow-float text-[13px] font-semibold animate-in fade-in duration-200">
+            {stickyLabel}
+          </Badge>
+        ) : <div />}
+        <div className="pointer-events-auto">{toolbar}</div>
+      </div>
     </div>
   );
 }

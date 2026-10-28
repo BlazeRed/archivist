@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Topbar } from './components/Topbar';
 import { Toaster } from './components/ui/sonner';
+import { TooltipProvider } from './components/ui/tooltip';
 import { TimelinePage } from './pages/TimelinePage';
 import { MapPage } from './pages/MapPage';
 import { GroupsPage } from './pages/GroupsPage';
@@ -16,7 +17,7 @@ import { cn } from './lib/utils';
 
 function App() {
   const { i18n } = useTranslation();
-  const { setConfig } = useAppConfigStore();
+  const { config, setConfig } = useAppConfigStore();
   const { settingsOpen, closeSettings } = useUIStore();
 
   useEffect(() => {
@@ -48,10 +49,24 @@ function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Theme: explicit choice, or follow the OS while set to 'system'
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const apply = () => {
+      const dark = config.theme === 'dark' || (config.theme === 'system' && media.matches);
+      document.documentElement.classList.toggle('dark', dark);
+    };
+    apply();
+    media.addEventListener('change', apply);
+    return () => media.removeEventListener('change', apply);
+  }, [config.theme]);
+
   return (
+    <TooltipProvider delayDuration={400}>
     <div className="min-h-screen flex flex-col bg-background">
       <Topbar />
-      <main className="flex-1 relative">
+      {/* Topbar is fixed: pages start below it (Timeline opts out to scroll underneath) */}
+      <main className="flex-1 relative pt-[var(--topbar-offset)]">
         <Routes>
           <Route path="/" element={<TimelinePage />} />
           <Route path="/map" element={<MapPage />} />
@@ -74,15 +89,16 @@ function App() {
       {/* Settings slide-over panel */}
       <div
         className={cn(
-          'fixed top-[52px] right-0 bottom-0 z-50 w-80 bg-card border-l border-border shadow-xl transition-transform duration-200',
+          'fixed top-[var(--topbar-offset)] right-0 bottom-0 z-50 w-80 bg-card border-l border-border shadow-xl transition-transform duration-200',
           settingsOpen ? 'translate-x-0' : 'translate-x-full'
         )}
       >
         <SettingsPage />
       </div>
 
-      <Toaster />
+      <Toaster theme={config.theme} />
     </div>
+    </TooltipProvider>
   );
 }
 
