@@ -312,6 +312,51 @@ fn load_config(app: tauri::AppHandle) -> Option<serde_json::Value> {
 }
 
 #[tauri::command]
+fn set_favourite_bulk(state: tauri::State<'_, Arc<AppState>>, image_ids: Vec<String>, is_favourite: bool) -> Result<(), error::AppError> {
+    state.db().set_favourite_bulk(&image_ids, is_favourite)
+}
+
+#[tauri::command]
+fn add_images_to_group_bulk(state: tauri::State<'_, Arc<AppState>>, image_ids: Vec<String>, group_id: i64) -> Result<(), error::AppError> {
+    state.db().add_images_to_group_bulk(&image_ids, group_id)
+}
+
+fn require_archive_path(state: &AppState) -> Result<String, error::AppError> {
+    state.get_archive_path().ok_or_else(|| error::AppError::ArchiveNotFound {
+        path: "No archive path set".to_string(),
+    })
+}
+
+#[tauri::command]
+async fn trash_images(state: tauri::State<'_, Arc<AppState>>, image_ids: Vec<String>) -> Result<commands::MoveResult, error::AppError> {
+    let archive_path = require_archive_path(&state)?;
+    let db = state.db();
+    tauri::async_runtime::spawn_blocking(move || commands::trash_images(&archive_path, &image_ids, &*db))
+        .await
+        .map_err(|e| error::AppError::Internal { message: e.to_string() })?
+}
+
+#[tauri::command]
+async fn restore_images(state: tauri::State<'_, Arc<AppState>>, image_ids: Vec<String>) -> Result<commands::MoveResult, error::AppError> {
+    let archive_path = require_archive_path(&state)?;
+    let db = state.db();
+    tauri::async_runtime::spawn_blocking(move || commands::restore_images(&archive_path, &image_ids, &*db))
+        .await
+        .map_err(|e| error::AppError::Internal { message: e.to_string() })?
+}
+
+#[tauri::command]
+fn get_trashed_images(state: tauri::State<'_, Arc<AppState>>) -> Result<Vec<db::image::Image>, error::AppError> {
+    let archive_path = require_archive_path(&state)?;
+    commands::get_trashed_images(&archive_path, &*state.db())
+}
+
+#[tauri::command]
+fn get_trash_count(state: tauri::State<'_, Arc<AppState>>) -> Result<i64, error::AppError> {
+    state.db().get_trash_count()
+}
+
+#[tauri::command]
 fn toggle_favourite(state: tauri::State<'_, Arc<AppState>>, image_id: String, is_favourite: bool) -> Result<(), error::AppError> {
     state.db().set_image_favourite(&image_id, is_favourite)
 }
@@ -435,6 +480,12 @@ pub fn run() {
             transcode_video,
             get_media_server_port,
             get_image_locations,
+            set_favourite_bulk,
+            add_images_to_group_bulk,
+            trash_images,
+            restore_images,
+            get_trashed_images,
+            get_trash_count,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

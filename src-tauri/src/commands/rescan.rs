@@ -8,6 +8,7 @@ use crate::error::AppError;
 use crate::db::Database;
 use crate::exif::{self, ExifResult};
 use crate::commands::import::{destination_path, classify_media};
+use crate::commands::trash::TRASH_DIR;
 use crate::hasher;
 use crate::thumbnail::{self, ThumbnailSize};
 
@@ -299,7 +300,8 @@ fn collect_image_paths_inner(dir: &Path, paths: &mut Vec<PathBuf>) -> Result<(),
         let path = entry.path();
         if path.is_dir() {
             let dir_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-            if dir_name == ".archivist" { continue; }
+            // Trashed files must stay put: relocating them would silently restore them
+            if dir_name == ".archivist" || dir_name == TRASH_DIR { continue; }
             collect_image_paths_inner(&path, paths)?;
         } else if is_image_file(&path) {
             paths.push(path);
@@ -422,7 +424,7 @@ fn repair_missing_gps(archive_path: &str, db: &Database) -> Result<usize, AppErr
     Ok(repaired)
 }
 
-fn unique_dest(dir: &Path, filename: &str) -> PathBuf {
+pub(crate) fn unique_dest(dir: &Path, filename: &str) -> PathBuf {
     let dest = dir.join(filename);
     if !dest.exists() { return dest; }
     let stem = Path::new(filename).file_stem().and_then(|s| s.to_str()).unwrap_or("file");
@@ -477,7 +479,7 @@ fn collect_dirs_inner(dir: &Path, dirs: &mut Vec<PathBuf>) -> Result<(), AppErro
         let path = entry.path();
         if path.is_dir() {
             let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-            if name == ".archivist" { continue; }
+            if name == ".archivist" || name == TRASH_DIR { continue; }
             collect_dirs_inner(&path, dirs)?;
             dirs.push(path); // push after recursing = children before parents
         }

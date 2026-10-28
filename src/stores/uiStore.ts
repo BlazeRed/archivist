@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { invoke } from '@tauri-apps/api/core';
 
 interface UIState {
   settingsOpen: boolean;
@@ -12,6 +13,9 @@ interface UIState {
    *  WebView may keep serving the stale cached image. */
   thumbnailCacheBust: number;
   bumpThumbnailCacheBust: () => void;
+  /** Items in the archive's Trash folder (topbar dot) */
+  trashCount: number;
+  refreshTrashCount: () => Promise<void>;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -22,4 +26,12 @@ export const useUIStore = create<UIState>((set) => ({
   setIsRescanning: (v) => set({ isRescanning: v }),
   thumbnailCacheBust: 0,
   bumpThumbnailCacheBust: () => set({ thumbnailCacheBust: Date.now() }),
+  trashCount: 0,
+  refreshTrashCount: async () => {
+    try {
+      set({ trashCount: await invoke<number>('get_trash_count') });
+    } catch {
+      set({ trashCount: 0 });
+    }
+  },
 }));

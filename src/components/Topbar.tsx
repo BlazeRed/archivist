@@ -26,11 +26,15 @@ export function Topbar() {
   const { clearImages, selectImage } = useTimelineStore();
   const clearGroups = useGroupStore((s) => s.clearGroups);
   const clearLocations = useMapStore((s) => s.clearLocations);
-  const { settingsOpen, toggleSettings } = useUIStore();
+  const { settingsOpen, toggleSettings, trashCount, refreshTrashCount } = useUIStore();
   const { isRescanning, handleRescan } = useRescan();
   const [pendingPath, setPendingPath] = useState<string | null>(null);
 
   const isImportActive = phase === 'scanning' || phase === 'analyzing' || phase === 'thumbnailing' || phase === 'importing';
+
+  useEffect(() => {
+    if (config.archive_path) refreshTrashCount();
+  }, [config.archive_path, refreshTrashCount]);
 
   useEffect(() => {
     if (!isImportActive) return;
@@ -66,14 +70,14 @@ export function Topbar() {
   const activeNav = navItems.find(n => isActive(n.to))?.to ?? '';
 
   return (
-    <header className="fixed top-3 inset-x-3 z-40 h-[52px] rounded-full bg-popover shadow-float ring-1 ring-frame flex items-center justify-between gap-3 pl-2.5 pr-2">
+    <header className="fixed top-3 inset-x-3 z-40 h-[52px] rounded-full bg-popover shadow-float ring-1 ring-frame grid grid-cols-[1fr_auto_1fr] items-center gap-3 pl-2.5 pr-2">
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
             variant="ghost"
             onClick={handleOpenArchive}
             disabled={isImportActive}
-            className="h-auto min-w-0 gap-2.5 pl-0.5 pr-3 py-0.5"
+            className="h-auto min-w-0 justify-self-start gap-2.5 pl-0.5 pr-3 py-0.5"
           >
             <span className="squircle w-[34px] h-[34px] rounded-[11px] bg-linear-145 from-primary to-violet flex items-center justify-center shrink-0">
               <svg className="size-5! text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -113,7 +117,7 @@ export function Topbar() {
         ))}
       </ToggleGroup>
 
-      <div className="flex items-center gap-0.5">
+      <div className="flex items-center justify-self-end gap-0.5">
         {/* Import */}
         <Tooltip>
           <TooltipTrigger asChild>
@@ -155,6 +159,30 @@ export function Topbar() {
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">{t('nav.rescan')}</TooltipContent>
+          </Tooltip>
+        )}
+
+        {/* Trash */}
+        {config.archive_path && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-lg"
+                onClick={() => handleNav('/trash')}
+                aria-label={t('nav.trash')}
+                className={cn('relative', isActive('/trash') ? 'text-primary-ink bg-primary/12 hover:bg-primary/12' : 'text-muted-foreground')}
+              >
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                {trashCount > 0 && (
+                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-destructive" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{t('nav.trash')}</TooltipContent>
           </Tooltip>
         )}
 

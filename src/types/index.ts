@@ -20,6 +20,8 @@ export interface Image {
   web_path: string | null;
   latitude: number | null;
   longitude: number | null;
+  /** Set while the file sits in the archive's Trash folder */
+  trashed_at: string | null;
 }
 
 export interface Group {

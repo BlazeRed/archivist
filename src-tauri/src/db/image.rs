@@ -23,6 +23,8 @@ pub struct Image {
     pub web_path: Option<String>,
     pub latitude: Option<f64>,
     pub longitude: Option<f64>,
+    /// Set while the file sits in `{archive}/Trash`; NULL for live images.
+    pub trashed_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,11 +69,12 @@ fn map_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Image> {
         web_path:      row.get(16)?,
         latitude:      row.get(17)?,
         longitude:     row.get(18)?,
+        trashed_at:    row.get(19)?,
     })
 }
 
 const SELECT_COLS: &str =
-    "id, filename, file_path, taken_at, imported_at, width, height, file_size, has_exif, date_source, thumbnail_path, is_favourite, media_type, duration_ms, codec, rotation, web_path, latitude, longitude";
+    "id, filename, file_path, taken_at, imported_at, width, height, file_size, has_exif, date_source, thumbnail_path, is_favourite, media_type, duration_ms, codec, rotation, web_path, latitude, longitude, trashed_at";
 
 impl super::Database {
     pub fn insert_image(&self, image: &NewImage) -> Result<(), super::AppError> {
@@ -118,7 +121,7 @@ impl super::Database {
     pub fn get_all_images(&self) -> Result<Vec<Image>, super::AppError> {
         let conn = self.connection();
         let sql = format!(
-            "SELECT {} FROM images ORDER BY taken_at DESC, imported_at DESC",
+            "SELECT {} FROM images WHERE trashed_at IS NULL ORDER BY taken_at DESC, imported_at DESC",
             SELECT_COLS
         );
         let mut stmt = conn.prepare(&sql)?;
@@ -131,7 +134,7 @@ impl super::Database {
 
         let images = if let Some(m) = month {
             let sql = format!(
-                "SELECT {} FROM images WHERE strftime('%Y', taken_at) = ?1 AND strftime('%m', taken_at) = ?2 ORDER BY taken_at DESC",
+                "SELECT {} FROM images WHERE trashed_at IS NULL AND strftime('%Y', taken_at) = ?1 AND strftime('%m', taken_at) = ?2 ORDER BY taken_at DESC",
                 SELECT_COLS
             );
             let mut stmt = conn.prepare(&sql)?;
@@ -140,7 +143,7 @@ impl super::Database {
             rows
         } else {
             let sql = format!(
-                "SELECT {} FROM images WHERE strftime('%Y', taken_at) = ?1 ORDER BY taken_at DESC",
+                "SELECT {} FROM images WHERE trashed_at IS NULL AND strftime('%Y', taken_at) = ?1 ORDER BY taken_at DESC",
                 SELECT_COLS
             );
             let mut stmt = conn.prepare(&sql)?;
@@ -161,7 +164,7 @@ impl super::Database {
 
     pub fn get_image_count(&self) -> Result<i64, super::AppError> {
         let conn = self.connection();
-        let count: i64 = conn.query_row("SELECT COUNT(*) FROM images", [], |row| row.get(0))?;
+        let count: i64 = conn.query_row("SELECT COUNT(*) FROM images WHERE trashed_at IS NULL", [], |row| row.get(0))?;
         Ok(count)
     }
 
@@ -177,7 +180,7 @@ impl super::Database {
 
     pub fn get_all_image_paths(&self) -> Result<Vec<(String, String)>, super::AppError> {
         let conn = self.connection();
-        let mut stmt = conn.prepare("SELECT id, file_path FROM images")?;
+        let mut stmt = conn.prepare("SELECT id, file_path FROM images WHERE trashed_at IS NULL")?;
         let rows = stmt.query_map([], |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
         })?.collect::<Result<Vec<_>, _>>()?;
@@ -186,7 +189,7 @@ impl super::Database {
 
     pub fn get_images_without_exif(&self) -> Result<Vec<(String, String)>, super::AppError> {
         let conn = self.connection();
-        let mut stmt = conn.prepare("SELECT id, file_path FROM images WHERE has_exif = 0")?;
+        let mut stmt = conn.prepare("SELECT id, file_path FROM images WHERE has_exif = 0 AND trashed_at IS NULL")?;
         let rows = stmt.query_map([], |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
         })?.collect::<Result<Vec<_>, _>>()?;
@@ -244,10 +247,63 @@ impl super::Database {
         Ok(())
     }
 
+    pub fn set_favourite_bulk(&self, ids: &[String], is_favourite: bool) -> Result<(), super::AppError> {
+        let mut conn = self.connection();
+        let tx = conn.transaction()?;
+        for id in ids {
+            tx.execute(
+                "UPDATE images SET is_favourite = ?1 WHERE id = ?2",
+                params![is_favourite as i32, id],
+            )?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Points a row at its file's new location after a trash/restore move.
+    /// `trashed_at` = Some marks it trashed, None restores it. A web-compatible
+    /// video's `web_path` is the file itself, so it follows the file.
+    pub fn set_image_location(
+        &self,
+        id: &str,
+        file_path: &str,
+        filename: &str,
+        trashed_at: Option<&str>,
+    ) -> Result<(), super::AppError> {
+        let conn = self.connection();
+        conn.execute(
+            "UPDATE images SET \
+             web_path = CASE WHEN web_path = file_path THEN ?1 ELSE web_path END, \
+             file_path = ?1, filename = ?2, trashed_at = ?3 \
+             WHERE id = ?4",
+            params![file_path, filename, trashed_at, id],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_trashed_images(&self) -> Result<Vec<Image>, super::AppError> {
+        let conn = self.connection();
+        let sql = format!(
+            "SELECT {} FROM images WHERE trashed_at IS NOT NULL ORDER BY trashed_at DESC",
+            SELECT_COLS
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let images = stmt.query_map([], map_row)?.collect::<Result<Vec<_>, _>>()?;
+        Ok(images)
+    }
+
+    pub fn get_trash_count(&self) -> Result<i64, super::AppError> {
+        let conn = self.connection();
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM images WHERE trashed_at IS NOT NULL", [], |row| row.get(0)
+        )?;
+        Ok(count)
+    }
+
     pub fn get_favourite_images(&self) -> Result<Vec<Image>, super::AppError> {
         let conn = self.connection();
         let sql = format!(
-            "SELECT {} FROM images WHERE is_favourite = 1 ORDER BY taken_at DESC, imported_at DESC",
+            "SELECT {} FROM images WHERE is_favourite = 1 AND trashed_at IS NULL ORDER BY taken_at DESC, imported_at DESC",
             SELECT_COLS
         );
         let mut stmt = conn.prepare(&sql)?;
@@ -338,7 +394,7 @@ impl super::Database {
     pub fn get_image_locations(&self) -> Result<Vec<crate::commands::locations::ImageLocation>, super::AppError> {
         let conn = self.connection();
         let mut stmt = conn.prepare(
-            "SELECT id, latitude, longitude FROM images WHERE latitude IS NOT NULL AND longitude IS NOT NULL"
+            "SELECT id, latitude, longitude FROM images WHERE latitude IS NOT NULL AND longitude IS NOT NULL AND trashed_at IS NULL"
         )?;
         let rows = stmt.query_map([], |row| {
             Ok(crate::commands::locations::ImageLocation {
@@ -353,7 +409,7 @@ impl super::Database {
     pub fn get_videos_needing_transcode(&self) -> Result<Vec<crate::commands::video::VideoStub>, super::AppError> {
         let conn = self.connection();
         let mut stmt = conn.prepare(
-            "SELECT id, file_path FROM images WHERE media_type='video' AND web_path IS NULL"
+            "SELECT id, file_path FROM images WHERE media_type='video' AND web_path IS NULL AND trashed_at IS NULL"
         )?;
         let rows = stmt.query_map([], |row| {
             Ok(crate::commands::video::VideoStub {

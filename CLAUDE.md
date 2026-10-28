@@ -106,6 +106,12 @@ All registered in `lib.rs` via `tauri::generate_handler![]`:
 | `save_config(config)` | Persist app config JSON |
 | `load_config()` | Load app config JSON |
 | `path_exists(path)` | Check if path exists on disk |
+| `trash_images(image_ids)` → `{moved, failed}` | Move files to `{archive}/Trash`, set `trashed_at` (rename undone if the DB write fails) |
+| `restore_images(image_ids)` → `{moved, failed}` | Move back to the folder `destination_path(taken_at)` maps to, clear `trashed_at` |
+| `get_trashed_images()` | Trashed items; rows whose file the user deleted by hand are dropped (with thumbnail) |
+| `get_trash_count()` | Trashed item count (topbar dot) |
+| `set_favourite_bulk(image_ids, is_favourite)` | Favourite/unfavourite many in one transaction |
+| `add_images_to_group_bulk(image_ids, group_id)` | Add many to a group in one transaction |
 
 ## UI Components
 
@@ -118,6 +124,7 @@ Key components in `src/components/`:
 | `AddMediaModal.tsx` | Full-screen group media picker (same layout as timeline) |
 | `ImagePreview.tsx` | Timeline preview column, always visible: selected item or static skeleton. Exports the shared media actions (favourite, folder, groups) |
 | `ImageDetail.tsx` | Fullscreen viewer: floating chrome, ⓘ metadata panel (closed by default), ←/→/Esc, FLIP zoom from/to the preview frame (`[data-preview-media]`) |
+| `pages/TrashPage.tsx` | Trash: plain grid, click/Shift-click selects, double-click opens the viewer; Restore selected / Restore all / Open folder |
 | `ProgressBar.tsx` | Import progress indicator |
 | `ConflictReview.tsx` | Duplicate conflict resolution UI |
 | `Toast.tsx` / `ui/sonner.tsx` | Toast notification display |
@@ -153,6 +160,7 @@ Project variants on shadcn components: `Badge` `gold` / `violet`; `Toggle`/`Togg
 5. **Never block UI** during analysis — Tauri async commands only
 6. **Never delete** without explicit user confirmation
 7. **Folder names on disk always in English** regardless of UI language (`01 - January`, not `01 - Gennaio`)
+8. **Trash is soft**: trashed rows keep `trashed_at` set; every query that lists live images must filter `trashed_at IS NULL`. Emptying the Trash folder is always the user's manual act
 
 ## Physical Archive Layout
 
@@ -161,6 +169,7 @@ Project variants on shadcn components: `Badge` `gold` / `violet`; `Toggle`/`Togg
 ├── YYYY/
 │   └── MM - MonthName/     ← always English, always this format
 │       └── image.jpg
+├── Trash/                ← trashed files (flat). Rescan skips it; Archivist never deletes from it
 └── .archivist/
     ├── archivist.db
     └── thumbnails/
@@ -179,7 +188,7 @@ Spec: `../Archivist_Design_System.md` (v2.0) — single source of truth. All col
 - Radius: `--radius: 1rem` → `rounded-sm` 10 (thumbs), `md` 12, `lg` 16 (cards), `xl` 24 (floating panels), `full` (buttons, chips)
 - `.squircle` = superellipse corners where supported (progressive enhancement)
 - Topbar is `fixed`; `<main>` has `pt-[var(--topbar-offset)]`. Page heights: `h-[calc(100vh-var(--topbar-offset))]`, never a hardcoded topbar height. Timeline opts out (`h-screen -mt-[var(--topbar-offset)]`) so the grid scrolls under the floating chrome
-- Animations: `tw-animate-css` (`animate-in fade-in slide-in-from-*`). shadcn `data-open:`/`data-closed:` classes work only through the `@custom-variant`s in `index.css` (Radix sets `data-state`); keep them when re-adding components. Panels (Popover, DropdownMenu, Select, Settings) share one motion: slide + fade, 300ms `cubic-bezier(.2,.8,.2,1)` in, 200ms `cubic-bezier(.4,0,1,1)` out; every `animate-out` needs `fill-mode-forwards` (else 1-frame flash before unmount); animate only transform/opacity, never the width of anything beside the grid (exception: the `segmented` ToggleGroup sliding pill, built into `ui/toggle-group.tsx`, animates `left`/`width`; it is absolute + out of flow, so no reflow)
+- Animations: `tw-animate-css` (`animate-in fade-in slide-in-from-*`). shadcn `data-open:`/`data-closed:`/`data-checked:` classes work only through the `@custom-variant`s in `index.css` (Radix sets `data-state`); keep them when re-adding components. Panels (Popover, DropdownMenu, Select, Settings) share one motion: slide + fade, 300ms `cubic-bezier(.2,.8,.2,1)` in, 200ms `cubic-bezier(.4,0,1,1)` out; every `animate-out` needs `fill-mode-forwards` (else 1-frame flash before unmount); animate only transform/opacity, never the width of anything beside the grid (exception: the `segmented` ToggleGroup sliding pill, built into `ui/toggle-group.tsx`, animates `left`/`width`; it is absolute + out of flow, so no reflow)
 
 Theme: `AppConfig.theme` (`system` | `light` | `dark`) toggles `.dark` on `<html>` in `App.tsx`.
 

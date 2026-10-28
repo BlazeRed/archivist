@@ -8,6 +8,7 @@ import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { useGroupUIStore } from '../stores/groupUIStore';
 import { useUIStore } from '../stores/uiStore';
+import { useTrashImages } from '../hooks/useTrash';
 import { ImageMetadataView, useImageGroups, useShowInFolder, type ImageGroups } from './ImageMetadata';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -21,7 +22,8 @@ import type { Image } from '../types';
 
 // Opaque theme-following buttons (popover fill + shadow) for the photo chrome: visible on any photo and
 // on both the light and the dark frame/backdrop, unlike the translucent `onMedia` circles.
-export const CHROME_BUTTON = 'pointer-events-auto bg-popover text-popover-foreground shadow-float hover:bg-accent';
+// Hover stays opaque (bg-card, like the timeline filter button): `accent` is translucent and would let the photo show through.
+export const CHROME_BUTTON = 'pointer-events-auto bg-popover text-popover-foreground shadow-float hover:bg-card';
 
 // Content layer of the card: swaps between skeleton and preview, fading in on each swap.
 // The card itself (frame, shadow) never moves.
@@ -91,6 +93,7 @@ function PreviewCard({ image: previewImage }: { image: Image }) {
   const { selectImage, setPreviewImage, updateImageWebPath, images } = useTimelineStore();
   const groups = useImageGroups(previewImage.id);
   const { config } = useAppConfigStore();
+  const trashImages = useTrashImages();
   const thumbnailCacheBust = useUIStore((s) => s.thumbnailCacheBust);
 
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -224,6 +227,10 @@ function PreviewCard({ image: previewImage }: { image: Image }) {
         </MediaButton>
         {/* Favourite toggle — top-right like the star on grid thumbnails */}
         <FavouriteButton image={previewImage} className={cn(CHROME_BUTTON, 'absolute top-2 right-12')} />
+        <MediaButton label={t('trash.moveToTrash')} onClick={() => trashImages([previewImage.id])} className={cn(CHROME_BUTTON, 'absolute top-2 right-22 text-destructive')}>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+        </MediaButton>
         <MediaButton label={t('preview.expand')} onClick={() => selectImage(previewImage)} className={cn(CHROME_BUTTON, 'absolute top-2 right-2')}>
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
             d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
@@ -360,7 +367,7 @@ export function Spinner() {
   );
 }
 
-function StarIcon({ filled, className }: { filled: boolean; className?: string }) {
+export function StarIcon({ filled, className }: { filled: boolean; className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} strokeLinejoin="round">
       <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />

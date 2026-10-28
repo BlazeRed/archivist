@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useTimelineStore } from '../stores/timelineStore';
+import { useGroupUIStore } from '../stores/groupUIStore';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -18,6 +19,7 @@ export function TimelineNavbar() {
   const monthNames = useMonthNames();
   const { filter, setFilter, availableYears, availableGroups, images, allImages } = useTimelineStore();
   const [open, setOpen] = useState(false);
+  const { isSelectionMode, setSelectionMode } = useGroupUIStore();
 
   const isFiltered = filter.noDate || filter.yearFrom !== null || filter.yearTo !== null || filter.month !== null || filter.groupId !== null || filter.mediaType !== 'all';
   const clearFilter = () => setFilter({ yearFrom: null, yearTo: null, month: null, noDate: false, groupId: null, mediaType: 'all' });
@@ -97,7 +99,7 @@ export function TimelineNavbar() {
 
   return (
     <div className="flex items-center gap-2">
-      <Badge variant="outline" className="h-9 px-4 border-0 bg-popover shadow-float text-xs font-normal text-muted-foreground tabular-nums">
+      <Badge variant="outline" className="cursor-default select-none h-9 px-4 border-0 bg-popover shadow-float text-xs font-normal text-muted-foreground tabular-nums">
         {mediaCountLabel}
       </Badge>
 
@@ -213,6 +215,18 @@ export function TimelineNavbar() {
           )}
         </PopoverContent>
       </Popover>
+
+      <Button
+        variant={isSelectionMode ? 'secondary' : 'outline'}
+        onClick={() => setSelectionMode(!isSelectionMode)}
+        aria-pressed={isSelectionMode}
+        className={cn('h-9 px-3.5 text-xs shadow-float', !isSelectionMode && 'bg-popover hover:bg-card')}
+      >
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        {t('timeline.select')}
+      </Button>
     </div>
   );
 }

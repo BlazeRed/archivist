@@ -52,16 +52,17 @@ impl super::Database {
         let conn = self.connection();
         
         let mut stmt = conn.prepare(
-            "SELECT g.id, g.name, g.created_at, COUNT(ig.image_id) as image_count,
+            "SELECT g.id, g.name, g.created_at, COUNT(li.id) as image_count,
                     g.cover_image_id,
                     COALESCE(
-                        (SELECT i.thumbnail_path FROM images i WHERE i.id = g.cover_image_id),
+                        (SELECT i.thumbnail_path FROM images i WHERE i.id = g.cover_image_id AND i.trashed_at IS NULL),
                         (SELECT i.thumbnail_path FROM images i
                          JOIN image_groups ig2 ON ig2.image_id = i.id
-                         WHERE ig2.group_id = g.id ORDER BY ig2.rowid ASC LIMIT 1)
+                         WHERE ig2.group_id = g.id AND i.trashed_at IS NULL ORDER BY ig2.rowid ASC LIMIT 1)
                     ) as cover_thumbnail_path
              FROM groups g
              LEFT JOIN image_groups ig ON g.id = ig.group_id
+             LEFT JOIN images li ON li.id = ig.image_id AND li.trashed_at IS NULL
              GROUP BY g.id
              ORDER BY g.created_at DESC"
         )?;
@@ -105,6 +106,19 @@ impl super::Database {
         Ok(())
     }
 
+    pub fn add_images_to_group_bulk(&self, image_ids: &[String], group_id: i64) -> Result<(), super::AppError> {
+        let mut conn = self.connection();
+        let tx = conn.transaction()?;
+        for image_id in image_ids {
+            tx.execute(
+                "INSERT OR IGNORE INTO image_groups (image_id, group_id) VALUES (?1, ?2)",
+                params![image_id, group_id],
+            )?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
     pub fn remove_image_from_group(&self, image_id: &str, group_id: i64) -> Result<(), super::AppError> {
         let conn = self.connection();
         conn.execute(
@@ -118,7 +132,9 @@ impl super::Database {
         let conn = self.connection();
 
         let mut stmt = conn.prepare(
-            "SELECT image_id FROM image_groups WHERE group_id = ?1"
+            "SELECT ig.image_id FROM image_groups ig
+             JOIN images i ON i.id = ig.image_id
+             WHERE ig.group_id = ?1 AND i.trashed_at IS NULL"
         )?;
 
         let image_ids = stmt.query_map([group_id], |row| row.get(0))?

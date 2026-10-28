@@ -9,7 +9,8 @@
     "favourites": "Preferiti",
     "import": "Importa",
     "settings": "Impostazioni",
-    "rescan": "Riscansiona archivio"
+    "rescan": "Riscansiona archivio",
+    "trash": "Cestino"
   },
   "common": {
     "cancel": "Annulla",
@@ -86,7 +87,10 @@
     "items": "elementi",
     "mediaAll": "Tutti",
     "mediaImages": "Immagini",
-    "mediaVideos": "Video"
+    "mediaVideos": "Video",
+    "select": "Seleziona",
+    "addFavourites": "Aggiungi ai preferiti",
+    "removeFavourites": "Togli dai preferiti"
   },
   "preview": {
     "empty": "Seleziona un'immagine per l'anteprima",
@@ -213,5 +217,20 @@
     "10": "Ottobre",
     "11": "Novembre",
     "12": "Dicembre"
+  },
+  "trash": {
+    "title": "Cestino",
+    "moveToTrash": "Sposta nel cestino",
+    "moved": "{{count}} spostate nel cestino",
+    "undo": "Annulla",
+    "moveFailed": "{{count}} non spostate nel cestino",
+    "restored": "{{count}} ripristinate",
+    "restoreError": "Alcuni elementi non sono stati ripristinati",
+    "restoreAll": "Ripristina tutte",
+    "restoreSelected": "Ripristina",
+    "openFolder": "Apri cartella",
+    "openFolderError": "Impossibile aprire la cartella Trash",
+    "summary": "{{count}} elementi · {{size}}",
+    "empty": "Il cestino è vuoto. Archivist non cancella mai i file: per liberare spazio, eliminali a mano dalla cartella Trash del tuo archivio."
   }
 }

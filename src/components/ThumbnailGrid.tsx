@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useState, useRef, useEffect, memo, type ReactNode, type CSSProperties } from 'react';
+import { useMemo, useCallback, useState, useRef, useEffect, memo, type ReactNode, type CSSProperties, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { flushSync } from 'react-dom';
 import { List, RowComponentProps, useListRef } from 'react-window';
@@ -30,8 +30,8 @@ const FLOATING_TOP = 116;
 // between rows); without this they would all fade in again and the grid would flash.
 const loadedThumbs = new Set<string>();
 
-// Room at the end so the last row clears the floating selection bar
-const FLOATING_BOTTOM = 76;
+// Room at the end so the last row clears the floating selection bar: 12 margin + 48 bar + 8 gap + 36 count pill + 8
+const FLOATING_BOTTOM = 112;
 
 type HeaderRow = { type: 'header'; label: string };
 type ImagesRow = { type: 'images'; images: Image[] };
@@ -86,7 +86,7 @@ type RowProps = {
   isSelectionMode: boolean;
   selectedImageIds: Set<string>;
   previewImageId: string | null;
-  onImageClick: (img: Image) => void;
+  onImageClick: (img: Image, e: MouseEvent) => void;
   onToggleSelect: (id: string) => void;
 };
 
@@ -106,7 +106,7 @@ const ThumbnailCell = memo(function ThumbnailCell({
   isSelectionMode: boolean;
   isSelected: boolean;
   isPreviewed: boolean;
-  onImageClick: (img: Image) => void;
+  onImageClick: (img: Image, e: MouseEvent) => void;
   onToggleSelect: (id: string) => void;
 }) {
   const { t } = useTranslation();
@@ -114,9 +114,9 @@ const ThumbnailCell = memo(function ThumbnailCell({
 
   return (
     <div
-      onClick={() => onImageClick(image)}
+      onClick={(e) => onImageClick(image, e)}
       className={cn(
-        'group/thumb relative w-full aspect-square bg-card rounded-sm overflow-hidden cursor-pointer flex-shrink-0 transition-[transform,box-shadow] duration-150 active:scale-[.97]',
+        'group/thumb relative w-full aspect-square bg-card rounded-sm overflow-hidden cursor-pointer select-none flex-shrink-0 transition-[transform,box-shadow] duration-150 active:scale-[.97]',
         (isSelected || isPreviewed) && 'shadow-[0_0_0_2px_var(--background),0_0_0_5px_var(--gold)]'
       )}
     >
@@ -173,14 +173,14 @@ const ThumbnailCell = memo(function ThumbnailCell({
         </Badge>
       )}
 
-      {/* Selection checkbox */}
+      {/* Selection checkbox: same opaque disc as the favourite badge (readable on any photo); gold when checked, like the selection ring */}
       {isSelectionMode && (
         <Checkbox
           checked={isSelected}
           onClick={(e) => e.stopPropagation()}
           onCheckedChange={() => onToggleSelect(image.id)}
           aria-label={image.filename}
-          className="absolute top-1.5 left-1.5 size-5 border-white bg-black/25 shadow-[0_1px_2px_rgba(0,0,0,.3)] dark:bg-black/25"
+          className="absolute top-1.5 left-1.5 size-5 rounded-full border-0 bg-popover shadow-[0_1px_3px_rgba(0,0,0,.4)] dark:bg-popover data-checked:bg-gold data-checked:text-gold-foreground dark:data-checked:bg-gold"
         />
       )}
 
@@ -341,15 +341,28 @@ export function ThumbnailGrid({ toolbar }: { toolbar?: ReactNode }) {
   }, [gridRows, isSelectionMode]);
 
   const handleImageClick = useCallback(
-    (img: Image) => {
-      if (isSelectionMode) {
+    (img: Image, e: MouseEvent) => {
+      const { isSelectionMode, lastSelectedId, setSelectionMode, addToSelection } = useGroupUIStore.getState();
+      // Shift-click: select everything between the last clicked item and this one, in timeline order
+      if (e.shiftKey && isSelectionMode && lastSelectedId) {
+        const ids = images.map(i => i.id);
+        const from = ids.indexOf(lastSelectedId);
+        const to = ids.indexOf(img.id);
+        if (from !== -1 && to !== -1) {
+          addToSelection(ids.slice(Math.min(from, to), Math.max(from, to) + 1), img.id);
+          return;
+        }
+      }
+      // Cmd/Ctrl-click (or Shift with no anchor) starts a selection
+      if (isSelectionMode || e.metaKey || e.ctrlKey || e.shiftKey) {
+        setSelectionMode(true);
         toggleSelection(img.id);
       } else {
         // Clicking the previewed image again closes the preview
         setPreviewImage(img.id === previewImage?.id ? null : img);
       }
     },
-    [isSelectionMode, toggleSelection, setPreviewImage, previewImage?.id]
+    [images, toggleSelection, setPreviewImage, previewImage?.id]
   );
 
   const rowProps = useMemo<RowProps>(
@@ -385,7 +398,8 @@ export function ThumbnailGrid({ toolbar }: { toolbar?: ReactNode }) {
   );
 
   let body: ReactNode;
-  if (loading || images.length === 0) {
+  // Reloads (after trash/restore/bulk favourite) keep the list mounted: unmounting it would reset the scroll to the top
+  if (images.length === 0) {
     body = (
       <div className="flex items-center justify-center h-full">
         <p className="text-muted-foreground">{t(loading ? 'common.loading' : 'timeline.noMedia')}</p>
@@ -418,8 +432,8 @@ export function ThumbnailGrid({ toolbar }: { toolbar?: ReactNode }) {
 
       {/* Floating row: current month (left), toolbar (right) */}
       <div className="pointer-events-none absolute inset-x-0 z-20 flex items-start justify-between gap-3 px-4 top-[calc(var(--topbar-offset)+8px)]">
-        {stickyLabel && !loading && images.length > 0 ? (
-          <Badge variant="outline" className="h-9 px-4 border-0 bg-popover text-popover-foreground shadow-float text-[13px] font-semibold animate-in fade-in duration-200">
+        {stickyLabel && images.length > 0 ? (
+          <Badge variant="outline" className="pointer-events-auto cursor-default select-none h-9 px-4 border-0 bg-popover text-popover-foreground shadow-float text-[13px] font-semibold animate-in fade-in duration-200">
             {stickyLabel}
           </Badge>
         ) : <div />}

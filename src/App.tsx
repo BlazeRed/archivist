@@ -11,6 +11,7 @@ import { GroupsPage } from './pages/GroupsPage';
 import { ImportPage } from './pages/ImportPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { FavouritesPage } from './pages/FavouritesPage';
+import { TrashPage } from './pages/TrashPage';
 import { useAppConfigStore } from './stores/appConfigStore';
 import { useUIStore } from './stores/uiStore';
 import { cn } from './lib/utils';
@@ -86,6 +87,7 @@ function App() {
           <Route path="/groups" element={<GroupsPage />} />
           <Route path="/import" element={<ImportPage />} />
           <Route path="/favourites" element={<FavouritesPage />} />
+          <Route path="/trash" element={<TrashPage />} />
           <Route path="/settings" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

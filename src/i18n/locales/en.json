@@ -9,7 +9,8 @@
     "favourites": "Favourites",
     "import": "Import",
     "settings": "Settings",
-    "rescan": "Rescan archive"
+    "rescan": "Rescan archive",
+    "trash": "Trash"
   },
   "common": {
     "cancel": "Cancel",
@@ -86,7 +87,10 @@
     "items": "items",
     "mediaAll": "All",
     "mediaImages": "Images",
-    "mediaVideos": "Videos"
+    "mediaVideos": "Videos",
+    "select": "Select",
+    "addFavourites": "Add to favourites",
+    "removeFavourites": "Remove from favourites"
   },
   "preview": {
     "empty": "Select an image to preview",
@@ -213,5 +217,20 @@
     "10": "October",
     "11": "November",
     "12": "December"
+  },
+  "trash": {
+    "title": "Trash",
+    "moveToTrash": "Move to trash",
+    "moved": "{{count}} moved to trash",
+    "undo": "Undo",
+    "moveFailed": "{{count}} could not be moved to trash",
+    "restored": "{{count}} restored",
+    "restoreError": "Some items could not be restored",
+    "restoreAll": "Restore all",
+    "restoreSelected": "Restore",
+    "openFolder": "Open folder",
+    "openFolderError": "Could not open the Trash folder",
+    "summary": "{{count}} items · {{size}}",
+    "empty": "The trash is empty. Archivist never deletes files: to free space, delete them by hand from the Trash folder in your archive."
   }
 }

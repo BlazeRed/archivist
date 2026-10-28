@@ -19,7 +19,7 @@ export function formatDate(dateStr: string | null, fallback: string) {
   });
 }
 
-function formatSize(bytes: number | null) {
+export function formatSize(bytes: number | null) {
   if (!bytes) return '—';
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -78,6 +78,53 @@ export function useImageGroups(imageId: string) {
 }
 
 export type ImageGroups = ReturnType<typeof useImageGroups>;
+
+/** `useImageGroups` for a multi-selection: a group counts as joined when every selected item is in it. */
+export function useBulkGroups(imageIds: string[]): ImageGroups {
+  const { availableGroups, fetchGroups } = useTimelineStore();
+  const [members, setMembers] = useState<Record<number, Set<string>>>({});
+
+  // Reloads whenever fetchGroups() refreshes the group list (i.e. after every add/remove)
+  useEffect(() => {
+    Promise.all(availableGroups.map(async g =>
+      [g.id, new Set(await invoke<string[]>('get_images_in_group', { groupId: g.id }))] as const
+    ))
+      .then(entries => setMembers(Object.fromEntries(entries)))
+      .catch(() => setMembers({}));
+  }, [availableGroups]);
+
+  const isMember = (groupId: number) => imageIds.length > 0 && imageIds.every(id => members[groupId]?.has(id));
+
+  const add = async (groupId: number) => {
+    try {
+      await invoke('add_images_to_group_bulk', { imageIds, groupId });
+      fetchGroups();
+    } catch (e) {
+      console.error('Failed to add to group:', e);
+    }
+  };
+
+  const remove = async (groupId: number) => {
+    try {
+      for (const imageId of imageIds) {
+        await invoke('remove_image_from_group', { imageId, groupId });
+      }
+      fetchGroups();
+    } catch (e) {
+      console.error('Failed to remove from group:', e);
+    }
+  };
+
+  return {
+    allGroups: availableGroups,
+    currentGroups: availableGroups.filter(g => isMember(g.id)),
+    addableGroups: availableGroups.filter(g => !isMember(g.id)),
+    isMember,
+    toggle: (groupId: number) => (isMember(groupId) ? remove(groupId) : add(groupId)),
+    add,
+    remove,
+  };
+}
 
 function Field({ label, value, truncate }: { label: string; value: string; truncate?: boolean }) {
   return (

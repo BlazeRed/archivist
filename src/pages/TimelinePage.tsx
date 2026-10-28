@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -10,9 +10,13 @@ import { useGroupStore } from '../stores/dataStore';
 import { TimelineNavbar } from '../components/TimelineNavbar';
 import { ThumbnailGrid } from '../components/ThumbnailGrid';
 import { ImageDetail } from '../components/ImageDetail';
-import { ImagePreview } from '../components/ImagePreview';
+import { ImagePreview, GroupsButton, StarIcon } from '../components/ImagePreview';
+import { useBulkGroups } from '../components/ImageMetadata';
+import { useTrashImages } from '../hooks/useTrash';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 const PREVIEW_MIN = 280;
@@ -55,59 +59,117 @@ function ResizeHandle({ onResize }: { onResize: (w: number) => void }) {
   );
 }
 
+// Icon-only circle on a narrow bar, icon + label pill from @2xl (container query on the bar)
+const BAR_BUTTON = 'size-9 px-0 @2xl:w-auto @2xl:pl-3.5 @2xl:pr-4';
+const BAR_LABEL = 'hidden @2xl:inline';
+
 function SelectionActionBar() {
   const { t } = useTranslation();
-  const { availableGroups } = useTimelineStore();
-  const { selectedImageIds, clearSelection, getSelectedCount } = useGroupUIStore();
-  const [addToGroupId, setAddToGroupId] = useState('');
-  const [addingToGroup, setAddingToGroup] = useState(false);
+  const { allImages, fetchImages } = useTimelineStore();
+  const { selectedImageIds, clearSelection } = useGroupUIStore();
+  const trashImages = useTrashImages();
+  const [busy, setBusy] = useState(false);
 
-  const handleAddToGroup = async () => {
-    if (!addToGroupId || selectedImageIds.size === 0) return;
-    setAddingToGroup(true);
-    try {
-      for (const imageId of selectedImageIds) {
-        await invoke('add_image_to_group', { imageId, groupId: Number(addToGroupId) });
-      }
+  const ids = useMemo(() => [...selectedImageIds], [selectedImageIds]);
+  const groups = useBulkGroups(ids);
+  const count = ids.length;
+  // All selected already favourite → the star removes them, else it marks them all
+  const allFavourite = count > 0 && allImages.filter(img => selectedImageIds.has(img.id)).every(img => img.is_favourite);
+  const favouriteLabel = t(allFavourite ? 'timeline.removeFavourites' : 'timeline.addFavourites');
+
+  // Esc leaves selection mode, unless a select/menu owns the key
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      if ((e.target as Element | null)?.closest?.('[role="listbox"], [role="dialog"], [role="menu"]')) return;
       clearSelection();
-      setAddToGroupId('');
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [clearSelection]);
+
+  const handleFavourite = async () => {
+    setBusy(true);
+    try {
+      await invoke('set_favourite_bulk', { imageIds: ids, isFavourite: !allFavourite });
+      await fetchImages();
     } catch (e) {
-      console.error('Failed to add to group:', e);
+      console.error('Failed to update favourites:', e);
     }
-    setAddingToGroup(false);
+    setBusy(false);
+  };
+
+  const handleTrash = async () => {
+    setBusy(true);
+    await trashImages(ids);
+    clearSelection();
+    setBusy(false);
   };
 
   return (
-    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 h-12 max-w-[calc(100%-1.5rem)] flex items-center gap-3 pl-5 pr-1.5 rounded-full bg-popover shadow-float animate-in fade-in slide-in-from-bottom-8 duration-300 ease-[cubic-bezier(.2,.8,.2,1)]">
-      <span className="text-sm font-medium tabular-nums whitespace-nowrap">
-        {t('timeline.selected', { count: getSelectedCount() })}
-      </span>
+    // Full-width row: count pill above on the left, action bar below. The bar is a size container:
+    // buttons show icon + label when it is wide enough (@2xl, 672px), icon only otherwise
+    <div className="absolute bottom-3 inset-x-3 z-10 flex flex-col items-start gap-2 animate-in fade-in slide-in-from-bottom-8 duration-300 ease-[cubic-bezier(.2,.8,.2,1)]">
+      <Badge variant="outline" className="cursor-default select-none h-9 px-4 border-0 bg-popover shadow-float text-xs font-normal text-muted-foreground tabular-nums">
+        {t('timeline.selected', { count })}
+      </Badge>
 
-      {availableGroups.length > 0 && (
-        <div className="flex items-center gap-2">
-          <Select value={addToGroupId} onValueChange={setAddToGroupId}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder={`${t('timeline.filterGroups')}…`} />
-            </SelectTrigger>
-            <SelectContent>
-              {availableGroups.map(g => (
-                <SelectItem key={g.id} value={g.id.toString()}>{g.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            variant="violet"
-            onClick={handleAddToGroup}
-            disabled={!addToGroupId || addingToGroup || getSelectedCount() === 0}
-          >
-            {t('timeline.addToGroup')}
-          </Button>
-        </div>
-      )}
+      <div className="@container w-full h-12 flex items-center gap-2 px-1.5 rounded-full bg-popover shadow-float">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="gold"
+              onClick={handleFavourite}
+              disabled={busy || count === 0}
+              aria-label={favouriteLabel}
+              aria-pressed={allFavourite}
+              className={BAR_BUTTON}
+            >
+              <StarIcon filled={allFavourite} />
+              <span className={BAR_LABEL}>{favouriteLabel}</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">{favouriteLabel}</TooltipContent>
+        </Tooltip>
 
-      <Button variant="ghost" onClick={clearSelection}>
-        {t('timeline.cancelSelection')}
-      </Button>
+        <GroupsButton groups={groups} side="top" />
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="destructive"
+              onClick={handleTrash}
+              disabled={busy || count === 0}
+              aria-label={t('trash.moveToTrash')}
+              className={BAR_BUTTON}
+            >
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              <span className={BAR_LABEL}>{t('trash.moveToTrash')}</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">{t('trash.moveToTrash')}</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              onClick={clearSelection}
+              aria-label={t('timeline.cancelSelection')}
+              className={cn(BAR_BUTTON, 'ml-auto text-muted-foreground')}
+            >
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              <span className={BAR_LABEL}>{t('timeline.cancelSelection')}</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">{t('timeline.cancelSelection')}</TooltipContent>
+        </Tooltip>
+      </div>
     </div>
   );
 }
