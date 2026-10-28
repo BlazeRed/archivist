@@ -198,6 +198,27 @@ body {
   .squircle { corner-shape: squircle; }
 }
 
+/* Scroller whose edges sit under floating chrome: the scrollbar track starts and ends clear of it
+   (like native scrollIndicatorInsets). Set --scroll-inset-top / --scroll-inset-bottom per scroller.
+   Track margins only apply to a styled ::-webkit-scrollbar (WebKit + WebView2). */
+.scroll-inset::-webkit-scrollbar { width: 12px; }
+.scroll-inset::-webkit-scrollbar-track {
+  background: transparent;
+  margin-top: var(--scroll-inset-top, 0px);
+  margin-bottom: var(--scroll-inset-bottom, 0px);
+}
+.scroll-inset::-webkit-scrollbar-thumb {
+  border: 3.5px solid transparent;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--primary) 55%, transparent) padding-box;
+}
+/* Hover/drag: thinner border = wider pill, full brand color */
+.scroll-inset::-webkit-scrollbar-thumb:hover,
+.scroll-inset::-webkit-scrollbar-thumb:active {
+  border-width: 1.5px;
+  background-color: var(--primary);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 1ms !important;

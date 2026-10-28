@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useState, useRef, useEffect, memo, type ReactNode } from 'react';
+import { useMemo, useCallback, useState, useRef, useEffect, memo, type ReactNode, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { flushSync } from 'react-dom';
 import { List, RowComponentProps } from 'react-window';
@@ -350,8 +350,8 @@ export function ThumbnailGrid({ toolbar }: { toolbar?: ReactNode }) {
         rowHeight={getRowHeight}
         rowProps={rowProps}
         onRowsRendered={handleRowsRendered}
-        className="h-full"
-        style={{ height: '100%' }}
+        className="h-full scroll-inset"
+        style={{ height: '100%', '--scroll-inset-top': `${FLOATING_TOP}px`, '--scroll-inset-bottom': '12px' } as CSSProperties}
       />
     );
   }

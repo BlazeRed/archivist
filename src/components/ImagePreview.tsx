@@ -223,7 +223,7 @@ function PreviewCard({ image: previewImage, width }: { image: Image; width: numb
       </div>
 
       {/* Scrollable metadata — bottom padding keeps the last rows clear of the floating bar */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-1 pb-14">
+      <div className="flex-1 min-h-0 overflow-y-auto px-1 pb-14 scroll-inset [--scroll-inset-bottom:2.75rem]">
         <ImageMetadataView image={previewImage} groups={groups} readOnly />
       </div>
 
