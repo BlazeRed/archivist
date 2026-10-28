@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { XIcon } from 'lucide-react';
 
-function formatDate(dateStr: string | null, fallback: string) {
+export function formatDate(dateStr: string | null, fallback: string) {
   if (!dateStr) return fallback;
   return new Date(dateStr).toLocaleDateString(undefined, {
     year: 'numeric', month: 'long', day: 'numeric',
@@ -137,17 +137,16 @@ export function ImageMetadataView({ image, groups, hideGroups, readOnly }: {
           <Field label={t('detail.duration')} value={formatDuration(image.duration_ms)} />
         )}
 
-        {image.width && image.height && (
-          <Field label={t('detail.dimensions')} value={`${image.width} × ${image.height}`} />
-        )}
+        {/* Rows stay even when the value is missing ("—"), so switching photos never shifts the layout */}
+        <Field label={t('detail.dimensions')} value={image.width && image.height ? `${image.width} × ${image.height}` : '—'} />
 
-        {image.file_size && (
-          <Field label={t('detail.fileSize')} value={formatSize(image.file_size)} />
-        )}
+        <Field label={t('detail.fileSize')} value={formatSize(image.file_size)} />
 
-        {image.latitude != null && image.longitude != null && (
-          <Field label={t('detail.location')} value={`${image.latitude.toFixed(5)}, ${image.longitude.toFixed(5)}`} />
-        )}
+        <Field
+          label={t('detail.location')}
+          value={image.latitude != null && image.longitude != null ? `${image.latitude.toFixed(5)}, ${image.longitude.toFixed(5)}` : '—'}
+        />
+
 
         <Field label={t('detail.imported')} value={formatDate(image.imported_at, '—')} />
 

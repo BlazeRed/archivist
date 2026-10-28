@@ -23,6 +23,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
       toastOptions={{
         classNames: {
           toast: "cn-toast",
+          // Sonner hardcodes description color per theme (#3f3f3f / #e8e8e8), which vanishes on our inverted secondary bg
+          description: "text-secondary-foreground/80!",
         },
       }}
       {...props}

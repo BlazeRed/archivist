@@ -1,4 +1,3 @@
-import { useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -63,7 +62,7 @@ function FavouriteThumb({ image, archivePath, cacheBust }: { image: Image; archi
 
 export function FavouritesPage() {
   const { t } = useTranslation();
-  const { allImages, clearImages, selectImage, selectedImage } = useTimelineStore();
+  const { allImages, clearImages, selectImage } = useTimelineStore();
   const { config, setConfig } = useAppConfigStore();
   const clearGroups = useGroupStore((s) => s.clearGroups);
   const clearLocations = useMapStore((s) => s.clearLocations);
@@ -93,30 +92,6 @@ export function FavouritesPage() {
   }
 
   const favourites = allImages.filter(img => img.is_favourite);
-
-  const favouritesRef = useRef(favourites);
-  favouritesRef.current = favourites;
-  const selectedImageRef = useRef(selectedImage);
-  selectedImageRef.current = selectedImage;
-
-  useEffect(() => {
-    if (!selectedImage) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-      const imgs = favouritesRef.current;
-      const current = selectedImageRef.current;
-      if (!current || imgs.length < 2) return;
-      const idx = imgs.findIndex(img => img.id === current.id);
-      if (idx === -1) return;
-      if (e.key === 'ArrowLeft') {
-        selectImage(imgs[(idx - 1 + imgs.length) % imgs.length]);
-      } else {
-        selectImage(imgs[(idx + 1) % imgs.length]);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedImage, selectImage]);
 
   return (
     <div className="flex flex-col h-[calc(100vh-var(--topbar-offset))]">

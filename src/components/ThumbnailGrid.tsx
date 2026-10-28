@@ -1,8 +1,9 @@
 import { useMemo, useCallback, useState, useRef, useEffect, memo, type ReactNode, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { flushSync } from 'react-dom';
-import { List, RowComponentProps } from 'react-window';
+import { List, RowComponentProps, useListRef } from 'react-window';
 import { getThumbnailUrl } from '@/lib/archivePath';
+import { gridNeighbour } from '@/lib/gridNav';
 import { yearMonthKey, parseYearMonth } from '@/lib/dateKeys';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
@@ -163,11 +164,13 @@ const ThumbnailCell = memo(function ThumbnailCell({
         </span>
       )}
 
-      {/* Favourite indicator */}
+      {/* Favourite indicator: solid gold disc (same look as the active star in the preview), readable on any photo */}
       {image.is_favourite && (
-        <svg className="absolute top-1.5 right-1.5 w-3.5 h-3.5 text-gold drop-shadow-[0_1px_1px_rgba(0,0,0,.45)] pointer-events-none" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />
-        </svg>
+        <Badge aria-hidden className="absolute top-1.5 right-1.5 size-5 p-0 bg-gold text-gold-foreground shadow-[0_1px_3px_rgba(0,0,0,.4)] pointer-events-none">
+          <svg fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />
+          </svg>
+        </Badge>
       )}
 
       {/* Selection checkbox */}
@@ -291,6 +294,52 @@ export function ThumbnailGrid({ toolbar }: { toolbar?: ReactNode }) {
     [rows, rowH]
   );
 
+  const listRef = useListRef(null);
+  // Image rows only, plus each one's index in `rows` (for scrolling)
+  const { gridRows, listIndex } = useMemo(() => {
+    const listIndex: number[] = [];
+    const gridRows: Image[][] = [];
+    rows.forEach((row, i) => {
+      if (row.type === 'images') { listIndex.push(i); gridRows.push(row.images); }
+    });
+    return { gridRows, listIndex };
+  }, [rows]);
+
+  // Keep the previewed item in view, whatever moved it (keys, preview arrows, fullscreen navigation)
+  const previewId = previewImage?.id;
+  useEffect(() => {
+    if (!previewId) return;
+    const r = gridRows.findIndex(row => row.some(img => img.id === previewId));
+    if (r !== -1) listRef.current?.scrollToRow({ index: listIndex[r], align: 'smart' });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewId]);
+
+  // Keyboard: arrows move the preview in grid order, Enter opens fullscreen, Esc back to the skeleton.
+  // The fullscreen viewer owns the keys while open; widgets that use arrows themselves keep them.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
+      const { previewImage, selectedImage, setPreviewImage, selectImage } = useTimelineStore.getState();
+      if (!previewImage || selectedImage || isSelectionMode || useUIStore.getState().settingsOpen) return;
+      const target = e.target as Element | null;
+      if (target?.closest?.('input, textarea, select, video, [role="listbox"], [role="dialog"], [role="menu"], [role="group"], [role="radiogroup"], [role="slider"]')) return;
+
+      if (e.key === 'Escape') {
+        setPreviewImage(null);
+      } else if (e.key === 'Enter') {
+        if (target?.closest?.('button, a')) return; // Enter activates the focused button instead
+        selectImage(previewImage);
+      } else {
+        const pos = gridNeighbour(gridRows, previewImage.id, e.key);
+        if (!pos) return;
+        setPreviewImage(gridRows[pos[0]][pos[1]]);
+      }
+      e.preventDefault();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [gridRows, isSelectionMode]);
+
   const handleImageClick = useCallback(
     (img: Image) => {
       if (isSelectionMode) {
@@ -345,6 +394,7 @@ export function ThumbnailGrid({ toolbar }: { toolbar?: ReactNode }) {
   } else {
     body = (
       <List
+        listRef={listRef}
         rowComponent={TimelineRowComponent}
         rowCount={rows.length}
         rowHeight={getRowHeight}

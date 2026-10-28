@@ -49,6 +49,19 @@ function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Esc closes the settings panel — unless a select/menu inside it owns the key
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      if ((e.target as Element | null)?.closest?.('[role="listbox"], [role="dialog"], [role="menu"]')) return;
+      e.preventDefault(); // so the Timeline doesn't also clear the preview on the same key
+      closeSettings();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [settingsOpen, closeSettings]);
+
   // Theme: explicit choice, or follow the OS while set to 'system'
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)');

@@ -116,7 +116,8 @@ Key components in `src/components/`:
 | `Topbar.tsx` | Floating pill nav bar — logo, page links, import/rescan/settings icon buttons |
 | `ThumbnailGrid.tsx` | Virtualized image grid with sticky month headers |
 | `AddMediaModal.tsx` | Full-screen group media picker (same layout as timeline) |
-| `ImageDetail.tsx` | Full image view modal with metadata panel and Show in Folder button |
+| `ImagePreview.tsx` | Timeline preview column, always visible: selected item or static skeleton. Exports the shared media actions (favourite, folder, groups) |
+| `ImageDetail.tsx` | Fullscreen viewer: floating chrome, ⓘ metadata panel (closed by default), ←/→/Esc, FLIP zoom from/to the preview frame (`[data-preview-media]`) |
 | `ProgressBar.tsx` | Import progress indicator |
 | `ConflictReview.tsx` | Duplicate conflict resolution UI |
 | `Toast.tsx` / `ui/sonner.tsx` | Toast notification display |
@@ -174,11 +175,11 @@ Spec: `../Archivist_Design_System.md` (v2.0) — single source of truth. All col
 - Brand: `primary` / `text-primary-ink` (blue text), `gold` / `gold-ink` / `gold-soft` (favourites), `violet` / `violet-ink` / `violet-soft` (groups)
 - Status: `success(-ink)`, `warning(-ink)`, `destructive`. Use `-ink` variants for text, never the fill color
 - `accent` = neutral hover fill (shadcn convention), not a brand color
-- Elevation: `shadow-raised`, `shadow-float`, `shadow-overlay`. Primary floating chrome gets the gold frame `ring-1 ring-frame` (opaque color, whole-pixel width) (no regular border); selected thumbnails a solid gold ring
+- Elevation: `shadow-raised`, `shadow-float`, `shadow-overlay`. Gold frame `ring-1 ring-frame` (opaque color, whole-pixel width, no regular border) only on primary floating chrome: topbar, preview card, settings panel; selected thumbnails a solid gold ring. Everything else floating (filters popover, selection bar, count/month badges, filter button) gets no ring: opaque `bg-popover` + shadow only (the shadow blur is the floating cue; no translucent/backdrop-blur glass). Gold marks only the primary three; adding it to all floating chrome makes the UI heavy
 - Radius: `--radius: 1rem` → `rounded-sm` 10 (thumbs), `md` 12, `lg` 16 (cards), `xl` 24 (floating panels), `full` (buttons, chips)
 - `.squircle` = superellipse corners where supported (progressive enhancement)
 - Topbar is `fixed`; `<main>` has `pt-[var(--topbar-offset)]`. Page heights: `h-[calc(100vh-var(--topbar-offset))]`, never a hardcoded topbar height. Timeline opts out (`h-screen -mt-[var(--topbar-offset)]`) so the grid scrolls under the floating chrome
-- Animations: `tw-animate-css` (`animate-in fade-in slide-in-from-*`). shadcn `data-open:`/`data-closed:` classes work only through the `@custom-variant`s in `index.css` (Radix sets `data-state`); keep them when re-adding components. Panels (Popover, DropdownMenu, Select, Settings, preview card) share one motion: slide + fade, 300ms `cubic-bezier(.2,.8,.2,1)` in, 200ms `cubic-bezier(.4,0,1,1)` out; every `animate-out` needs `fill-mode-forwards` (else 1-frame flash before unmount); animate only transform/opacity, never the width of anything beside the grid
+- Animations: `tw-animate-css` (`animate-in fade-in slide-in-from-*`). shadcn `data-open:`/`data-closed:` classes work only through the `@custom-variant`s in `index.css` (Radix sets `data-state`); keep them when re-adding components. Panels (Popover, DropdownMenu, Select, Settings) share one motion: slide + fade, 300ms `cubic-bezier(.2,.8,.2,1)` in, 200ms `cubic-bezier(.4,0,1,1)` out; every `animate-out` needs `fill-mode-forwards` (else 1-frame flash before unmount); animate only transform/opacity, never the width of anything beside the grid (exception: the `segmented` ToggleGroup sliding pill, built into `ui/toggle-group.tsx`, animates `left`/`width`; it is absolute + out of flow, so no reflow)
 
 Theme: `AppConfig.theme` (`system` | `light` | `dark`) toggles `.dark` on `<html>` in `App.tsx`.
 

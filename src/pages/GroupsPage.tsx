@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -27,7 +27,7 @@ export function GroupsPage() {
   const { t } = useTranslation();
   const { groups, fetchGroups, createGroup, updateGroup, deleteGroup, clearGroups } = useGroupStore();
   const { config, setConfig } = useAppConfigStore();
-  const { selectedImage, selectImage, clearImages } = useTimelineStore();
+  const { selectImage, clearImages } = useTimelineStore();
   const { selectedImageIds, isSelectionMode, clearSelection, getSelectedCount } = useGroupUIStore();
 
   const [view, setView] = useState<'grid' | 'detail'>('grid');
@@ -41,11 +41,6 @@ export function GroupsPage() {
   const [editingName, setEditingName] = useState('');
   const [exportingGroupId, setExportingGroupId] = useState<number | null>(null);
 
-  const groupImagesRef = useRef(groupImages);
-  groupImagesRef.current = groupImages;
-  const selectedImageRef = useRef(selectedImage);
-  selectedImageRef.current = selectedImage;
-
   const thumbPx = config.thumbnail_size === 'small' ? 120 : config.thumbnail_size === 'large' ? 280 : 180;
   const coverPx = config.group_cover_size === 'small' ? 140 : config.group_cover_size === 'large' ? 220 : 176;
   const archivePath = config.archive_path ? config.archive_path.replace(/\/+$/, '') : '';
@@ -54,25 +49,6 @@ export function GroupsPage() {
   useEffect(() => {
     fetchGroups();
   }, [fetchGroups]);
-
-  useEffect(() => {
-    if (!selectedImage) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-      const images = groupImagesRef.current;
-      const current = selectedImageRef.current;
-      if (!current || images.length < 2) return;
-      const idx = images.findIndex(img => img.id === current.id);
-      if (idx === -1) return;
-      if (e.key === 'ArrowLeft') {
-        selectImage(images[(idx - 1 + images.length) % images.length]);
-      } else {
-        selectImage(images[(idx + 1) % images.length]);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedImage, selectImage]);
 
   const handleOpenArchive = async () => {
     const selected = await open({ directory: true });

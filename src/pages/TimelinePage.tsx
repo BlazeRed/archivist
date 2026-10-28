@@ -14,11 +14,12 @@ import { ImagePreview } from '../components/ImagePreview';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { cn } from '@/lib/utils';
 
 const PREVIEW_MIN = 280;
 const PREVIEW_MAX = 720;
 const RESIZE_HANDLE_W = 8; // w-2
+// The grid keeps at least this much: on a narrow window the preview gives way, not the grid
+const GRID_MIN = 360;
 
 function ResizeHandle({ onResize }: { onResize: (w: number) => void }) {
   const dragging = useRef(false);
@@ -77,7 +78,7 @@ function SelectionActionBar() {
   };
 
   return (
-    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 h-12 max-w-[calc(100%-1.5rem)] flex items-center gap-3 pl-5 pr-1.5 rounded-full bg-popover shadow-float ring-1 ring-frame animate-in fade-in slide-in-from-bottom-8 duration-300 ease-[cubic-bezier(.2,.8,.2,1)]">
+    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 h-12 max-w-[calc(100%-1.5rem)] flex items-center gap-3 pl-5 pr-1.5 rounded-full bg-popover shadow-float animate-in fade-in slide-in-from-bottom-8 duration-300 ease-[cubic-bezier(.2,.8,.2,1)]">
       <span className="text-sm font-medium tabular-nums whitespace-nowrap">
         {t('timeline.selected', { count: getSelectedCount() })}
       </span>
@@ -113,15 +114,10 @@ function SelectionActionBar() {
 
 export function TimelinePage() {
   const { t } = useTranslation();
-  const { fetchImages, fetchGroups, clearImages, selectImage } = useTimelineStore();
+  const { fetchImages, fetchGroups, clearImages, selectImage, setPreviewImage, selectedImage, images } = useTimelineStore();
   const clearGroups = useGroupStore((s) => s.clearGroups);
   const { config, setConfig } = useAppConfigStore();
   const { isSelectionMode } = useGroupUIStore();
-  const hasPreview = useTimelineStore((s) => s.previewImage !== null);
-  const previewOpen = hasPreview && !isSelectionMode;
-  // Keep the card mounted while it animates out; the column collapses after the exit animation
-  const [previewMounted, setPreviewMounted] = useState(previewOpen);
-  if (previewOpen && !previewMounted) setPreviewMounted(true);
   const phase = useImportStore((s) => s.phase);
   const isImportActive = phase === 'scanning' || phase === 'analyzing' || phase === 'thumbnailing' || phase === 'importing';
 
@@ -163,6 +159,11 @@ export function TimelinePage() {
     }
   }, [config.archive_path, fetchImages, fetchGroups]);
 
+  // Navigating in fullscreen moves the preview (and the grid selection) along, so closing lands on that photo
+  useEffect(() => {
+    if (selectedImage) setPreviewImage(selectedImage);
+  }, [selectedImage, setPreviewImage]);
+
 
   if (!config.archive_path) {
     return (
@@ -197,29 +198,17 @@ export function TimelinePage() {
           {isSelectionMode && <SelectionActionBar />}
         </main>
 
-        {/* Preview column. The grid reflows once (the column takes its final width at once), then the card
-            slides into the freed space; on close the card slides out first, then the column collapses.
-            Only transform/opacity animate, so the grid never re-lays out mid-animation. */}
-        {previewMounted && (
-          <div
-            className={cn(
-              'shrink-0 flex h-full pt-[calc(var(--topbar-offset)+8px)] fill-mode-forwards',
-              previewOpen
-                ? 'animate-in fade-in slide-in-from-right-full duration-300 ease-[cubic-bezier(.2,.8,.2,1)]'
-                : 'animate-out fade-out slide-out-to-right-full duration-200 ease-[cubic-bezier(.4,0,1,1)]'
-            )}
-            style={{ width: previewWidth + RESIZE_HANDLE_W }}
-            onAnimationEnd={(e) => {
-              if (e.target === e.currentTarget && !previewOpen) setPreviewMounted(false);
-            }}
-          >
-            <ResizeHandle onResize={handleResize} />
-            <ImagePreview width={previewWidth} />
-          </div>
-        )}
+        {/* Permanent preview column: selection only changes its content, so the grid never reflows */}
+        <div
+          className="shrink-0 flex h-full pt-[calc(var(--topbar-offset)+8px)]"
+          style={{ width: previewWidth + RESIZE_HANDLE_W, maxWidth: `calc(100vw - ${GRID_MIN}px)` }}
+        >
+          <ResizeHandle onResize={handleResize} />
+          <ImagePreview />
+        </div>
       </div>
 
-      <ImageDetail hideDetails />
+      <ImageDetail navImages={images} />
     </div>
   );
 }

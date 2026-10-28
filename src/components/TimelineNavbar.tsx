@@ -113,7 +113,7 @@ export function TimelineNavbar() {
         <PopoverContent
           align="end"
           sideOffset={8}
-          className="squircle w-max max-w-[min(720px,calc(100vw-2rem))] flex-row flex-wrap items-center gap-6 px-5 py-4 rounded-xl ring-frame"
+          className="squircle w-max max-w-[min(720px,calc(100vw-2rem))] flex-row flex-wrap items-center gap-6 px-5 py-4 rounded-xl ring-0 bg-popover"
         >
           {/* Media type */}
           <ToggleGroup

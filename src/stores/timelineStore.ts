@@ -157,6 +157,7 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
     allImages: s.allImages.map(img => img.id === imageId ? { ...img, is_favourite: isFavourite } : img),
     images: s.images.map(img => img.id === imageId ? { ...img, is_favourite: isFavourite } : img),
     previewImage: s.previewImage?.id === imageId ? { ...s.previewImage, is_favourite: isFavourite } : s.previewImage,
+    selectedImage: s.selectedImage?.id === imageId ? { ...s.selectedImage, is_favourite: isFavourite } : s.selectedImage,
   })),
   updateImageWebPath: (imageId, webPath) => set((s) => ({
     allImages: s.allImages.map(img => img.id === imageId ? { ...img, web_path: webPath } : img),
