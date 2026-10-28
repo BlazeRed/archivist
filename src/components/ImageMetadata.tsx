@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { FolderIcon, XIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
@@ -10,7 +11,6 @@ import { formatDuration } from '@/lib/formatDuration';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { XIcon } from 'lucide-react';
 
 export function formatDate(dateStr: string | null, fallback: string) {
   if (!dateStr) return fallback;
@@ -208,10 +208,7 @@ export function ImageMetadataView({ image, groups, hideGroups, readOnly }: {
 
         {!readOnly && (
           <Button variant="outline" size="sm" onClick={handleShowInFolder} className="mt-1 w-full">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
-                d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
-            </svg>
+            <FolderIcon />
             {t('detail.showInFolder')}
           </Button>
         )}

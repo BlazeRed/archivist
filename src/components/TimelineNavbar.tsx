@@ -1,9 +1,10 @@
 import { useTranslation } from 'react-i18next';
+import { CircleCheckIcon } from 'lucide-react';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useGroupUIStore } from '../stores/groupUIStore';
 import { FilterPopover } from './FilterPopover';
+import { InfoPill, ROW_BUTTON } from './FloatingSelectionBar';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 export function TimelineNavbar() {
@@ -17,9 +18,9 @@ export function TimelineNavbar() {
 
   return (
     <div className="flex items-center gap-2">
-      <Badge variant="outline" className="cursor-default select-none h-9 px-4 border-0 bg-popover shadow-float text-xs font-normal text-muted-foreground tabular-nums">
+      <InfoPill>
         {mediaCountLabel}
-      </Badge>
+      </InfoPill>
 
       <FilterPopover
         filter={filter}
@@ -29,17 +30,23 @@ export function TimelineNavbar() {
         availableGroups={availableGroups}
       />
 
-      <Button
-        variant={isSelectionMode ? 'secondary' : 'outline'}
-        onClick={() => setSelectionMode(!isSelectionMode)}
-        aria-pressed={isSelectionMode}
-        className={cn('h-9 px-3.5 text-xs shadow-float', !isSelectionMode && 'bg-popover hover:bg-card')}
-      >
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        {t('timeline.select')}
-      </Button>
+      <SelectModeButton active={isSelectionMode} onToggle={() => setSelectionMode(!isSelectionMode)} />
     </div>
+  );
+}
+
+/** Pill that turns multi-selection on/off (Timeline, Favourites) */
+export function SelectModeButton({ active, onToggle }: { active: boolean; onToggle: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <Button
+      variant={active ? 'secondary' : 'outline'}
+      onClick={onToggle}
+      aria-pressed={active}
+      className={cn(ROW_BUTTON, !active && 'bg-popover hover:bg-card')}
+    >
+      <CircleCheckIcon />
+      {t('timeline.select')}
+    </Button>
   );
 }

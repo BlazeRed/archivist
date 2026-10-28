@@ -1,4 +1,5 @@
-import { useState, useEffect, type CSSProperties, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, type MouseEvent, type ReactNode } from 'react';
+import { ChevronLeftIcon, CircleMinusIcon, FolderIcon, FolderOutputIcon, ImageIcon, LoaderCircleIcon, PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -11,9 +12,13 @@ import { useTimelineStore } from '../stores/timelineStore';
 import { useUIStore } from '../stores/uiStore';
 import { useGridSelection } from '../hooks/useGridSelection';
 import { AddMediaModal } from '../components/AddMediaModal';
+import { SelectModeButton } from '../components/TimelineNavbar';
+import { InfoPill, SelectionCountPill, ROW_BUTTON } from '../components/FloatingSelectionBar';
+import { ArchiveNotSet } from '../components/ArchiveNotSet';
 import { ImageDetail } from '../components/ImageDetail';
 import { MediaButton, CHROME_BUTTON } from '../components/ImagePreview';
-import { ThumbnailCell, SIZES, FLOATING_TOP, type SizeKey } from '../components/ThumbnailGrid';
+import { FloatingScroll, PlainGrid } from '../components/ThumbnailGrid';
+import { cn } from '@/lib/utils';
 import type { Image, GroupWithCount } from '../types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,9 +36,9 @@ const PILL = 'cursor-default select-none h-9 px-4 border-0 bg-popover text-popov
 
 export function GroupsPage() {
   const { t } = useTranslation();
-  const { groups, fetchGroups, createGroup, updateGroup, deleteGroup, clearGroups } = useGroupStore();
-  const { config, setConfig } = useAppConfigStore();
-  const { selectImage, clearImages } = useTimelineStore();
+  const { groups, fetchGroups, createGroup, updateGroup, deleteGroup } = useGroupStore();
+  const { config } = useAppConfigStore();
+  const { selectImage } = useTimelineStore();
   const { selectedImageIds, isSelectionMode, clearSelection: clearTimelineSelection, getSelectedCount } = useGroupUIStore();
 
   const [view, setView] = useState<'grid' | 'detail'>('grid');
@@ -46,31 +51,15 @@ export function GroupsPage() {
   const [showAddMedia, setShowAddMedia] = useState(false);
   const [exportingGroupId, setExportingGroupId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
-  const { selected, clearSelection, toggle, handleClick } = useGridSelection(groupImages);
+  const { selected, clearSelection, toggle, handleClick, isSelectionMode: isPicking, setSelectionMode, exitSelection } = useGridSelection(groupImages);
 
-  const size = SIZES[config.thumbnail_size as SizeKey];
   const coverPx = config.group_cover_size === 'small' ? 140 : config.group_cover_size === 'large' ? 220 : 176;
   const archivePath = config.archive_path ? config.archive_path.replace(/\/+$/, '') : '';
   const thumbnailCacheBust = useUIStore((s) => s.thumbnailCacheBust);
 
   useEffect(() => {
-    fetchGroups();
-  }, [fetchGroups]);
-
-  const handleOpenArchive = async () => {
-    const selected = await open({ directory: true });
-    if (selected) {
-      clearImages();
-      selectImage(null);
-      clearGroups();
-      try {
-        await invoke('init_archive', { archivePath: selected });
-      } catch (e) {
-        console.error('Failed to init archive:', e);
-      }
-      setConfig({ archive_path: selected as string });
-    }
-  };
+    if (config.archive_path) fetchGroups();
+  }, [config.archive_path, fetchGroups]);
 
   const handleOpenGroup = async (groupId: number) => {
     setSelectedGroupId(groupId);
@@ -88,8 +77,14 @@ export function GroupsPage() {
     setView('grid');
     setSelectedGroupId(null);
     setGroupImages([]);
-    clearSelection();
+    exitSelection();
   };
+
+  // Click opens the viewer; in selection mode it toggles (Shift-click = range), as in Favourites
+  const handleImageClick = useCallback((img: Image, e: MouseEvent) => {
+    if (isPicking) handleClick(img, e);
+    else selectImage(img);
+  }, [isPicking, handleClick, selectImage]);
 
   // One dialog for create and rename: the name field and the confirm flow are the same
   const isNameDialogOpen = showCreateModal || renamingGroupId !== null;
@@ -182,16 +177,7 @@ export function GroupsPage() {
     }
   };
 
-  if (!config.archive_path) {
-    return (
-      <div className="flex items-center justify-center h-[calc(100vh-var(--topbar-offset))]">
-        <div className="squircle bg-card px-8 py-6 rounded-xl text-center max-w-sm">
-          <p className="text-muted-foreground text-sm mb-4">{t('timeline.archiveNotSet')}</p>
-          <Button onClick={handleOpenArchive}>{t('timeline.openArchive')}</Button>
-        </div>
-      </div>
-    );
-  }
+  if (!config.archive_path) return <ArchiveNotSet />;
 
   const selectedGroup = groups.find(g => g.id === selectedGroupId);
   const deletingGroup = groups.find(g => g.id === deletingGroupId);
@@ -199,10 +185,75 @@ export function GroupsPage() {
   return (
     // Full-height, pulled up under the fixed topbar so the content scrolls beneath the floating chrome (like Timeline)
     <div className="relative h-screen -mt-[var(--topbar-offset)]">
-      {/* Content */}
-      <div
-        className="h-full overflow-y-auto scroll-inset px-6"
-        style={{ paddingTop: FLOATING_TOP, paddingBottom: 12, '--scroll-inset-top': `${FLOATING_TOP}px`, '--scroll-inset-bottom': '12px' } as CSSProperties}
+      <FloatingScroll
+        // Grid: no title pill (like the timeline), the topbar already says where you are
+        leading={view === 'detail' && (
+          <>
+            <MediaButton label={t('common.back')} onClick={handleBack} className={`${CHROME_BUTTON} size-9 shrink-0`}>
+              <ChevronLeftIcon />
+            </MediaButton>
+            <Badge variant="outline" className={`${PILL} text-[13px] font-semibold min-w-0`}>
+              <span className="truncate">{selectedGroup?.name}</span>
+            </Badge>
+          </>
+        )}
+        toolbar={view === 'grid' ? (
+          groups.length > 0 && (
+            <Button variant="violet" className={ROW_BUTTON} onClick={() => setShowCreateModal(true)}>
+              <PlusIcon />
+              {t('groups.create')}
+            </Button>
+          )
+        ) : isPicking ? (
+          <>
+            {selected.size > 0 && <SelectionCountPill count={selected.size} onClear={clearSelection} />}
+            {selected.size === 1 && (
+              <Button variant="outline" className={cn(ROW_BUTTON, 'bg-popover hover:bg-card')} onClick={handleSetCover}>
+                <ImageIcon />
+                {t('groups.setCover')}
+              </Button>
+            )}
+            <Button variant="violet" className={ROW_BUTTON} onClick={handleRemoveSelected} disabled={busy || selected.size === 0}>
+              <CircleMinusIcon />
+              {t('detail.removeFromGroup')}
+            </Button>
+            <SelectModeButton active onToggle={exitSelection} />
+          </>
+        ) : (
+          <>
+            {groupImages.length > 0 && <InfoPill>{groupImages.length} {t('timeline.items')}</InfoPill>}
+            <Button className={ROW_BUTTON} onClick={() => setShowAddMedia(true)}>
+              <PlusIcon />
+              {t('groups.addMediaTitle')}
+            </Button>
+            {groupImages.length > 0 && (
+              <Button
+                variant="violet"
+                className={ROW_BUTTON}
+                onClick={() => handleExportGroup(selectedGroupId!)}
+                disabled={exportingGroupId === selectedGroupId}
+              >
+                {exportingGroupId === selectedGroupId ? <LoaderCircleIcon className="animate-spin" /> : <FolderOutputIcon />}
+                {t('groups.export')}
+              </Button>
+            )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-lg"
+                  aria-label={t('groups.deleteGroup')}
+                  onClick={() => setDeletingGroupId(selectedGroupId)}
+                  className="bg-popover shadow-float text-muted-foreground hover:bg-popover hover:text-destructive"
+                >
+                  <Trash2Icon />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">{t('groups.deleteGroup')}</TooltipContent>
+            </Tooltip>
+            {groupImages.length > 0 && <SelectModeButton active={false} onToggle={() => setSelectionMode(true)} />}
+          </>
+        )}
       >
         {view === 'grid' ? (
           groups.length === 0 ? (
@@ -234,116 +285,22 @@ export function GroupsPage() {
             </Button>
           </EmptyState>
         ) : (
-          /* Detail: timeline look. Click selects, double-click opens the viewer */
-          <div className="grid" style={{ gap: size.gap, gridTemplateColumns: `repeat(auto-fill, minmax(${size.px}px, 1fr))` }}>
-            {groupImages.map(img => (
-              <div key={img.id} className="relative" onDoubleClick={() => selectImage(img)}>
-                <ThumbnailCell
-                  image={img}
-                  archivePath={archivePath}
-                  cacheBust={thumbnailCacheBust}
-                  isSelectionMode
-                  isSelected={selected.has(img.id)}
-                  isPreviewed={false}
-                  onImageClick={handleClick}
-                  onToggleSelect={toggle}
-                />
-                {/* Cover marker: violet, the groups color (gold is reserved for favourites) */}
-                {selectedGroup?.cover_image_id === img.id && (
-                  <Badge className="absolute bottom-1.5 right-1.5 h-5 px-2 bg-violet text-violet-foreground text-[10px] font-semibold shadow-[0_1px_3px_rgba(0,0,0,.4)] pointer-events-none">
-                    {t('groups.cover')}
-                  </Badge>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Scroll-edge fade: content dissolves as it passes under the floating chrome */}
-      <div
-        className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-linear-to-b from-background from-55% to-transparent"
-        style={{ height: FLOATING_TOP + 8 }}
-      />
-
-      {/* Floating row: title/back (left), actions (right) */}
-      <div className="pointer-events-none absolute inset-x-0 z-20 flex items-start justify-between gap-3 px-4 top-[calc(var(--topbar-offset)+8px)]">
-        {view === 'detail' ? (
-          <div className="pointer-events-auto flex items-center gap-2 min-w-0">
-            <MediaButton label={t('common.back')} onClick={handleBack} className={`${CHROME_BUTTON} size-9 shrink-0`}>
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </MediaButton>
-            <Badge variant="outline" className={`${PILL} text-[13px] font-semibold min-w-0`}>
-              <span className="truncate">{selectedGroup?.name}</span>
-            </Badge>
-            {selected.size > 0 && (
-              <Badge variant="outline" className={`${PILL} text-xs font-normal text-muted-foreground tabular-nums animate-in fade-in duration-200`}>
-                {t('timeline.selected', { count: selected.size })}
+          /* Detail: click opens the viewer; selection sits behind the Select button */
+          <PlainGrid
+            images={groupImages}
+            isSelectionMode={isPicking}
+            selectedIds={selected}
+            onImageClick={handleImageClick}
+            onToggleSelect={toggle}
+            // Cover marker: violet, the groups color (gold is reserved for favourites)
+            overlay={img => selectedGroup?.cover_image_id === img.id && (
+              <Badge className="absolute bottom-1.5 right-1.5 h-5 px-2 bg-violet text-violet-foreground text-[10px] font-semibold shadow-[0_1px_3px_rgba(0,0,0,.4)] pointer-events-none">
+                {t('groups.cover')}
               </Badge>
             )}
-          </div>
-        ) : <div /> /* No title pill (like the timeline): the topbar already says where you are */}
-
-        <div className="pointer-events-auto flex items-center gap-2 shrink-0">
-          {view === 'grid' ? (
-            groups.length > 0 && (
-              <Button size="lg" variant="violet" className="shadow-float" onClick={() => setShowCreateModal(true)}>
-                <PlusIcon />
-                {t('groups.create')}
-              </Button>
-            )
-          ) : selected.size > 0 ? (
-            <>
-              {selected.size === 1 && (
-                <Button size="lg" variant="outline" className="bg-popover hover:bg-card shadow-float" onClick={handleSetCover}>
-                  {t('groups.setCover')}
-                </Button>
-              )}
-              <Button size="lg" variant="violet" className="shadow-float" onClick={handleRemoveSelected} disabled={busy}>
-                {t('detail.removeFromGroup')}
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button size="lg" className="shadow-float" onClick={() => setShowAddMedia(true)}>
-                <PlusIcon />
-                {t('groups.addMediaTitle')}
-              </Button>
-              {groupImages.length > 0 && (
-                <Button
-                  size="lg"
-                  variant="violet"
-                  className="shadow-float"
-                  onClick={() => handleExportGroup(selectedGroupId!)}
-                  disabled={exportingGroupId === selectedGroupId}
-                >
-                  {exportingGroupId === selectedGroupId && (
-                    <svg className="animate-spin" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                    </svg>
-                  )}
-                  {t('groups.export')}
-                </Button>
-              )}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-lg"
-                    aria-label={t('groups.deleteGroup')}
-                    onClick={() => setDeletingGroupId(selectedGroupId)}
-                    className="bg-popover shadow-float text-muted-foreground hover:bg-popover hover:text-destructive"
-                  >
-                    <TrashIcon />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">{t('groups.deleteGroup')}</TooltipContent>
-              </Tooltip>
-            </>
-          )}
-        </div>
-      </div>
+          />
+        )}
+      </FloatingScroll>
 
       <ImageDetail hideGroups navImages={groupImages} />
 
@@ -426,9 +383,7 @@ function GroupCard({ group, coverUrl, onOpen, onRename, onDelete }: {
           <img src={coverUrl} alt={group.name} className="w-full h-full object-cover" loading="lazy" />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-muted-foreground/50">
-            <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
-            </svg>
+            <FolderIcon className="w-10 h-10" strokeWidth={1} />
             {group.image_count === 0 && (
               <span className="text-[10px]">{t('groups.noCover')}</span>
             )}
@@ -444,10 +399,10 @@ function GroupCard({ group, coverUrl, onOpen, onRename, onDelete }: {
           className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover/card:opacity-100 focus-within:opacity-100 transition-opacity"
         >
           <MediaButton label={t('groups.rename')} onClick={onRename} className={CHROME_BUTTON}>
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.862 4.487a2.1 2.1 0 113 3L8.5 18.85 4 20l1.15-4.5L16.862 4.487z" />
+            <PencilIcon />
           </MediaButton>
           <MediaButton label={t('groups.deleteGroup')} onClick={onDelete} className={`${CHROME_BUTTON} hover:text-destructive`}>
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            <Trash2Icon />
           </MediaButton>
         </div>
       </div>
@@ -470,21 +425,5 @@ function EmptyState({ text, children }: { text: string; children: ReactNode }) {
         {children}
       </div>
     </div>
-  );
-}
-
-function PlusIcon() {
-  return (
-    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
-    </svg>
-  );
-}
-
-function TrashIcon() {
-  return (
-    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-    </svg>
   );
 }

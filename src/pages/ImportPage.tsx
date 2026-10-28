@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { CheckIcon, FileIcon, FolderIcon, LoaderCircleIcon, UploadIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
@@ -63,10 +64,7 @@ function DropZone({
       )}
     >
       <div className="py-8 flex flex-col items-center gap-2 text-muted-foreground pointer-events-none select-none">
-        <svg className="w-8 h-8 opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <path strokeLinecap="round" strokeLinejoin="round"
-            d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-        </svg>
+        <UploadIcon className="w-8 h-8 opacity-50" strokeWidth={1.5} />
         <p className="text-sm font-medium">
           {isDragging ? dropLabel : dragLabel}
         </p>
@@ -81,9 +79,7 @@ function DropZone({
             onClick={onSelectFolder}
             className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-muted hover:bg-muted/80 rounded-lg text-xs font-medium text-foreground transition-colors"
           >
-            <svg className="w-3.5 h-3.5 text-muted-foreground" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
-            </svg>
+            <FolderIcon className="w-3.5 h-3.5 text-muted-foreground" />
             {folderLabel}
           </button>
           {onSelectFile && fileLabel && (
@@ -91,9 +87,7 @@ function DropZone({
               onClick={onSelectFile}
               className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-muted hover:bg-muted/80 rounded-lg text-xs font-medium text-foreground transition-colors"
             >
-              <svg className="w-3.5 h-3.5 text-muted-foreground" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd"/>
-              </svg>
+              <FileIcon className="w-3.5 h-3.5 text-muted-foreground" />
               {fileLabel}
             </button>
           )}
@@ -222,15 +216,7 @@ export function ImportPage() {
       <div className="p-6 max-w-2xl mx-auto">
         <div className="bg-card p-8 rounded-xl text-center">
           <div className="w-12 h-12 rounded-full bg-success/15 flex items-center justify-center mx-auto mb-4">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path
-                d="M3 10.5L8 15.5L17 5"
-                stroke="var(--success-ink)"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            <CheckIcon className="size-5 text-success-ink" />
           </div>
           <h2 className="text-xl font-semibold text-foreground mb-4">{t('import.complete')}</h2>
           <div className="flex justify-center gap-8 mb-6">
@@ -318,10 +304,7 @@ export function ImportPage() {
           />
           {isFinalizing && (
             <div className="flex items-center gap-2 mt-3 text-sm text-muted-foreground">
-              <svg className="animate-spin size-4 shrink-0" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-              </svg>
+              <LoaderCircleIcon className="animate-spin size-4 shrink-0" />
               <span>{t('import.finalizing')}</span>
             </div>
           )}
@@ -453,10 +436,7 @@ export function ImportPage() {
               <Button variant="outline" onClick={() => setStep(2)} disabled={isAnalyzing}>← {t('common.back')}</Button>
               <Button onClick={handleStartAnalysis} disabled={isAnalyzing} className="gap-2">
                 {isAnalyzing && (
-                  <svg className="animate-spin size-4" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                  </svg>
+                  <LoaderCircleIcon className="animate-spin size-4" />
                 )}
                 {isAnalyzing
                   ? (phase === 'scanning' ? t('import.scanningFolder') : t('import.analyzing'))

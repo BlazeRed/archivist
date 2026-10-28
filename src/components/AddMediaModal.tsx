@@ -6,12 +6,11 @@ import { applyClientFilter, normalizeFilter, EMPTY_FILTER, type TimelineFilter }
 import { useGridSelection } from "../hooks/useGridSelection";
 import { MonthGrid, FLOATING_ROW, type DateField } from "./ThumbnailGrid";
 import { FilterPopover } from "./FilterPopover";
+import { BottomFade, InfoPill, SelectionCountPill } from "./FloatingSelectionBar";
 import type { Image } from "../types";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 // The floating row sits one floating inset (12px) from the top of the dialog
 const INSET_TOP = 12 + FLOATING_ROW;
@@ -129,9 +128,9 @@ export function AddMediaModal({ groupId, groupName, onClose, onAdded }: Props) {
           }
           toolbar={
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="cursor-default select-none h-9 px-4 border-0 bg-popover shadow-float text-xs font-normal text-muted-foreground tabular-nums">
+              <InfoPill>
                 {countLabel}
-              </Badge>
+              </InfoPill>
               <FilterPopover
                 filter={filter}
                 setFilter={setFilter}
@@ -154,26 +153,11 @@ export function AddMediaModal({ groupId, groupName, onClose, onAdded }: Props) {
           }
         />
 
+        <BottomFade height={INSET_TOP + 8} />
+
         {/* Floating actions, bottom-right: Cancel first, as in every dialog */}
         <div className="absolute bottom-3 right-4 z-20 flex items-center gap-2">
-          {/* Selected count + clear, one pill; ends on the button with a 3px inset */}
-          {selected.size > 0 && (
-            <div className="h-9 flex items-center gap-1 pl-4 pr-[3px] rounded-full bg-popover shadow-float animate-in fade-in duration-200">
-              <span className="cursor-default select-none text-xs text-muted-foreground tabular-nums whitespace-nowrap">
-                {t("timeline.selected", { count: selected.size })}
-              </span>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon-sm" aria-label={t("timeline.clearSelection")} onClick={clearSelection} className="text-muted-foreground">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top">{t("timeline.clearSelection")}</TooltipContent>
-              </Tooltip>
-            </div>
-          )}
+          {selected.size > 0 && <SelectionCountPill count={selected.size} onClear={clearSelection} tooltipSide="top" />}
           <Button size="lg" variant="outline" className="bg-popover hover:bg-card shadow-float" onClick={onClose}>
             {t("common.cancel")}
           </Button>

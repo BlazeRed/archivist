@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { StarIcon, Trash2Icon, XIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -10,7 +11,7 @@ import { useGroupStore } from '../stores/dataStore';
 import { TimelineNavbar } from '../components/TimelineNavbar';
 import { ThumbnailGrid } from '../components/ThumbnailGrid';
 import { ImageDetail } from '../components/ImageDetail';
-import { ImagePreview, GroupsButton, StarIcon } from '../components/ImagePreview';
+import { ImagePreview, GroupsButton } from '../components/ImagePreview';
 import { useBulkGroups } from '../components/ImageMetadata';
 import { FloatingSelectionBar, BAR_BUTTON, BAR_LABEL } from '../components/FloatingSelectionBar';
 import { useTrashImages } from '../hooks/useTrash';
@@ -114,7 +115,7 @@ function SelectionActionBar() {
             aria-pressed={allFavourite}
             className={BAR_BUTTON}
           >
-            <StarIcon filled={allFavourite} />
+            <StarIcon fill={allFavourite ? 'currentColor' : 'none'} />
             <span className={BAR_LABEL}>{favouriteLabel}</span>
           </Button>
         </TooltipTrigger>
@@ -132,10 +133,7 @@ function SelectionActionBar() {
             aria-label={t('trash.moveToTrash')}
             className={BAR_BUTTON}
           >
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
+            <Trash2Icon />
             <span className={BAR_LABEL}>{t('trash.moveToTrash')}</span>
           </Button>
         </TooltipTrigger>
@@ -150,9 +148,7 @@ function SelectionActionBar() {
             aria-label={t('timeline.cancelSelection')}
             className={cn(BAR_BUTTON, 'ml-auto text-muted-foreground')}
           >
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <XIcon />
             <span className={BAR_LABEL}>{t('timeline.cancelSelection')}</span>
           </Button>
         </TooltipTrigger>

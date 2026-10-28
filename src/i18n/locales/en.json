@@ -106,7 +106,6 @@
     "group": "Group"
   },
   "favourites": {
-    "title": "Favourites",
     "empty": "No favourites yet. Add to favourites from the timeline preview."
   },
   "map": {
@@ -164,6 +163,7 @@
     "rescanMissingTitle": "{{count}} file(s) missing from archive",
     "rescanMissingDesc": "These files could not be found on disk (moved, renamed, or on an unmounted drive?). Their records will stay until you confirm removal.",
     "rescanMissingConfirm": "Remove records",
+    "rescanMissingDismiss": "Ignore",
     "rescanMissingRemoved": "Removed {{count}} missing entries",
     "groupCoverSize": "Group cover size",
     "coverSizeSmall": "Small (140px)",
@@ -237,6 +237,8 @@
     "restoreError": "Some items could not be restored",
     "restoreAll": "Restore all",
     "restoreSelected": "Restore",
+    "restoreAllTitle": "Restore the whole trash?",
+    "restoreAllConfirm": "{{count}} items will go back to their folders and the timeline. The trash will be empty.",
     "openFolder": "Open folder",
     "openFolderError": "Could not open the Trash folder",
     "summary": "{{count}} items · {{size}}",

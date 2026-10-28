@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { ArrowLeftIcon, ChevronLeftIcon, ChevronRightIcon, InfoIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { toast } from 'sonner';
@@ -203,7 +204,7 @@ function Viewer({ image, hideGroups, navImages }: { image: Image; hideGroups?: b
         <div className="absolute top-3 inset-x-3 flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
             <MediaButton label={t('common.close')} onClick={close} className={CHROME_BUTTON}>
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              <ArrowLeftIcon />
             </MediaButton>
             <Badge variant="outline" className="h-9 min-w-0 max-w-[40vw] gap-2 px-4 border-0 bg-popover text-popover-foreground shadow-float text-[13px]">
               <span className="truncate font-semibold">{image.filename}</span>
@@ -215,7 +216,7 @@ function Viewer({ image, hideGroups, navImages }: { image: Image; hideGroups?: b
             <FolderButton image={image} />
             {!hideGroups && <GroupsButton groups={groups} side="bottom" />}
             <MediaButton label={t('detail.title')} pressed={infoOpen} onClick={() => setInfoOpen(o => !o)} className={cn(CHROME_BUTTON, infoOpen && 'bg-primary text-primary-foreground hover:bg-primary')}>
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <InfoIcon />
             </MediaButton>
           </div>
         </div>
@@ -223,12 +224,12 @@ function Viewer({ image, hideGroups, navImages }: { image: Image; hideGroups?: b
         {/* Prev/next stop at the ends: no wrap-around */}
         {prev && (
           <MediaButton label={t('common.previous')} onClick={() => selectImage(prev)} className={cn(CHROME_BUTTON, 'absolute left-4 top-1/2 -translate-y-1/2 size-11')}>
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            <ChevronLeftIcon />
           </MediaButton>
         )}
         {next && (
           <MediaButton label={t('common.next')} onClick={() => selectImage(next)} className={cn(CHROME_BUTTON, 'absolute top-1/2 -translate-y-1/2 size-11', infoOpen ? 'right-[21rem]' : 'right-4')}>
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            <ChevronRightIcon />
           </MediaButton>
         )}
 

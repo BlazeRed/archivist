@@ -1,4 +1,5 @@
 import { useMemo, useCallback } from 'react';
+import { ArrowRightIcon, ImageOffIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { List, RowComponentProps } from 'react-window';
@@ -48,11 +49,7 @@ function PreviewThumb({ src, label, filename }: { src: string; label: string; fi
           <img src={src} alt={filename} className="w-full h-full object-cover" loading="lazy" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-            <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-              <line x1="3" y1="3" x2="21" y2="21"/>
-              <circle cx="8.5" cy="8.5" r="1.5"/>
-            </svg>
+            <ImageOffIcon className="w-6 h-6" strokeWidth={1.5} />
           </div>
         )}
       </div>
@@ -83,9 +80,7 @@ function ConflictRowInner({
       <div className="flex gap-3 mb-2.5">
         <PreviewThumb src={incomingUrl} label={t('conflicts.incoming')} filename={img.filename} />
         <div className="flex items-center self-center text-muted-foreground">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="1.5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 8h10M9 4l4 4-4 4"/>
-          </svg>
+          <ArrowRightIcon className="w-4 h-4" />
         </div>
         <PreviewThumb src={existingUrl} label={t('conflicts.inArchive')} filename={img.conflict?.existing_path ?? ''} />
         <div className="flex-1 min-w-0 self-center">

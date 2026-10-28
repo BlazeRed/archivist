@@ -120,14 +120,16 @@ Key components in `src/components/`:
 | Component | Purpose |
 |-----------|---------|
 | `Topbar.tsx` | Floating pill nav bar — logo, page links, import/rescan/settings icon buttons |
-| `ThumbnailGrid.tsx` | `MonthGrid`: generic virtualized month grid under floating chrome (fade, floating row with `leading` + month pill + `toolbar`, `insetTop`, optional `onSelectMonth` clickable headers). `ThumbnailGrid` = MonthGrid wired to timelineStore (preview, keyboard nav, selection). Also exports `ThumbnailCell`, `SIZES`, `FLOATING_TOP`/`FLOATING_ROW` |
+| `ThumbnailGrid.tsx` | `MonthGrid`: generic virtualized month grid under floating chrome (fade, floating row with `leading` + month pill + `toolbar`, `insetTop`, optional `onSelectMonth` clickable headers). `ThumbnailGrid` = MonthGrid wired to timelineStore (preview, keyboard nav, selection). Also exports `ThumbnailCell`, `SIZES`, `FLOATING_TOP`/`FLOATING_ROW`. `FloatingScroll` (non-virtualized page under the floating chrome: fade + floating row `leading`/`toolbar`) and `PlainGrid` (CSS grid of `ThumbnailCell`, optional `overlay`) serve Favourites/Trash/group detail; `MonthGrid` only for Timeline and AddMediaModal |
 | `FilterPopover.tsx` | Filters pill + panel, controlled (`filter`/`setFilter`): Timeline passes the store, AddMediaModal local state via `normalizeFilter`/`applyClientFilter` from timelineStore. `children` = extra panel controls |
 | `AddMediaModal.tsx` | Group media picker: near-fullscreen dialog (inset 12) with `MonthGrid` + `FilterPopover` (+ sort segmented), `useGridSelection` (click month header = select month), layered Esc, bulk add via `add_images_to_group_bulk` |
 | `ImagePreview.tsx` | Timeline preview column, always visible: selected item or static skeleton. Exports the shared media actions (favourite, folder, groups) |
 | `ImageDetail.tsx` | Fullscreen viewer: floating chrome, ⓘ metadata panel (closed by default), ←/→/Esc, FLIP zoom from/to the preview frame (`[data-preview-media]`) |
-| `pages/TrashPage.tsx` | Trash: timeline look (grid under the floating chrome, `ThumbnailCell`) on a plain CSS grid, no bottom bar: the title pill holds Restore all, which becomes Restore + selected count while selecting; click/Shift-click selects, Esc clears, double-click opens the viewer; Open folder on the right |
-| `pages/GroupsPage.tsx` | Groups: floating row + content under the chrome (like Trash). Cards `shadow-raised` + violet count badge, rename/delete via `onMedia` icon buttons → dialogs. Detail = `ThumbnailCell` grid (`useGridSelection`): selecting swaps the actions for Set cover (1 item) / Remove from group; cover marked by a violet badge |
-| `FloatingSelectionBar.tsx` | Timeline multi-selection chrome: count pill + full-width bar; `BAR_BUTTON`/`BAR_LABEL` = icon only below @2xl, icon + label above |
+| `pages/TrashPage.tsx` | Trash: `FloatingScroll` + `PlainGrid`. Idle: summary pill, Restore all (confirm dialog: it undoes the whole trash history), Open folder, Select. Selection mode: count ✕ pill + Restore. Click opens the viewer |
+| `pages/GroupsPage.tsx` | Groups: `FloatingScroll`. Cards `shadow-raised` + violet count badge, rename/delete via `onMedia` icon buttons → dialogs. Detail = `PlainGrid` (cover marked by a violet badge via `overlay`): idle = count pill, Add media, Export, Delete, Select; selection mode = count ✕ pill, Set cover (1 item), Remove from group |
+| `pages/FavouritesPage.tsx` | Favourites: `FloatingScroll` + `PlainGrid` over `allImages` filtered by `is_favourite` (fetches them itself if the Timeline hasn't). Idle = count pill + Select; selection mode = count ✕ pill + Remove from favourites |
+| `FloatingSelectionBar.tsx` | Selection chrome. `FloatingSelectionBar` (Timeline only: count pill + full-width bottom bar with `BottomFade`; `BAR_BUTTON`/`BAR_LABEL` = icon only below @2xl). `SelectionCountPill` (count + ✕ clear), `InfoPill` (read-only pill), `ROW_BUTTON` (compact floating-row button, opaque when disabled), `BottomFade` (bottom scroll-edge fade under bottom chrome) |
+| `ArchiveNotSet.tsx` | "No archive" card + Open archive (Favourites, Groups, Trash) |
 | `ProgressBar.tsx` | Import progress indicator |
 | `ConflictReview.tsx` | Duplicate conflict resolution UI |
 | `Toast.tsx` / `ui/sonner.tsx` | Toast notification display |
@@ -151,6 +153,10 @@ All buttons are pills (`rounded-full`), press = `scale(.97)`, hover = `brightnes
 | `link` | Text links |
 
 **Framework first:** build UI only from `src/components/ui/` (shadcn, style `radix-nova`). Missing component → `npx shadcn@latest add <name>` (then switch its `cn` import to `@/lib/utils`; do not add the `cn` npm package). Customize only with token classes / CVA variants, and ask the user before customizing or creating a component.
+
+**Icons:** `lucide-react` only (shadcn `iconLibrary`), imported with the `Icon` suffix (`XIcon`, `StarIcon`, `StarOffIcon`…). Never hand-draw `<svg>` icons.
+
+**Selection pages** (Favourites, Trash, group detail): `useGridSelection` (`isSelectionMode`/`setSelectionMode`/`exitSelection`, Esc exits, auto-exit when the list empties) + `SelectModeButton` (from `TimelineNavbar`). Click opens the viewer outside selection mode. Spec: design system §10 "Selection on secondary pages". Filled star = `<StarIcon fill="currentColor" />`; spinner = `<LoaderCircleIcon className="animate-spin" />`; `MediaButton` takes the icon element as children.
 
 Project variants on shadcn components: `Badge` `gold` / `violet`; `Toggle`/`ToggleGroup` `segmented` (pill segments, active = primary — topbar nav, media filter, theme); `Button` `violet` / `gold` / `onMedia`. Tooltips: `TooltipProvider delayDuration={400}` in `App.tsx`; icon-only buttons get a `Tooltip` + `aria-label`, not `title`.
 

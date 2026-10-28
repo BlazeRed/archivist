@@ -50,6 +50,9 @@ export function useRescan() {
         toast.warning(t('settings.rescanMissingTitle', { count: missingIds.length }), {
           description: t('settings.rescanMissingDesc'),
           duration: Infinity,
+          // Persistent: needs its own way out. Ignore first, then the destructive action (red: it deletes DB records)
+          cancel: { label: t('settings.rescanMissingDismiss'), onClick: () => {} },
+          classNames: { actionButton: 'ml-1.5! bg-destructive! text-destructive-foreground!' },
           action: {
             label: t('settings.rescanMissingConfirm'),
             onClick: async () => {

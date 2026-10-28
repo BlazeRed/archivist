@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { ChevronLeftIcon, ChevronRightIcon, ChevronUpIcon, FolderIcon, ImageIcon, LoaderCircleIcon, Maximize2Icon, PlayIcon, StarIcon, Trash2Icon, XIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { toast } from 'sonner';
@@ -58,11 +59,7 @@ function PreviewSkeleton() {
   return (
     <div className={CONTENT}>
       <div className="shrink-0 rounded-md bg-muted flex flex-col items-center justify-center gap-2 px-6 text-muted-foreground" style={{ aspectRatio: '1 / 1' }}>
-        <svg className="size-8 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="3" width="18" height="18" rx="2" />
-          <circle cx="8.5" cy="8.5" r="1.5" />
-          <path d="M21 15l-5-5L5 21" />
-        </svg>
+        <ImageIcon className="size-8 opacity-60" strokeWidth={1.5} />
         <p className="text-xs text-center">{t('preview.empty')}</p>
       </div>
 
@@ -198,9 +195,7 @@ function PreviewCard({ image: previewImage }: { image: Image }) {
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button variant="onMedia" onClick={handlePlay} aria-label={t('preview.play')} className={cn(CHROME_BUTTON, 'relative size-14 [&_svg]:size-6!')}>
-                  <svg className="ml-1" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
+                  <PlayIcon className="ml-1" fill="currentColor" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">{t('preview.play')}</TooltipContent>
@@ -223,27 +218,25 @@ function PreviewCard({ image: previewImage }: { image: Image }) {
         )}
         {/* Overlay controls: opaque theme-following buttons (CHROME_BUTTON) */}
         <MediaButton label={t('common.close')} onClick={() => setPreviewImage(null)} className={cn(CHROME_BUTTON, 'absolute top-2 left-2')}>
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          <XIcon />
         </MediaButton>
         {/* Favourite toggle — top-right like the star on grid thumbnails */}
         <FavouriteButton image={previewImage} className={cn(CHROME_BUTTON, 'absolute top-2 right-12')} />
         <MediaButton label={t('trash.moveToTrash')} onClick={() => trashImages([previewImage.id])} className={cn(CHROME_BUTTON, 'absolute top-2 right-22 text-destructive')}>
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          <Trash2Icon />
         </MediaButton>
         <MediaButton label={t('preview.expand')} onClick={() => selectImage(previewImage)} className={cn(CHROME_BUTTON, 'absolute top-2 right-2')}>
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-            d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+          <Maximize2Icon />
         </MediaButton>
         {/* Prev/next stop at the ends: no wrap-around */}
         {currentIdx > 0 && (
           <MediaButton label={t('common.previous')} onClick={() => setPreviewImage(images[currentIdx - 1])} className={cn(CHROME_BUTTON, 'absolute left-2 top-1/2 -translate-y-1/2')}>
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            <ChevronLeftIcon />
           </MediaButton>
         )}
         {currentIdx > -1 && currentIdx < images.length - 1 && (
           <MediaButton label={t('common.next')} onClick={() => setPreviewImage(images[currentIdx + 1])} className={cn(CHROME_BUTTON, 'absolute right-2 top-1/2 -translate-y-1/2')}>
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            <ChevronRightIcon />
           </MediaButton>
         )}
       </div>
@@ -281,7 +274,7 @@ export function FavouriteButton({ image, className }: { image: Image; className?
           }}
           className={cn(className, image.is_favourite && 'bg-gold text-gold-foreground hover:bg-gold')}
         >
-          <StarIcon filled={image.is_favourite} className={cn(image.is_favourite && 'animate-in zoom-in-50 duration-200')} />
+          <StarIcon fill={image.is_favourite ? 'currentColor' : 'none'} className={cn(image.is_favourite && 'animate-in zoom-in-50 duration-200')} />
         </Button>
       </TooltipTrigger>
       <TooltipContent side="bottom">{t('preview.favourite')}</TooltipContent>
@@ -301,10 +294,7 @@ export function FolderButton({ image }: { image: Image }) {
           onClick={handleShowInFolder}
           className="pointer-events-auto h-9 min-w-0 px-4 shadow-float"
         >
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
-              d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
-          </svg>
+          <FolderIcon />
           <span className="truncate">{t('preview.folder')}</span>
         </Button>
       </TooltipTrigger>
@@ -326,9 +316,7 @@ export function GroupsButton({ groups, side }: { groups: ImageGroups; side: 'top
               {groups.currentGroups.length}
             </Badge>
           )}
-          <svg className={cn('opacity-80', side === 'bottom' && 'rotate-180')} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-          </svg>
+          <ChevronUpIcon className={cn('opacity-80', side === 'bottom' && 'rotate-180')} />
         </Button>
       </PopoverTrigger>
       <PopoverContent side={side} align="end" sideOffset={8} className="w-auto min-w-60 gap-0.5 p-1.5">
@@ -360,18 +348,7 @@ export function GroupsButton({ groups, side }: { groups: ImageGroups; side: 'top
 
 export function Spinner() {
   return (
-    <svg className="animate-spin size-8 text-muted-foreground" viewBox="0 0 24 24" fill="none">
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-    </svg>
-  );
-}
-
-export function StarIcon({ filled, className }: { filled: boolean; className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} strokeLinejoin="round">
-      <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />
-    </svg>
+    <LoaderCircleIcon className="animate-spin size-8 text-muted-foreground" />
   );
 }
 
@@ -387,7 +364,7 @@ export function MediaButton({ label, onClick, className, pressed, children }: {
     <Tooltip>
       <TooltipTrigger asChild>
         <Button variant="onMedia" size="icon" aria-label={label} aria-pressed={pressed} onClick={onClick} className={className}>
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">{children}</svg>
+          {children}
         </Button>
       </TooltipTrigger>
       <TooltipContent side="bottom">{label}</TooltipContent>

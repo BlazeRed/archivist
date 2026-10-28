@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { ArchiveIcon, RefreshCwIcon, SettingsIcon, Trash2Icon, UploadIcon } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -80,14 +81,7 @@ export function Topbar() {
             className="h-auto min-w-0 justify-self-start gap-2.5 pl-0.5 pr-3 py-0.5"
           >
             <span className="squircle w-[34px] h-[34px] rounded-[11px] bg-linear-145 from-primary to-violet flex items-center justify-center shrink-0">
-              <svg className="size-5! text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
-                />
-              </svg>
+              <ArchiveIcon className="size-5! text-white" />
             </span>
             <span className="flex flex-col leading-none text-left">
               <span className="text-[15px] font-semibold text-foreground leading-none">{t('app.name')}</span>
@@ -128,10 +122,7 @@ export function Topbar() {
               aria-label={t('nav.import')}
               className={cn('relative', isActive('/import') ? 'text-primary-ink bg-primary/12 hover:bg-primary/12' : 'text-muted-foreground')}
             >
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-              </svg>
+              <UploadIcon />
               {isImportActive && (
                 <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-primary animate-pulse" />
               )}
@@ -152,10 +143,7 @@ export function Topbar() {
                 aria-label={t('nav.rescan')}
                 className="text-muted-foreground"
               >
-                <svg className={cn(isRescanning && 'animate-spin')} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
+                <RefreshCwIcon className={cn(isRescanning && 'animate-spin')} />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">{t('nav.rescan')}</TooltipContent>
@@ -173,10 +161,7 @@ export function Topbar() {
                 aria-label={t('nav.trash')}
                 className={cn('relative', isActive('/trash') ? 'text-primary-ink bg-primary/12 hover:bg-primary/12' : 'text-muted-foreground')}
               >
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
+                <Trash2Icon />
                 {trashCount > 0 && (
                   <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-destructive" />
                 )}
@@ -196,11 +181,7 @@ export function Topbar() {
               aria-label={t('nav.settings')}
               className={cn(settingsOpen ? 'text-primary-ink bg-primary/12 hover:bg-primary/12' : 'text-muted-foreground')}
             >
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
+              <SettingsIcon />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom">{t('nav.settings')}</TooltipContent>

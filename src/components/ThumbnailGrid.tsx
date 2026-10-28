@@ -1,4 +1,5 @@
 import { useMemo, useCallback, useState, useRef, useEffect, memo, type ReactNode, type CSSProperties, type MouseEvent, type RefObject } from 'react';
+import { ImageOffIcon, PlayIcon, StarIcon, VideoIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { flushSync } from 'react-dom';
 import { List, RowComponentProps, useListRef } from 'react-window';
@@ -139,21 +140,12 @@ export const ThumbnailCell = memo(function ThumbnailCell({
         />
       ) : image.media_type === 'video' ? (
         <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-foreground/40">
-          <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="2" y="6" width="14" height="12" rx="2" />
-            <path d="M16 10l6-3v10l-6-3V10z" />
-          </svg>
-          <svg className="w-4 h-4 opacity-60" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M8 5v14l11-7z" />
-          </svg>
+          <VideoIcon className="w-7 h-7" strokeWidth={1.5} />
+          <PlayIcon className="w-4 h-4 opacity-60" fill="currentColor" />
         </div>
       ) : (
         <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-foreground/40">
-          <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-            <line x1="3" y1="3" x2="21" y2="21"/>
-            <circle cx="8.5" cy="8.5" r="1.5"/>
-          </svg>
+          <ImageOffIcon className="w-6 h-6" strokeWidth={1.5} />
           <p className="text-[8px] text-center px-1 leading-tight">{t('common.noThumbnail')}</p>
         </div>
       )}
@@ -165,7 +157,7 @@ export const ThumbnailCell = memo(function ThumbnailCell({
       {/* Video: duration pill (play glyph when duration is unknown) */}
       {image.media_type === 'video' && (
         <span className="absolute bottom-1.5 left-1.5 flex items-center gap-0.5 text-[10px] font-semibold tabular-nums text-white bg-[rgba(0,20,45,.55)] rounded-full px-1.5 leading-4 pointer-events-none">
-          <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+          <PlayIcon className="w-2.5 h-2.5" fill="currentColor" />
           {image.duration_ms != null && formatDuration(image.duration_ms)}
         </span>
       )}
@@ -173,9 +165,7 @@ export const ThumbnailCell = memo(function ThumbnailCell({
       {/* Favourite indicator: solid gold disc (same look as the active star in the preview), readable on any photo */}
       {image.is_favourite && (
         <Badge aria-hidden className="absolute top-1.5 right-1.5 size-5 p-0 bg-gold text-gold-foreground shadow-[0_1px_3px_rgba(0,0,0,.4)] pointer-events-none">
-          <svg fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />
-          </svg>
+          <StarIcon fill="currentColor" />
         </Badge>
       )}
 
@@ -526,5 +516,66 @@ export function ThumbnailGrid({ toolbar }: { toolbar?: ReactNode }) {
       toolbar={toolbar}
       gridRowsRef={gridRowsRef}
     />
+  );
+}
+
+/** Non-virtualized page under the floating chrome (Favourites, Trash, Groups): scroller pulled under the
+ *  topbar, scroll-edge fade, floating row (`leading` left, `toolbar` right). Place inside a `relative` parent. */
+export function FloatingScroll({ leading, toolbar, children }: { leading?: ReactNode; toolbar?: ReactNode; children: ReactNode }) {
+  return (
+    <>
+      <div
+        className="h-full overflow-y-auto scroll-inset px-6"
+        style={{ paddingTop: FLOATING_TOP, paddingBottom: 12, '--scroll-inset-top': `${FLOATING_TOP}px`, '--scroll-inset-bottom': '12px' } as CSSProperties}
+      >
+        {children}
+      </div>
+
+      {/* Scroll-edge fade: content dissolves as it passes under the floating chrome */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-linear-to-b from-background from-55% to-transparent"
+        style={{ height: FLOATING_TOP + 8 }}
+      />
+
+      <div className="pointer-events-none absolute inset-x-0 z-20 flex items-start justify-between gap-3 px-4 top-[calc(var(--topbar-offset)+8px)]">
+        <div className="pointer-events-auto flex items-center gap-2 min-w-0">{leading}</div>
+        <div className="pointer-events-auto flex items-center gap-2 shrink-0">{toolbar}</div>
+      </div>
+    </>
+  );
+}
+
+/** Plain CSS grid of thumbnails, no month grouping (Favourites, Trash, group detail).
+ *  `overlay` draws extra marks on a cell (e.g. the group cover badge). */
+export function PlainGrid({ images, isSelectionMode, selectedIds, onImageClick, onToggleSelect, overlay }: {
+  images: Image[];
+  isSelectionMode: boolean;
+  selectedIds: Set<string>;
+  onImageClick: (img: Image, e: MouseEvent) => void;
+  onToggleSelect: (id: string) => void;
+  overlay?: (img: Image) => ReactNode;
+}) {
+  const { config } = useAppConfigStore();
+  const thumbnailCacheBust = useUIStore((s) => s.thumbnailCacheBust);
+  const size = SIZES[config.thumbnail_size as SizeKey];
+
+  return (
+    <div className="grid" style={{ gap: size.gap, gridTemplateColumns: `repeat(auto-fill, minmax(${size.px}px, 1fr))` }}>
+      {images.map(img => (
+        <div key={img.id} className="relative">
+          <ThumbnailCell
+            image={img}
+            archivePath={config.archive_path}
+            cacheBust={thumbnailCacheBust}
+            isSelectionMode={isSelectionMode}
+            isSelected={selectedIds.has(img.id)}
+            isPreviewed={false}
+            onImageClick={onImageClick}
+            onToggleSelect={onToggleSelect}
+          />
+          {overlay?.(img)}
+        </div>
+      ))}
+    </div>
   );
 }

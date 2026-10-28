@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
+import { ChevronDownIcon, ListFilterIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { TimelineFilter } from '../stores/timelineStore';
 import type { Image, GroupWithCount } from '../types';
@@ -84,18 +85,14 @@ export function FilterPopover({ filter, setFilter, allImages, availableYears, av
         variant={isFiltered ? 'secondary' : 'outline'}
         className={cn('h-9 pl-3.5 pr-3 text-xs shadow-float', !isFiltered && 'bg-popover hover:bg-card aria-expanded:bg-card')}
       >
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h18M7 9h10M10 14h4" />
-        </svg>
+        <ListFilterIcon />
         {t('timeline.filter')}
         {isFiltered && (
           <Badge variant="outline" className="h-4 min-w-4 px-1 border-0 bg-secondary-foreground text-secondary text-[10px] font-semibold tabular-nums">
             {filterChips.length}
           </Badge>
         )}
-        <svg className={cn('size-3! transition-transform duration-150', open && 'rotate-180')} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+        <ChevronDownIcon className={cn('size-3! transition-transform duration-150', open && 'rotate-180')} />
       </Button>
     </PopoverTrigger>
   );

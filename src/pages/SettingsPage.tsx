@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { LoaderCircleIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
@@ -178,10 +179,7 @@ export function SettingsPage() {
                 className="gap-2 w-full"
               >
                 {isRescanning && (
-                  <svg className="animate-spin size-4" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                  </svg>
+                  <LoaderCircleIcon className="animate-spin size-4" />
                 )}
                 {isRescanning ? t('common.loading') : t('settings.rescanArchive')}
               </Button>
