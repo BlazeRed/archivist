@@ -114,7 +114,11 @@
     "retry": "Retry",
     "tileLoadError": "Could not load the map — check your connection.",
     "noLocations": "No photos with location data in this archive yet.",
-    "noLocationsHint": "Photos already in the archive may not have had their location extracted yet — try a rescan."
+    "noLocationsHint": "Photos already in the archive may not have had their location extracted yet — try a rescan.",
+    "located": "{{count}} with location",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "fitAll": "Show all"
   },
   "groups": {
     "title": "Groups",

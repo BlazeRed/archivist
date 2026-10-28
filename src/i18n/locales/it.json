@@ -114,7 +114,11 @@
     "retry": "Riprova",
     "tileLoadError": "Impossibile caricare la mappa — controlla la connessione.",
     "noLocations": "Nessuna foto con dati di posizione in questo archivio.",
-    "noLocationsHint": "Le foto già in archivio potrebbero non avere ancora i dati di posizione estratti — prova una riscansione."
+    "noLocationsHint": "Le foto già in archivio potrebbero non avere ancora i dati di posizione estratti — prova una riscansione.",
+    "located": "{{count}} con posizione",
+    "zoomIn": "Ingrandisci",
+    "zoomOut": "Riduci",
+    "fitAll": "Mostra tutte"
   },
   "groups": {
     "title": "Gruppi",
