@@ -124,7 +124,8 @@ Key components in `src/components/`:
 | `AddMediaModal.tsx` | Full-screen group media picker (same layout as timeline) |
 | `ImagePreview.tsx` | Timeline preview column, always visible: selected item or static skeleton. Exports the shared media actions (favourite, folder, groups) |
 | `ImageDetail.tsx` | Fullscreen viewer: floating chrome, ⓘ metadata panel (closed by default), ←/→/Esc, FLIP zoom from/to the preview frame (`[data-preview-media]`) |
-| `pages/TrashPage.tsx` | Trash: plain grid, click/Shift-click selects, double-click opens the viewer; Restore selected / Restore all / Open folder |
+| `pages/TrashPage.tsx` | Trash: timeline look (grid under the floating chrome, `ThumbnailCell`) on a plain CSS grid, no bottom bar: the title pill holds Restore all, which becomes Restore + selected count while selecting; click/Shift-click selects, Esc clears, double-click opens the viewer; Open folder on the right |
+| `FloatingSelectionBar.tsx` | Timeline multi-selection chrome: count pill + full-width bar; `BAR_BUTTON`/`BAR_LABEL` = icon only below @2xl, icon + label above |
 | `ProgressBar.tsx` | Import progress indicator |
 | `ConflictReview.tsx` | Duplicate conflict resolution UI |
 | `Toast.tsx` / `ui/sonner.tsx` | Toast notification display |

@@ -16,22 +16,22 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { formatDuration } from '@/lib/formatDuration';
 
-const SIZES = {
+export const SIZES = {
   small:  { px: 120, cols: 6, gap: 8,  rowH: 134 },
   medium: { px: 180, cols: 4, gap: 10, rowH: 196 },
   large:  { px: 280, cols: 3, gap: 12, rowH: 296 },
 } as const;
 
-type SizeKey = keyof typeof SIZES;
+export type SizeKey = keyof typeof SIZES;
 
 // The grid scrolls under the floating chrome: topbar (--topbar-offset 64) + 8 gap + 36 pill row + 8 gap
-const FLOATING_TOP = 116;
+export const FLOATING_TOP = 116;
 // Thumbnails that already faded in once. Cells remount when the column count changes (images move
 // between rows); without this they would all fade in again and the grid would flash.
 const loadedThumbs = new Set<string>();
 
 // Room at the end so the last row clears the floating selection bar: 12 margin + 48 bar + 8 gap + 36 count pill + 8
-const FLOATING_BOTTOM = 112;
+export const FLOATING_BOTTOM = 112;
 
 type HeaderRow = { type: 'header'; label: string };
 type ImagesRow = { type: 'images'; images: Image[] };
@@ -90,7 +90,7 @@ type RowProps = {
   onToggleSelect: (id: string) => void;
 };
 
-const ThumbnailCell = memo(function ThumbnailCell({
+export const ThumbnailCell = memo(function ThumbnailCell({
   image,
   archivePath,
   cacheBust,

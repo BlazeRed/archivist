@@ -12,10 +12,10 @@ import { ThumbnailGrid } from '../components/ThumbnailGrid';
 import { ImageDetail } from '../components/ImageDetail';
 import { ImagePreview, GroupsButton, StarIcon } from '../components/ImagePreview';
 import { useBulkGroups } from '../components/ImageMetadata';
+import { FloatingSelectionBar, BAR_BUTTON, BAR_LABEL } from '../components/FloatingSelectionBar';
 import { useTrashImages } from '../hooks/useTrash';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
@@ -58,10 +58,6 @@ function ResizeHandle({ onResize }: { onResize: (w: number) => void }) {
     </div>
   );
 }
-
-// Icon-only circle on a narrow bar, icon + label pill from @2xl (container query on the bar)
-const BAR_BUTTON = 'size-9 px-0 @2xl:w-auto @2xl:pl-3.5 @2xl:pr-4';
-const BAR_LABEL = 'hidden @2xl:inline';
 
 function SelectionActionBar() {
   const { t } = useTranslation();
@@ -107,70 +103,62 @@ function SelectionActionBar() {
   };
 
   return (
-    // Full-width row: count pill above on the left, action bar below. The bar is a size container:
-    // buttons show icon + label when it is wide enough (@2xl, 672px), icon only otherwise
-    <div className="absolute bottom-3 inset-x-3 z-10 flex flex-col items-start gap-2 animate-in fade-in slide-in-from-bottom-8 duration-300 ease-[cubic-bezier(.2,.8,.2,1)]">
-      <Badge variant="outline" className="cursor-default select-none h-9 px-4 border-0 bg-popover shadow-float text-xs font-normal text-muted-foreground tabular-nums">
-        {t('timeline.selected', { count })}
-      </Badge>
+    <FloatingSelectionBar count={count}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="gold"
+            onClick={handleFavourite}
+            disabled={busy || count === 0}
+            aria-label={favouriteLabel}
+            aria-pressed={allFavourite}
+            className={BAR_BUTTON}
+          >
+            <StarIcon filled={allFavourite} />
+            <span className={BAR_LABEL}>{favouriteLabel}</span>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top">{favouriteLabel}</TooltipContent>
+      </Tooltip>
 
-      <div className="@container w-full h-12 flex items-center gap-2 px-1.5 rounded-full bg-popover shadow-float">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="gold"
-              onClick={handleFavourite}
-              disabled={busy || count === 0}
-              aria-label={favouriteLabel}
-              aria-pressed={allFavourite}
-              className={BAR_BUTTON}
-            >
-              <StarIcon filled={allFavourite} />
-              <span className={BAR_LABEL}>{favouriteLabel}</span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="top">{favouriteLabel}</TooltipContent>
-        </Tooltip>
+      <GroupsButton groups={groups} side="top" />
 
-        <GroupsButton groups={groups} side="top" />
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="destructive"
+            onClick={handleTrash}
+            disabled={busy || count === 0}
+            aria-label={t('trash.moveToTrash')}
+            className={BAR_BUTTON}
+          >
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            <span className={BAR_LABEL}>{t('trash.moveToTrash')}</span>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top">{t('trash.moveToTrash')}</TooltipContent>
+      </Tooltip>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="destructive"
-              onClick={handleTrash}
-              disabled={busy || count === 0}
-              aria-label={t('trash.moveToTrash')}
-              className={BAR_BUTTON}
-            >
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-              <span className={BAR_LABEL}>{t('trash.moveToTrash')}</span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="top">{t('trash.moveToTrash')}</TooltipContent>
-        </Tooltip>
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              onClick={clearSelection}
-              aria-label={t('timeline.cancelSelection')}
-              className={cn(BAR_BUTTON, 'ml-auto text-muted-foreground')}
-            >
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-              <span className={BAR_LABEL}>{t('timeline.cancelSelection')}</span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="top">{t('timeline.cancelSelection')}</TooltipContent>
-        </Tooltip>
-      </div>
-    </div>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            onClick={clearSelection}
+            aria-label={t('timeline.cancelSelection')}
+            className={cn(BAR_BUTTON, 'ml-auto text-muted-foreground')}
+          >
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            <span className={BAR_LABEL}>{t('timeline.cancelSelection')}</span>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top">{t('timeline.cancelSelection')}</TooltipContent>
+      </Tooltip>
+    </FloatingSelectionBar>
   );
 }
 
