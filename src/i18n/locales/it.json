@@ -90,7 +90,10 @@
     "mediaVideos": "Video",
     "select": "Seleziona",
     "addFavourites": "Aggiungi ai preferiti",
-    "removeFavourites": "Togli dai preferiti"
+    "removeFavourites": "Togli dai preferiti",
+    "clearSelection": "Deseleziona tutto",
+    "selectMonth": "Seleziona mese",
+    "deselectMonth": "Deseleziona mese"
   },
   "preview": {
     "empty": "Seleziona un'immagine per l'anteprima",
@@ -132,7 +135,13 @@
     "sortByDate": "Data scatto",
     "sortByRecent": "Aggiunte di recente",
     "setCover": "Imposta come copertina",
-    "noCover": "Nessun elemento"
+    "noCover": "Nessun elemento",
+    "rename": "Rinomina gruppo",
+    "cover": "Copertina",
+    "deleteGroup": "Elimina gruppo",
+    "addMediaTo": "Aggiungi media a {{name}}",
+    "addMediaError": "Impossibile aggiungere i media al gruppo",
+    "loadMediaError": "Impossibile caricare i media"
   },
   "settings": {
     "title": "Impostazioni",

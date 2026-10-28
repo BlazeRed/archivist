@@ -90,7 +90,10 @@
     "mediaVideos": "Videos",
     "select": "Select",
     "addFavourites": "Add to favourites",
-    "removeFavourites": "Remove from favourites"
+    "removeFavourites": "Remove from favourites",
+    "clearSelection": "Clear selection",
+    "selectMonth": "Select month",
+    "deselectMonth": "Deselect month"
   },
   "preview": {
     "empty": "Select an image to preview",
@@ -132,7 +135,13 @@
     "sortByDate": "Date taken",
     "sortByRecent": "Recently added",
     "setCover": "Set as cover",
-    "noCover": "No media yet"
+    "noCover": "No media yet",
+    "rename": "Rename group",
+    "cover": "Cover",
+    "deleteGroup": "Delete group",
+    "addMediaTo": "Add media to {{name}}",
+    "addMediaError": "Could not add media to the group",
+    "loadMediaError": "Could not load media"
   },
   "settings": {
     "title": "Settings",

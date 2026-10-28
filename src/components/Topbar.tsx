@@ -214,6 +214,9 @@ export function Topbar() {
           </DialogHeader>
           <p className="text-sm text-muted-foreground">{t('import.navWarningBody')}</p>
           <div className="flex gap-3 justify-end">
+            <Button onClick={() => setPendingPath(null)} variant="outline" size="sm">
+              {t('common.cancel')}
+            </Button>
             <Button
               onClick={async () => {
                 setPendingPath(null);
@@ -223,9 +226,6 @@ export function Topbar() {
               size="sm"
             >
               {t('import.navWarningLeave')}
-            </Button>
-            <Button onClick={() => setPendingPath(null)} variant="outline" size="sm">
-              {t('common.cancel')}
             </Button>
           </div>
         </DialogContent>

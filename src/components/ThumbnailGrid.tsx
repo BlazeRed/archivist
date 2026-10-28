@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useState, useRef, useEffect, memo, type ReactNode, type CSSProperties, type MouseEvent } from 'react';
+import { useMemo, useCallback, useState, useRef, useEffect, memo, type ReactNode, type CSSProperties, type MouseEvent, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { flushSync } from 'react-dom';
 import { List, RowComponentProps, useListRef } from 'react-window';
@@ -13,6 +13,7 @@ import type { Image } from '../types';
 import { useMonthNames } from '../lib/months';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { formatDuration } from '@/lib/formatDuration';
 
@@ -24,8 +25,12 @@ export const SIZES = {
 
 export type SizeKey = keyof typeof SIZES;
 
-// The grid scrolls under the floating chrome: topbar (--topbar-offset 64) + 8 gap + 36 pill row + 8 gap
-export const FLOATING_TOP = 116;
+// The grid scrolls under the floating chrome: topbar (--topbar-offset 64) + 8 gap + FLOATING_ROW
+export const FLOATING_TOP = 128;
+// Floating pill row (36) + gap to the first row (20): the row sits this far above the content inset
+export const FLOATING_ROW = 56;
+
+export type DateField = 'taken_at' | 'imported_at';
 // Thumbnails that already faded in once. Cells remount when the column count changes (images move
 // between rows); without this they would all fade in again and the grid would flash.
 const loadedThumbs = new Set<string>();
@@ -33,16 +38,16 @@ const loadedThumbs = new Set<string>();
 // Room at the end so the last row clears the floating selection bar: 12 margin + 48 bar + 8 gap + 36 count pill + 8
 export const FLOATING_BOTTOM = 112;
 
-type HeaderRow = { type: 'header'; label: string };
+type HeaderRow = { type: 'header'; label: string; images: Image[] };
 type ImagesRow = { type: 'images'; images: Image[] };
 type SpacerRow = { type: 'spacer'; height: number };
 type TimelineRow = HeaderRow | ImagesRow | SpacerRow;
 
-function buildRows(images: Image[], cols: number, noDateLabel: string, monthNames: string[]): TimelineRow[] {
+function buildRows(images: Image[], cols: number, noDateLabel: string, monthNames: string[], dateField: DateField): TimelineRow[] {
   const groups = new Map<string, Image[]>();
 
   for (const img of images) {
-    const key = yearMonthKey(img.taken_at);
+    const key = yearMonthKey(img[dateField]);
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(img);
   }
@@ -66,7 +71,7 @@ function buildRows(images: Image[], cols: number, noDateLabel: string, monthName
       label = `${ym.year}  ›  ${monthNames[ym.month - 1]}`;
     }
 
-    rows.push({ type: 'header', label });
+    rows.push({ type: 'header', label, images: imgs });
 
     for (let i = 0; i < imgs.length; i += cols) {
       rows.push({ type: 'images', images: imgs.slice(i, i + cols) });
@@ -88,6 +93,7 @@ type RowProps = {
   previewImageId: string | null;
   onImageClick: (img: Image, e: MouseEvent) => void;
   onToggleSelect: (id: string) => void;
+  onSelectMonth?: (images: Image[]) => void;
 };
 
 export const ThumbnailCell = memo(function ThumbnailCell({
@@ -202,7 +208,9 @@ function TimelineRowComponent({
   previewImageId,
   onImageClick,
   onToggleSelect,
+  onSelectMonth,
 }: RowComponentProps<RowProps>) {
+  const { t } = useTranslation();
   const row = rows[index];
   const size = SIZES[sizeKey];
 
@@ -211,7 +219,21 @@ function TimelineRowComponent({
   if (row.type === 'header') {
     return (
       <div style={style} className="flex items-end pb-1 px-6 bg-background">
-        <span className="text-xs font-semibold text-muted-foreground tracking-[0.02em]">{row.label}</span>
+        {onSelectMonth ? (
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => onSelectMonth(row.images)}
+            className="group/month -mx-2 text-xs font-semibold text-muted-foreground tracking-[0.02em]"
+          >
+            {row.label}
+            <span className="font-normal opacity-0 group-hover/month:opacity-100 group-focus-visible/month:opacity-100 transition-opacity">
+              · {t(row.images.every(img => selectedImageIds.has(img.id)) ? 'timeline.deselectMonth' : 'timeline.selectMonth')}
+            </span>
+          </Button>
+        ) : (
+          <span className="text-xs font-semibold text-muted-foreground tracking-[0.02em]">{row.label}</span>
+        )}
       </div>
     );
   }
@@ -237,12 +259,46 @@ function TimelineRowComponent({
   );
 }
 
-/** Virtualized timeline grid. Scrolls under the floating topbar; renders the floating month pill and `toolbar` above it. */
-export function ThumbnailGrid({ toolbar }: { toolbar?: ReactNode }) {
+type MonthGridProps = {
+  images: Image[];
+  dateField?: DateField;
+  emptyText: string;
+  isSelectionMode: boolean;
+  selectedIds: Set<string>;
+  previewImageId?: string | null;
+  onImageClick: (img: Image, e: MouseEvent) => void;
+  onToggleSelect: (id: string) => void;
+  /** Makes month headers clickable (select/deselect the whole month) */
+  onSelectMonth?: (images: Image[]) => void;
+  /** Left of the floating row, before the current month pill */
+  leading?: ReactNode;
+  /** Right of the floating row */
+  toolbar?: ReactNode;
+  /** Distance from the top of the scroller to the first row. The floating row sits FLOATING_ROW above it */
+  insetTop?: number;
+  /** Receives the image rows on every render (for keyboard navigation in grid order) */
+  gridRowsRef?: RefObject<Image[][]>;
+};
+
+/** Virtualized grid grouped by month. Scrolls under floating chrome: renders the scroll-edge fade and the
+ *  floating row (leading + current month pill left, toolbar right), and keeps `previewImageId` in view. */
+export function MonthGrid({
+  images,
+  dateField = 'taken_at',
+  emptyText,
+  isSelectionMode,
+  selectedIds,
+  previewImageId = null,
+  onImageClick,
+  onToggleSelect,
+  onSelectMonth,
+  leading,
+  toolbar,
+  insetTop = FLOATING_TOP,
+  gridRowsRef,
+}: MonthGridProps) {
   const { t } = useTranslation();
-  const { images, setPreviewImage, previewImage, loading } = useTimelineStore();
   const { config } = useAppConfigStore();
-  const { isSelectionMode, selectedImageIds, toggleSelection } = useGroupUIStore();
   const thumbnailCacheBust = useUIStore((s) => s.thumbnailCacheBust);
   const [stickyLabel, setStickyLabel] = useState('');
 
@@ -278,11 +334,11 @@ export function ThumbnailGrid({ toolbar }: { toolbar?: ReactNode }) {
 
   const rows = useMemo<TimelineRow[]>(
     () => [
-      { type: 'spacer', height: FLOATING_TOP },
-      ...buildRows(images, dynamicCols, t('timeline.noDateHeader'), monthNames),
+      { type: 'spacer', height: insetTop },
+      ...buildRows(images, dynamicCols, t('timeline.noDateHeader'), monthNames, dateField),
       { type: 'spacer', height: FLOATING_BOTTOM },
     ],
-    [images, dynamicCols, t, monthNames]
+    [images, dynamicCols, t, monthNames, dateField, insetTop]
   );
 
   const getRowHeight = useCallback(
@@ -304,15 +360,107 @@ export function ThumbnailGrid({ toolbar }: { toolbar?: ReactNode }) {
     });
     return { gridRows, listIndex };
   }, [rows]);
+  if (gridRowsRef) gridRowsRef.current = gridRows;
 
   // Keep the previewed item in view, whatever moved it (keys, preview arrows, fullscreen navigation)
-  const previewId = previewImage?.id;
   useEffect(() => {
-    if (!previewId) return;
-    const r = gridRows.findIndex(row => row.some(img => img.id === previewId));
+    if (!previewImageId) return;
+    const r = gridRows.findIndex(row => row.some(img => img.id === previewImageId));
     if (r !== -1) listRef.current?.scrollToRow({ index: listIndex[r], align: 'smart' });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [previewId]);
+  }, [previewImageId]);
+
+  const rowProps = useMemo<RowProps>(
+    () => ({
+      rows,
+      sizeKey,
+      cols: dynamicCols,
+      cellPx: Math.floor(cellPx),
+      archivePath: config.archive_path,
+      cacheBust: thumbnailCacheBust,
+      isSelectionMode,
+      selectedImageIds: selectedIds,
+      previewImageId,
+      onImageClick,
+      onToggleSelect,
+      onSelectMonth,
+    }),
+    [rows, sizeKey, dynamicCols, cellPx, config.archive_path, thumbnailCacheBust, isSelectionMode, selectedIds, previewImageId, onImageClick, onToggleSelect, onSelectMonth]
+  );
+
+  const handleRowsRendered = useCallback(
+    (visibleRows: { startIndex: number; stopIndex: number }) => {
+      for (let i = visibleRows.startIndex; i >= 0; i--) {
+        if (rows[i]?.type === 'header') {
+          setStickyLabel((rows[i] as HeaderRow).label);
+          return;
+        }
+      }
+      // At the very top only the spacer precedes the first month
+      const first = rows.find((r): r is HeaderRow => r.type === 'header');
+      setStickyLabel(first?.label ?? '');
+    },
+    [rows]
+  );
+
+  let body: ReactNode;
+  // Reloads (after trash/restore/bulk favourite) keep the list mounted: unmounting it would reset the scroll to the top
+  if (images.length === 0) {
+    body = (
+      <div className="flex items-center justify-center h-full">
+        <p className="text-muted-foreground">{emptyText}</p>
+      </div>
+    );
+  } else {
+    body = (
+      <List
+        listRef={listRef}
+        rowComponent={TimelineRowComponent}
+        rowCount={rows.length}
+        rowHeight={getRowHeight}
+        rowProps={rowProps}
+        onRowsRendered={handleRowsRendered}
+        className="h-full scroll-inset"
+        style={{ height: '100%', '--scroll-inset-top': `${insetTop}px`, '--scroll-inset-bottom': '12px' } as CSSProperties}
+      />
+    );
+  }
+
+  return (
+    <div ref={containerRef} className="relative h-full">
+      {body}
+
+      {/* Scroll-edge fade: photos dissolve as they pass under the floating chrome */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-linear-to-b from-background from-55% to-transparent"
+        style={{ height: insetTop + 8 }}
+      />
+
+      {/* Floating row: leading + current month (left), toolbar (right) */}
+      <div
+        className="pointer-events-none absolute inset-x-0 z-20 flex items-start justify-between gap-3 px-4"
+        style={{ top: insetTop - FLOATING_ROW }}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          {leading && <div className="pointer-events-auto min-w-0">{leading}</div>}
+          {stickyLabel && images.length > 0 && (
+            <Badge variant="outline" className="pointer-events-auto cursor-default select-none h-9 px-4 border-0 bg-popover text-popover-foreground shadow-float text-[13px] font-semibold animate-in fade-in duration-200">
+              {stickyLabel}
+            </Badge>
+          )}
+        </div>
+        <div className="pointer-events-auto">{toolbar}</div>
+      </div>
+    </div>
+  );
+}
+
+/** Timeline grid: MonthGrid wired to the timeline store (preview, keyboard navigation, multi-selection). */
+export function ThumbnailGrid({ toolbar }: { toolbar?: ReactNode }) {
+  const { t } = useTranslation();
+  const { images, setPreviewImage, previewImage, loading } = useTimelineStore();
+  const { isSelectionMode, selectedImageIds, toggleSelection } = useGroupUIStore();
+  const gridRowsRef = useRef<Image[][]>([]);
 
   // Keyboard: arrows move the preview in grid order, Enter opens fullscreen, Esc back to the skeleton.
   // The fullscreen viewer owns the keys while open; widgets that use arrows themselves keep them.
@@ -330,6 +478,7 @@ export function ThumbnailGrid({ toolbar }: { toolbar?: ReactNode }) {
         if (target?.closest?.('button, a')) return; // Enter activates the focused button instead
         selectImage(previewImage);
       } else {
+        const gridRows = gridRowsRef.current;
         const pos = gridNeighbour(gridRows, previewImage.id, e.key);
         if (!pos) return;
         setPreviewImage(gridRows[pos[0]][pos[1]]);
@@ -338,7 +487,7 @@ export function ThumbnailGrid({ toolbar }: { toolbar?: ReactNode }) {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [gridRows, isSelectionMode]);
+  }, [isSelectionMode]);
 
   const handleImageClick = useCallback(
     (img: Image, e: MouseEvent) => {
@@ -365,80 +514,17 @@ export function ThumbnailGrid({ toolbar }: { toolbar?: ReactNode }) {
     [images, toggleSelection, setPreviewImage, previewImage?.id]
   );
 
-  const rowProps = useMemo<RowProps>(
-    () => ({
-      rows,
-      sizeKey,
-      cols: dynamicCols,
-      cellPx: Math.floor(cellPx),
-      archivePath: config.archive_path,
-      cacheBust: thumbnailCacheBust,
-      isSelectionMode,
-      selectedImageIds,
-      previewImageId: previewImage?.id ?? null,
-      onImageClick: handleImageClick,
-      onToggleSelect: toggleSelection,
-    }),
-    [rows, sizeKey, dynamicCols, cellPx, config.archive_path, thumbnailCacheBust, isSelectionMode, selectedImageIds, previewImage?.id, handleImageClick, toggleSelection]
-  );
-
-  const handleRowsRendered = useCallback(
-    (visibleRows: { startIndex: number; stopIndex: number }) => {
-      for (let i = visibleRows.startIndex; i >= 0; i--) {
-        if (rows[i]?.type === 'header') {
-          setStickyLabel((rows[i] as HeaderRow).label);
-          return;
-        }
-      }
-      // At the very top only the spacer precedes the first month
-      const first = rows.find((r): r is HeaderRow => r.type === 'header');
-      setStickyLabel(first?.label ?? '');
-    },
-    [rows]
-  );
-
-  let body: ReactNode;
-  // Reloads (after trash/restore/bulk favourite) keep the list mounted: unmounting it would reset the scroll to the top
-  if (images.length === 0) {
-    body = (
-      <div className="flex items-center justify-center h-full">
-        <p className="text-muted-foreground">{t(loading ? 'common.loading' : 'timeline.noMedia')}</p>
-      </div>
-    );
-  } else {
-    body = (
-      <List
-        listRef={listRef}
-        rowComponent={TimelineRowComponent}
-        rowCount={rows.length}
-        rowHeight={getRowHeight}
-        rowProps={rowProps}
-        onRowsRendered={handleRowsRendered}
-        className="h-full scroll-inset"
-        style={{ height: '100%', '--scroll-inset-top': `${FLOATING_TOP}px`, '--scroll-inset-bottom': '12px' } as CSSProperties}
-      />
-    );
-  }
-
   return (
-    <div ref={containerRef} className="relative h-full">
-      {body}
-
-      {/* Scroll-edge fade: photos dissolve as they pass under the floating chrome */}
-      <div
-        className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-linear-to-b from-background from-55% to-transparent"
-        style={{ height: FLOATING_TOP + 8 }}
-      />
-
-      {/* Floating row: current month (left), toolbar (right) */}
-      <div className="pointer-events-none absolute inset-x-0 z-20 flex items-start justify-between gap-3 px-4 top-[calc(var(--topbar-offset)+8px)]">
-        {stickyLabel && images.length > 0 ? (
-          <Badge variant="outline" className="pointer-events-auto cursor-default select-none h-9 px-4 border-0 bg-popover text-popover-foreground shadow-float text-[13px] font-semibold animate-in fade-in duration-200">
-            {stickyLabel}
-          </Badge>
-        ) : <div />}
-        <div className="pointer-events-auto">{toolbar}</div>
-      </div>
-    </div>
+    <MonthGrid
+      images={images}
+      emptyText={t(loading ? 'common.loading' : 'timeline.noMedia')}
+      isSelectionMode={isSelectionMode}
+      selectedIds={selectedImageIds}
+      previewImageId={previewImage?.id ?? null}
+      onImageClick={handleImageClick}
+      onToggleSelect={toggleSelection}
+      toolbar={toolbar}
+      gridRowsRef={gridRowsRef}
+    />
   );
 }

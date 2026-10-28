@@ -120,11 +120,13 @@ Key components in `src/components/`:
 | Component | Purpose |
 |-----------|---------|
 | `Topbar.tsx` | Floating pill nav bar — logo, page links, import/rescan/settings icon buttons |
-| `ThumbnailGrid.tsx` | Virtualized image grid with sticky month headers |
-| `AddMediaModal.tsx` | Full-screen group media picker (same layout as timeline) |
+| `ThumbnailGrid.tsx` | `MonthGrid`: generic virtualized month grid under floating chrome (fade, floating row with `leading` + month pill + `toolbar`, `insetTop`, optional `onSelectMonth` clickable headers). `ThumbnailGrid` = MonthGrid wired to timelineStore (preview, keyboard nav, selection). Also exports `ThumbnailCell`, `SIZES`, `FLOATING_TOP`/`FLOATING_ROW` |
+| `FilterPopover.tsx` | Filters pill + panel, controlled (`filter`/`setFilter`): Timeline passes the store, AddMediaModal local state via `normalizeFilter`/`applyClientFilter` from timelineStore. `children` = extra panel controls |
+| `AddMediaModal.tsx` | Group media picker: near-fullscreen dialog (inset 12) with `MonthGrid` + `FilterPopover` (+ sort segmented), `useGridSelection` (click month header = select month), layered Esc, bulk add via `add_images_to_group_bulk` |
 | `ImagePreview.tsx` | Timeline preview column, always visible: selected item or static skeleton. Exports the shared media actions (favourite, folder, groups) |
 | `ImageDetail.tsx` | Fullscreen viewer: floating chrome, ⓘ metadata panel (closed by default), ←/→/Esc, FLIP zoom from/to the preview frame (`[data-preview-media]`) |
 | `pages/TrashPage.tsx` | Trash: timeline look (grid under the floating chrome, `ThumbnailCell`) on a plain CSS grid, no bottom bar: the title pill holds Restore all, which becomes Restore + selected count while selecting; click/Shift-click selects, Esc clears, double-click opens the viewer; Open folder on the right |
+| `pages/GroupsPage.tsx` | Groups: floating row + content under the chrome (like Trash). Cards `shadow-raised` + violet count badge, rename/delete via `onMedia` icon buttons → dialogs. Detail = `ThumbnailCell` grid (`useGridSelection`): selecting swaps the actions for Set cover (1 item) / Remove from group; cover marked by a violet badge |
 | `FloatingSelectionBar.tsx` | Timeline multi-selection chrome: count pill + full-width bar; `BAR_BUTTON`/`BAR_LABEL` = icon only below @2xl, icon + label above |
 | `ProgressBar.tsx` | Import progress indicator |
 | `ConflictReview.tsx` | Duplicate conflict resolution UI |

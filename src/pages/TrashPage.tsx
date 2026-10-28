@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type CSSProperties, type MouseEvent } from 'react';
+import { useCallback, useEffect, useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
@@ -7,6 +7,7 @@ import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { useUIStore } from '../stores/uiStore';
 import { refreshAfterMove, type MoveResult } from '../hooks/useTrash';
+import { useGridSelection } from '../hooks/useGridSelection';
 import { ImageDetail } from '../components/ImageDetail';
 import { formatSize } from '../components/ImageMetadata';
 import { ThumbnailCell, SIZES, FLOATING_TOP, type SizeKey } from '../components/ThumbnailGrid';
@@ -24,10 +25,9 @@ export function TrashPage() {
   const selectImage = useTimelineStore((s) => s.selectImage);
   const thumbnailCacheBust = useUIStore((s) => s.thumbnailCacheBust);
   const [items, setItems] = useState<Image[]>([]);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [anchor, setAnchor] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const size = SIZES[config.thumbnail_size as SizeKey];
+  const { selected, clearSelection, toggle, handleClick } = useGridSelection(items);
 
   const load = useCallback(async () => {
     try {
@@ -41,23 +41,6 @@ export function TrashPage() {
   useEffect(() => {
     if (config.archive_path) load();
   }, [config.archive_path, load]);
-
-  const clearSelection = useCallback(() => {
-    setSelected(new Set());
-    setAnchor(null);
-  }, []);
-
-  // Esc clears the selection. With the viewer open, Esc only closes the viewer.
-  useEffect(() => {
-    if (selected.size === 0) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || e.defaultPrevented || useTimelineStore.getState().selectedImage) return;
-      if ((e.target as Element | null)?.closest?.('[role="listbox"], [role="dialog"], [role="menu"]')) return;
-      clearSelection();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [selected.size, clearSelection]);
 
   const restore = async (ids: string[]) => {
     setBusy(true);
@@ -74,27 +57,6 @@ export function TrashPage() {
     refreshAfterMove();
     setBusy(false);
   };
-
-  const toggle = useCallback((id: string) => {
-    setSelected(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-    setAnchor(id);
-  }, []);
-
-  // Same rules as the timeline: click toggles, Shift-click selects the range from the last clicked item
-  const handleClick = useCallback((img: Image, e: MouseEvent) => {
-    const from = anchor ? items.findIndex(i => i.id === anchor) : -1;
-    if (e.shiftKey && from !== -1) {
-      const to = items.findIndex(i => i.id === img.id);
-      setSelected(prev => new Set([...prev, ...items.slice(Math.min(from, to), Math.max(from, to) + 1).map(i => i.id)]));
-      setAnchor(img.id);
-    } else {
-      toggle(img.id);
-    }
-  }, [anchor, items, toggle]);
 
   const openFolder = () => revealItemInDir(`${config.archive_path}/Trash`).catch(() => toast.error(t('trash.openFolderError')));
 
