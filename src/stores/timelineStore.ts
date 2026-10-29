@@ -9,7 +9,6 @@ export interface TimelineFilter {
   noDate: boolean;
   groupId: number | null;
   mediaType: 'all' | 'images' | 'videos';
-  location: { lat: number; lng: number } | null;
 }
 
 interface TimelineState {
@@ -32,19 +31,8 @@ interface TimelineState {
   clearImages: () => void;
 }
 
-const LOCATION_MATCH_EPSILON = 1e-4; // ~11m, absorbs float round-trip noise
-
-function applyClientFilter(all: Image[], filter: TimelineFilter, groupIds: Set<string> | null): Image[] {
+export function applyClientFilter(all: Image[], filter: TimelineFilter, groupIds: Set<string> | null): Image[] {
   let result = all;
-
-  if (filter.location !== null) {
-    const { lat, lng } = filter.location;
-    result = result.filter(img =>
-      img.latitude != null && img.longitude != null &&
-      Math.abs(img.latitude - lat) < LOCATION_MATCH_EPSILON &&
-      Math.abs(img.longitude - lng) < LOCATION_MATCH_EPSILON
-    );
-  }
 
   if (filter.mediaType !== 'all') {
     result = result.filter(img =>
@@ -77,6 +65,18 @@ function applyClientFilter(all: Image[], filter: TimelineFilter, groupIds: Set<s
   return result;
 }
 
+export const EMPTY_FILTER: TimelineFilter = { yearFrom: null, yearTo: null, month: null, noDate: false, groupId: null, mediaType: 'all' };
+
+/** Merges a filter change and keeps it consistent. Shared with filters that live outside the store (AddMediaModal). */
+export function normalizeFilter(prev: TimelineFilter, partial: Partial<TimelineFilter>): TimelineFilter {
+  const next = { ...prev, ...partial };
+  if (partial.noDate) { next.yearFrom = null; next.yearTo = null; next.month = null; next.groupId = null; }
+  // reset month when year range cleared or spans multiple years
+  if (next.yearFrom === null || next.yearTo === null || next.yearFrom !== next.yearTo) next.month = null;
+  if (partial.groupId !== undefined && partial.groupId !== null) next.noDate = false;
+  return next;
+}
+
 export const useTimelineStore = create<TimelineState>((set, get) => ({
   allImages: [],
   images: [],
@@ -84,7 +84,7 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
   error: null,
   selectedImage: null,
   previewImage: null,
-  filter: { yearFrom: null, yearTo: null, month: null, noDate: false, groupId: null, mediaType: 'all', location: null },
+  filter: EMPTY_FILTER,
   availableYears: [],
   availableGroups: [],
 
@@ -129,11 +129,7 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
   },
 
   setFilter: async (partial) => {
-    const newFilter = { ...get().filter, ...partial };
-    // reset month when year range cleared or spans multiple years
-    if (partial.noDate) { newFilter.yearFrom = null; newFilter.yearTo = null; newFilter.month = null; newFilter.groupId = null; }
-    if (newFilter.yearFrom === null || newFilter.yearTo === null || newFilter.yearFrom !== newFilter.yearTo) newFilter.month = null;
-    if (partial.groupId !== undefined && partial.groupId !== null) newFilter.noDate = false;
+    const newFilter = normalizeFilter(get().filter, partial);
 
     set({ filter: newFilter });
 
@@ -157,6 +153,7 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
     allImages: s.allImages.map(img => img.id === imageId ? { ...img, is_favourite: isFavourite } : img),
     images: s.images.map(img => img.id === imageId ? { ...img, is_favourite: isFavourite } : img),
     previewImage: s.previewImage?.id === imageId ? { ...s.previewImage, is_favourite: isFavourite } : s.previewImage,
+    selectedImage: s.selectedImage?.id === imageId ? { ...s.selectedImage, is_favourite: isFavourite } : s.selectedImage,
   })),
   updateImageWebPath: (imageId, webPath) => set((s) => ({
     allImages: s.allImages.map(img => img.id === imageId ? { ...img, web_path: webPath } : img),

@@ -94,6 +94,7 @@ impl Database {
         let _ = conn.execute("ALTER TABLE images ADD COLUMN web_path TEXT", []);
         let _ = conn.execute("ALTER TABLE images ADD COLUMN latitude REAL", []);
         let _ = conn.execute("ALTER TABLE images ADD COLUMN longitude REAL", []);
+        let _ = conn.execute("ALTER TABLE images ADD COLUMN trashed_at TEXT", []);
 
         // Must run after the ALTER TABLEs above: on a fresh DB, latitude/longitude
         // don't exist until this point (the base CREATE TABLE predates this feature).

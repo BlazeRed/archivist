@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback, type MouseEvent, type ReactNode } from 'react';
+import { ChevronLeftIcon, CircleMinusIcon, FolderIcon, FolderOutputIcon, ImageIcon, LoaderCircleIcon, PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -9,13 +10,21 @@ import { useGroupUIStore } from '../stores/groupUIStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useUIStore } from '../stores/uiStore';
+import { useGridSelection } from '../hooks/useGridSelection';
 import { AddMediaModal } from '../components/AddMediaModal';
+import { SelectModeButton } from '../components/TimelineNavbar';
+import { InfoPill, SelectionCountPill, ROW_BUTTON } from '../components/FloatingSelectionBar';
+import { ArchiveNotSet } from '../components/ArchiveNotSet';
 import { ImageDetail } from '../components/ImageDetail';
+import { MediaButton, CHROME_BUTTON } from '../components/ImagePreview';
+import { FloatingScroll, PlainGrid } from '../components/ThumbnailGrid';
+import { cn } from '@/lib/utils';
 import type { Image, GroupWithCount } from '../types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface ExportResult {
   copied: number;
@@ -23,71 +32,34 @@ interface ExportResult {
   dest_path: string;
 }
 
+const PILL = 'cursor-default select-none h-9 px-4 border-0 bg-popover text-popover-foreground shadow-float';
+
 export function GroupsPage() {
   const { t } = useTranslation();
-  const { groups, fetchGroups, createGroup, updateGroup, deleteGroup, clearGroups } = useGroupStore();
-  const { config, setConfig } = useAppConfigStore();
-  const { selectedImage, selectImage, clearImages } = useTimelineStore();
-  const { selectedImageIds, isSelectionMode, clearSelection, getSelectedCount } = useGroupUIStore();
+  const { groups, fetchGroups, createGroup, updateGroup, deleteGroup } = useGroupStore();
+  const { config } = useAppConfigStore();
+  const { selectImage } = useTimelineStore();
+  const { selectedImageIds, isSelectionMode, clearSelection: clearTimelineSelection, getSelectedCount } = useGroupUIStore();
 
   const [view, setView] = useState<'grid' | 'detail'>('grid');
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [groupImages, setGroupImages] = useState<Image[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newGroupName, setNewGroupName] = useState('');
+  const [renamingGroupId, setRenamingGroupId] = useState<number | null>(null);
+  const [groupName, setGroupName] = useState('');
   const [deletingGroupId, setDeletingGroupId] = useState<number | null>(null);
   const [showAddMedia, setShowAddMedia] = useState(false);
-  const [editingGroupId, setEditingGroupId] = useState<number | null>(null);
-  const [editingName, setEditingName] = useState('');
   const [exportingGroupId, setExportingGroupId] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const { selected, clearSelection, toggle, handleClick, isSelectionMode: isPicking, setSelectionMode, exitSelection } = useGridSelection(groupImages);
 
-  const groupImagesRef = useRef(groupImages);
-  groupImagesRef.current = groupImages;
-  const selectedImageRef = useRef(selectedImage);
-  selectedImageRef.current = selectedImage;
-
-  const thumbPx = config.thumbnail_size === 'small' ? 120 : config.thumbnail_size === 'large' ? 280 : 180;
   const coverPx = config.group_cover_size === 'small' ? 140 : config.group_cover_size === 'large' ? 220 : 176;
   const archivePath = config.archive_path ? config.archive_path.replace(/\/+$/, '') : '';
   const thumbnailCacheBust = useUIStore((s) => s.thumbnailCacheBust);
 
   useEffect(() => {
-    fetchGroups();
-  }, [fetchGroups]);
-
-  useEffect(() => {
-    if (!selectedImage) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-      const images = groupImagesRef.current;
-      const current = selectedImageRef.current;
-      if (!current || images.length < 2) return;
-      const idx = images.findIndex(img => img.id === current.id);
-      if (idx === -1) return;
-      if (e.key === 'ArrowLeft') {
-        selectImage(images[(idx - 1 + images.length) % images.length]);
-      } else {
-        selectImage(images[(idx + 1) % images.length]);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedImage, selectImage]);
-
-  const handleOpenArchive = async () => {
-    const selected = await open({ directory: true });
-    if (selected) {
-      clearImages();
-      selectImage(null);
-      clearGroups();
-      try {
-        await invoke('init_archive', { archivePath: selected });
-      } catch (e) {
-        console.error('Failed to init archive:', e);
-      }
-      setConfig({ archive_path: selected as string });
-    }
-  };
+    if (config.archive_path) fetchGroups();
+  }, [config.archive_path, fetchGroups]);
 
   const handleOpenGroup = async (groupId: number) => {
     setSelectedGroupId(groupId);
@@ -105,18 +77,42 @@ export function GroupsPage() {
     setView('grid');
     setSelectedGroupId(null);
     setGroupImages([]);
+    exitSelection();
   };
 
-  const handleCreateGroup = async () => {
-    if (!newGroupName.trim()) return;
-    const id = await createGroup(newGroupName.trim());
-    setNewGroupName('');
+  // Click opens the viewer; in selection mode it toggles (Shift-click = range), as in Favourites
+  const handleImageClick = useCallback((img: Image, e: MouseEvent) => {
+    if (isPicking) handleClick(img, e);
+    else selectImage(img);
+  }, [isPicking, handleClick, selectImage]);
+
+  // One dialog for create and rename: the name field and the confirm flow are the same
+  const isNameDialogOpen = showCreateModal || renamingGroupId !== null;
+
+  const closeNameDialog = () => {
     setShowCreateModal(false);
+    setRenamingGroupId(null);
+    setGroupName('');
+  };
+
+  const handleStartRename = (group: GroupWithCount) => {
+    setRenamingGroupId(group.id);
+    setGroupName(group.name);
+  };
+
+  const handleConfirmName = async () => {
+    const name = groupName.trim();
+    if (!name) return;
+    if (renamingGroupId !== null) {
+      await updateGroup(renamingGroupId, name);
+      closeNameDialog();
+      return;
+    }
+    const id = await createGroup(name);
+    closeNameDialog();
     if (selectedImageIds.size > 0) {
-      for (const imageId of selectedImageIds) {
-        await invoke('add_image_to_group', { imageId, groupId: id });
-      }
-      clearSelection();
+      await invoke('add_images_to_group_bulk', { imageIds: [...selectedImageIds], groupId: id });
+      clearTimelineSelection();
       fetchGroups();
     }
   };
@@ -128,6 +124,10 @@ export function GroupsPage() {
       try {
         const result = await invoke<ExportResult>('export_group', { groupId, destPath: dest });
         toast.success(t('groups.exportSuccess', { count: result.copied, path: result.dest_path }));
+        if (result.errors.length > 0) {
+          toast.warning(t('groups.exportPartial', { count: result.errors.length }));
+          console.error('Export errors:', result.errors);
+        }
       } catch (e) {
         toast.error(t('groups.exportError'));
         console.error('Export failed:', e);
@@ -137,18 +137,10 @@ export function GroupsPage() {
     }
   };
 
-  const handleDeleteGroup = (id: number) => {
-    setDeletingGroupId(id);
-  };
-
   const handleConfirmDelete = async () => {
     if (deletingGroupId === null) return;
     await deleteGroup(deletingGroupId);
-    if (selectedGroupId === deletingGroupId) {
-      setView('grid');
-      setSelectedGroupId(null);
-      setGroupImages([]);
-    }
+    if (selectedGroupId === deletingGroupId) handleBack();
     setDeletingGroupId(null);
   };
 
@@ -160,271 +152,160 @@ export function GroupsPage() {
     fetchGroups();
   };
 
-  const handleStartEdit = (e: React.MouseEvent, group: GroupWithCount) => {
-    e.stopPropagation();
-    setEditingGroupId(group.id);
-    setEditingName(group.name);
-  };
-
-  const handleConfirmEdit = async () => {
-    if (editingGroupId === null || !editingName.trim()) return;
-    await updateGroup(editingGroupId, editingName.trim());
-    setEditingGroupId(null);
-  };
-
-  const handleCancelEdit = () => setEditingGroupId(null);
-
-  const handleRemoveFromGroup = async (imageId: string) => {
+  // Only unlinks (no file touched, reversible), so no confirmation, as in the preview's groups popover
+  const handleRemoveSelected = async () => {
     if (selectedGroupId === null) return;
+    setBusy(true);
+    const ids = [...selected];
     try {
-      await invoke('remove_image_from_group', { imageId, groupId: selectedGroupId });
-      setGroupImages(prev => prev.filter(img => img.id !== imageId));
-      fetchGroups();
+      for (const imageId of ids) {
+        await invoke('remove_image_from_group', { imageId, groupId: selectedGroupId });
+      }
     } catch (e) {
-      console.error('Failed to remove image from group:', e);
+      console.error('Failed to remove images from group:', e);
     }
+    setGroupImages(prev => prev.filter(img => !ids.includes(img.id)));
+    clearSelection();
+    fetchGroups();
+    setBusy(false);
   };
 
-  const handleSetCover = async (e: React.MouseEvent, imageId: string) => {
-    e.stopPropagation();
-    if (selectedGroupId === null) return;
+  const handleSetCover = async () => {
+    if (selectedGroupId === null || selected.size !== 1) return;
     try {
-      await invoke('set_group_cover', { groupId: selectedGroupId, imageId });
+      await invoke('set_group_cover', { groupId: selectedGroupId, imageId: [...selected][0] });
+      clearSelection();
       fetchGroups();
     } catch (e) {
       console.error('Failed to set cover:', e);
     }
   };
 
-  if (!config.archive_path) {
-    return (
-      <div className="flex items-center justify-center h-[calc(100vh-52px)]">
-        <div className="bg-card px-8 py-6 rounded-xl text-center max-w-sm">
-          <p className="text-muted-foreground text-sm mb-4">{t('timeline.archiveNotSet')}</p>
-          <Button onClick={handleOpenArchive}>{t('timeline.openArchive')}</Button>
-        </div>
-      </div>
-    );
-  }
+  if (!config.archive_path) return <ArchiveNotSet />;
 
   const selectedGroup = groups.find(g => g.id === selectedGroupId);
   const deletingGroup = groups.find(g => g.id === deletingGroupId);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-52px)]">
-      {/* Mini top navbar */}
-      <div className="h-12 px-4 flex items-center gap-3 border-b border-border bg-card shrink-0">
-        {view === 'detail' ? (
+    // Full-height, pulled up under the fixed topbar so the content scrolls beneath the floating chrome (like Timeline)
+    <div className="relative h-screen -mt-[var(--topbar-offset)]">
+      <FloatingScroll
+        // Grid: no title pill (like the timeline), the topbar already says where you are
+        leading={view === 'detail' && (
           <>
-            <button
-              onClick={handleBack}
-              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-              </svg>
-              {t('common.back')}
-            </button>
-            <span className="text-border">|</span>
-            <h2 className="font-semibold text-sm text-foreground truncate">{selectedGroup?.name}</h2>
-            <div className="ml-auto flex items-center gap-2">
-              <Button size="sm" onClick={() => setShowAddMedia(true)}>
-                {t('groups.addMediaTitle')}
+            <MediaButton label={t('common.back')} onClick={handleBack} className={`${CHROME_BUTTON} size-9 shrink-0`}>
+              <ChevronLeftIcon />
+            </MediaButton>
+            <Badge variant="outline" className={`${PILL} text-[13px] font-semibold min-w-0`}>
+              <span className="truncate">{selectedGroup?.name}</span>
+            </Badge>
+          </>
+        )}
+        toolbar={view === 'grid' ? (
+          groups.length > 0 && (
+            <Button variant="violet" className={ROW_BUTTON} onClick={() => setShowCreateModal(true)}>
+              <PlusIcon />
+              {t('groups.create')}
+            </Button>
+          )
+        ) : isPicking ? (
+          <>
+            {selected.size > 0 && <SelectionCountPill count={selected.size} onClear={clearSelection} />}
+            {selected.size === 1 && (
+              <Button variant="outline" className={cn(ROW_BUTTON, 'bg-popover hover:bg-card')} onClick={handleSetCover}>
+                <ImageIcon />
+                {t('groups.setCover')}
               </Button>
+            )}
+            <Button variant="violet" className={ROW_BUTTON} onClick={handleRemoveSelected} disabled={busy || selected.size === 0}>
+              <CircleMinusIcon />
+              {t('detail.removeFromGroup')}
+            </Button>
+            <SelectModeButton active onToggle={exitSelection} />
+          </>
+        ) : (
+          <>
+            {groupImages.length > 0 && <InfoPill>{groupImages.length} {t('timeline.items')}</InfoPill>}
+            <Button className={ROW_BUTTON} onClick={() => setShowAddMedia(true)}>
+              <PlusIcon />
+              {t('groups.addMediaTitle')}
+            </Button>
+            {groupImages.length > 0 && (
               <Button
-                size="sm"
-                variant="secondary"
+                variant="violet"
+                className={ROW_BUTTON}
                 onClick={() => handleExportGroup(selectedGroupId!)}
                 disabled={exportingGroupId === selectedGroupId}
-                className="flex items-center gap-1.5"
               >
-                {exportingGroupId === selectedGroupId && (
-                  <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                  </svg>
-                )}
+                {exportingGroupId === selectedGroupId ? <LoaderCircleIcon className="animate-spin" /> : <FolderOutputIcon />}
                 {t('groups.export')}
               </Button>
-              <Button size="sm" variant="destructive" onClick={() => handleDeleteGroup(selectedGroupId!)}>
-                {t('common.delete')}
-              </Button>
-            </div>
-          </>
-        ) : (
-          <>
-            <h2 className="font-semibold text-sm text-foreground">{t('groups.title')}</h2>
-            <Button size="icon-sm" className="ml-auto" onClick={() => setShowCreateModal(true)}>+</Button>
+            )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-lg"
+                  aria-label={t('groups.deleteGroup')}
+                  onClick={() => setDeletingGroupId(selectedGroupId)}
+                  className="bg-popover shadow-float text-muted-foreground hover:bg-popover hover:text-destructive"
+                >
+                  <Trash2Icon />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">{t('groups.deleteGroup')}</TooltipContent>
+            </Tooltip>
+            {groupImages.length > 0 && <SelectModeButton active={false} onToggle={() => setSelectionMode(true)} />}
           </>
         )}
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 overflow-auto">
+      >
         {view === 'grid' ? (
-          /* Album card grid */
           groups.length === 0 ? (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-muted-foreground text-sm">{t('groups.noGroups')}</p>
-            </div>
+            <EmptyState text={t('groups.noGroups')}>
+              <Button variant="violet" onClick={() => setShowCreateModal(true)}>
+                <PlusIcon />
+                {t('groups.create')}
+              </Button>
+            </EmptyState>
           ) : (
-            <div className="flex flex-wrap gap-4 p-6">
-              {groups.map(group => {
-                const coverUrl = getThumbnailUrl(archivePath, group.cover_thumbnail_path, thumbnailCacheBust) || null;
-                return (
-                  <div
-                    key={group.id}
-                    onClick={() => editingGroupId !== group.id && handleOpenGroup(group.id)}
-                    style={{ width: coverPx }}
-                    className="group/card cursor-pointer rounded-xl overflow-hidden border border-border bg-card hover:shadow-lg transition-shadow"
-                  >
-                    {/* Cover image */}
-                    <div className="aspect-[4/3] bg-muted overflow-hidden relative">
-                      {coverUrl ? (
-                        <img
-                          src={coverUrl}
-                          alt={group.name}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-muted-foreground/50">
-                          <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
-                          </svg>
-                          {group.image_count === 0 && (
-                            <span className="text-[10px]">{t('groups.noCover')}</span>
-                          )}
-                        </div>
-                      )}
-                      {/* Hover action buttons */}
-                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-start justify-end gap-1 p-2">
-                        <button
-                          onClick={e => handleStartEdit(e, group)}
-                          title={t('common.save')}
-                          className="w-7 h-7 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/80 transition-colors"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="1.5">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M11.5 2.5a2.121 2.121 0 013 3L5 15H2v-3L11.5 2.5z"/>
-                          </svg>
-                        </button>
-                        <button
-                          onClick={e => { e.stopPropagation(); handleDeleteGroup(group.id); }}
-                          title={t('common.delete')}
-                          className="w-7 h-7 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-destructive transition-colors"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Card footer */}
-                    <div className="p-3">
-                      {editingGroupId === group.id ? (
-                        <input
-                          autoFocus
-                          className="w-full text-sm font-medium bg-transparent border-b border-foreground outline-none"
-                          value={editingName}
-                          onChange={e => setEditingName(e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') handleConfirmEdit();
-                            if (e.key === 'Escape') handleCancelEdit();
-                          }}
-                          onBlur={handleConfirmEdit}
-                          onClick={e => e.stopPropagation()}
-                        />
-                      ) : (
-                        <p className="font-medium text-sm truncate text-foreground">{group.name}</p>
-                      )}
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {t('groups.mediaCount', { count: group.image_count })}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${coverPx}px, 1fr))` }}>
+              {groups.map(group => (
+                <GroupCard
+                  key={group.id}
+                  group={group}
+                  coverUrl={getThumbnailUrl(archivePath, group.cover_thumbnail_path, thumbnailCacheBust) || null}
+                  onOpen={() => handleOpenGroup(group.id)}
+                  onRename={() => handleStartRename(group)}
+                  onDelete={() => setDeletingGroupId(group.id)}
+                />
+              ))}
             </div>
           )
+        ) : groupImages.length === 0 ? (
+          <EmptyState text={t('groups.noMedia')}>
+            <Button onClick={() => setShowAddMedia(true)}>
+              <PlusIcon />
+              {t('groups.addMediaTitle')}
+            </Button>
+          </EmptyState>
         ) : (
-          /* Detail view: media inside selected group */
-          <div className="p-4">
-            {groupImages.length === 0 ? (
-              <p className="text-muted-foreground text-sm">{t('groups.noMedia')}</p>
-            ) : (
-              <div className="flex flex-wrap gap-3">
-                {groupImages.map(img => {
-                  const thumbnailUrl = getThumbnailUrl(archivePath, img.thumbnail_path, thumbnailCacheBust);
-                  const isCover = selectedGroup?.cover_image_id === img.id;
-                  return (
-                    <div
-                      key={img.id}
-                      style={{ width: thumbPx }}
-                      onClick={() => selectImage(img)}
-                      className="group/img relative bg-card rounded-lg overflow-hidden border border-border cursor-pointer"
-                    >
-                      <div className="aspect-square bg-[#001A36] overflow-hidden">
-                        {thumbnailUrl ? (
-                          <img
-                            src={thumbnailUrl}
-                            alt={img.filename}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-white/40">
-                            <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                              <line x1="3" y1="3" x2="21" y2="21"/>
-                              <circle cx="8.5" cy="8.5" r="1.5"/>
-                            </svg>
-                            <p className="text-[9px] text-center px-1 leading-tight">{t('common.noThumbnail')}</p>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Set cover button */}
-                      <button
-                        onClick={e => handleSetCover(e, img.id)}
-                        title={t('groups.setCover')}
-                        className={cn(
-                          'absolute top-1.5 left-1.5 w-6 h-6 rounded-full flex items-center justify-center transition-all',
-                          isCover
-                            ? 'bg-primary text-primary-foreground opacity-100'
-                            : 'bg-black/60 text-white opacity-0 group-hover/img:opacity-100 hover:bg-primary'
-                        )}
-                      >
-                        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                        </svg>
-                      </button>
-
-                      {/* Remove button */}
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleRemoveFromGroup(img.id); }}
-                        title={t('detail.removeFromGroup')}
-                        className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 text-white text-xs flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity hover:bg-destructive"
-                      >
-                        ×
-                      </button>
-
-                      <div className="p-2">
-                        <p className="text-xs text-foreground truncate font-medium">{img.filename}</p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">
-                          {img.taken_at
-                            ? new Date(img.taken_at).toLocaleDateString()
-                            : t('detail.noDate')}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          /* Detail: click opens the viewer; selection sits behind the Select button */
+          <PlainGrid
+            images={groupImages}
+            isSelectionMode={isPicking}
+            selectedIds={selected}
+            onImageClick={handleImageClick}
+            onToggleSelect={toggle}
+            // Cover marker: violet, the groups color (gold is reserved for favourites)
+            overlay={img => selectedGroup?.cover_image_id === img.id && (<>
+              <div className="absolute inset-0 rounded-sm ring-2 ring-inset ring-violet pointer-events-none" />
+              <Badge className="absolute bottom-1.5 right-1.5 h-5 px-2 bg-violet text-violet-foreground text-[10px] font-semibold shadow-[0_1px_3px_rgba(0,0,0,.4)] pointer-events-none">
+                {t('groups.cover')}
+              </Badge>
+            </>)}
+          />
         )}
-      </div>
+      </FloatingScroll>
 
       <ImageDetail hideGroups navImages={groupImages} />
 
@@ -432,21 +313,22 @@ export function GroupsPage() {
       {showAddMedia && selectedGroupId !== null && (
         <AddMediaModal
           groupId={selectedGroupId}
+          groupName={selectedGroup?.name ?? ''}
           onClose={() => setShowAddMedia(false)}
           onAdded={handleMediaAdded}
         />
       )}
 
-      {/* Create group modal */}
-      <Dialog open={showCreateModal} onOpenChange={(open) => { if (!open) { setShowCreateModal(false); setNewGroupName(''); } }}>
+      {/* Create / rename group modal */}
+      <Dialog open={isNameDialogOpen} onOpenChange={(open) => { if (!open) closeNameDialog(); }}>
         <DialogContent className="w-96">
           <DialogHeader>
-            <DialogTitle>{t('groups.create')}</DialogTitle>
+            <DialogTitle>{t(renamingGroupId !== null ? 'groups.rename' : 'groups.create')}</DialogTitle>
           </DialogHeader>
 
-          {isSelectionMode && (
-            <div className="p-3 bg-accent/12 rounded-lg">
-              <p className="text-sm text-accent">
+          {renamingGroupId === null && isSelectionMode && (
+            <div className="p-3 bg-violet-soft rounded-lg">
+              <p className="text-sm text-violet-ink">
                 {t('groups.selectedMediaInfo', { count: getSelectedCount() })}
               </p>
             </div>
@@ -454,18 +336,18 @@ export function GroupsPage() {
 
           <Input
             type="text"
-            value={newGroupName}
-            onChange={(e) => setNewGroupName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleCreateGroup()}
+            value={groupName}
+            onChange={(e) => setGroupName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleConfirmName()}
             placeholder={t('groups.namePlaceholder')}
             autoFocus
           />
 
           <div className="flex gap-3 justify-end">
-            <Button onClick={handleCreateGroup}>{t('common.confirm')}</Button>
-            <Button variant="outline" onClick={() => { setShowCreateModal(false); setNewGroupName(''); }}>
+            <Button variant="outline" onClick={closeNameDialog}>
               {t('common.cancel')}
             </Button>
+            <Button onClick={handleConfirmName}>{t('common.confirm')}</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -478,11 +360,75 @@ export function GroupsPage() {
           </DialogHeader>
           <p className="text-sm text-muted-foreground">{t('groups.deleteConfirm')}</p>
           <div className="flex gap-3 justify-end">
-            <Button variant="destructive" onClick={handleConfirmDelete}>{t('common.delete')}</Button>
             <Button variant="outline" onClick={() => setDeletingGroupId(null)}>{t('common.cancel')}</Button>
+            <Button variant="destructive" onClick={handleConfirmDelete}>{t('common.delete')}</Button>
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function GroupCard({ group, coverUrl, onOpen, onRename, onDelete }: {
+  group: GroupWithCount;
+  coverUrl: string | null;
+  onOpen: () => void;
+  onRename: () => void;
+  onDelete: () => void;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <div
+      onClick={onOpen}
+      className="group/card squircle cursor-pointer rounded-lg overflow-hidden bg-card shadow-raised ring-violet transition-[transform,box-shadow] duration-150 hover:ring-2 active:scale-[.97]"
+    >
+      <div className="aspect-[4/3] bg-muted overflow-hidden relative">
+        {coverUrl ? (
+          <img src={coverUrl} alt={group.name} className="w-full h-full object-cover" loading="lazy" />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-muted-foreground/50">
+            <FolderIcon className="w-10 h-10" strokeWidth={1} />
+            {group.image_count === 0 && (
+              <span className="text-[10px]">{t('groups.noCover')}</span>
+            )}
+          </div>
+        )}
+
+        {/* Hover dark overlay, as on timeline thumbnails */}
+        <div className="absolute inset-0 bg-black/15 opacity-0 group-hover/card:opacity-100 transition-opacity pointer-events-none" />
+
+        {/* Hover actions: opaque chrome buttons, same as the preview/viewer. Clicks stop here so the card doesn't open */}
+        <div
+          onClick={e => e.stopPropagation()}
+          className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover/card:opacity-100 focus-within:opacity-100 transition-opacity"
+        >
+          <MediaButton label={t('groups.rename')} onClick={onRename} className={CHROME_BUTTON}>
+            <PencilIcon />
+          </MediaButton>
+          <MediaButton label={t('groups.deleteGroup')} onClick={onDelete} className={`${CHROME_BUTTON} hover:text-destructive`}>
+            <Trash2Icon />
+          </MediaButton>
+        </div>
+      </div>
+
+      <div className="p-3 flex flex-col items-start gap-1.5">
+        <p className="w-full font-medium text-sm truncate text-foreground">{group.name}</p>
+        <Badge variant="violet" className="text-[11px] font-semibold">
+          {t('groups.mediaCount', { count: group.image_count })}
+        </Badge>
+      </div>
+    </div>
+  );
+}
+
+function EmptyState({ text, children }: { text: string; children: ReactNode }) {
+  return (
+    <div className="flex items-center justify-center h-full">
+      <div className="squircle bg-card px-8 py-6 rounded-xl text-center max-w-sm flex flex-col items-center gap-4">
+        <p className="text-muted-foreground text-sm">{text}</p>
+        {children}
+      </div>
     </div>
   );
 }

@@ -8,6 +8,7 @@ use crate::error::AppError;
 use crate::db::Database;
 use crate::exif::{self, ExifResult};
 use crate::commands::import::{destination_path, classify_media};
+use crate::commands::trash::TRASH_DIR;
 use crate::hasher;
 use crate::thumbnail::{self, ThumbnailSize};
 
@@ -17,6 +18,8 @@ pub struct RescanResult {
     pub missing: Vec<MissingImage>,
     pub repaired: usize,
     pub moved: usize,
+    /// Known files found at a new path (moved by the user): their rows now point there
+    pub relinked: usize,
     pub thumbnailed: usize,
     pub folders_removed: usize,
     pub gps_repaired: usize,
@@ -58,12 +61,13 @@ pub fn rescan_archive(archive_path: &str, db: &Database) -> Result<RescanResult,
     // Phase 1: collect all image paths (serial walk)
     let candidates = collect_image_paths(root)?;
 
-    // Phase 2: parallel hash + EXIF + dims (skip already-known files)
-    let discovered: Vec<DiscoveredFile> = candidates
+    // Phase 2: parallel hash + EXIF + dims for new files; known hashes are set aside
+    let mut known: Vec<(String, PathBuf)> = Vec::new();
+    let found: Vec<Result<DiscoveredFile, (String, PathBuf)>> = candidates
         .par_iter()
         .filter_map(|path| {
             let id = compute_image_id(path).ok()?;
-            if db.image_exists(&id).ok()? { return None; }
+            if db.image_exists(&id).ok()? { return Some(Err((id, path.clone()))); }
             let filename = path.file_name()?.to_str()?.to_string();
             let media_type = classify_media(path).unwrap_or("image").to_string();
             let exif_result = exif::extract_date(path);
@@ -82,9 +86,18 @@ pub fn rescan_archive(archive_path: &str, db: &Database) -> Result<RescanResult,
                     None => (None, None),
                 }
             };
-            Some(DiscoveredFile { original_path: path.clone(), id, exif_result, dims, duration_ms, video_creation_time, file_size, filename, media_type, codec, rotation, latitude, longitude })
+            Some(Ok(DiscoveredFile { original_path: path.clone(), id, exif_result, dims, duration_ms, video_creation_time, file_size, filename, media_type, codec, rotation, latitude, longitude }))
         })
         .collect();
+    let mut discovered: Vec<DiscoveredFile> = Vec::new();
+    for f in found {
+        match f {
+            Ok(new) => discovered.push(new),
+            Err(k) => known.push(k),
+        }
+    }
+
+    let relinked = relink_moved_files(archive_path, db, known)?;
 
     // Phase 3: serial — relocate + thumbnail + DB insert
     let mut added = 0usize;
@@ -198,7 +211,33 @@ pub fn rescan_archive(archive_path: &str, db: &Database) -> Result<RescanResult,
     let gps_repaired = repair_missing_gps(archive_path, db)?;
 
     let folders_removed = remove_empty_dirs(root)?;
-    Ok(RescanResult { added, missing, repaired, moved, thumbnailed, folders_removed, gps_repaired })
+    Ok(RescanResult { added, missing, repaired, moved, relinked, thumbnailed, folders_removed, gps_repaired })
+}
+
+/// Files whose hash is already in the DB but whose row points to a path that no longer
+/// exists were moved by the user (or out of `Trash/` by hand): point the row at them,
+/// keeping groups and favourite, instead of reporting it "missing" (whose confirmation
+/// would delete the row). Moved files follow the date-folder layout like new ones.
+/// A file whose row still finds its own path is a true duplicate copy and is left alone.
+// ponytail: matches by exact id only; a moved "Keep both" copy (id `hash_name`) still shows as missing.
+fn relink_moved_files(archive_path: &str, db: &Database, known: Vec<(String, PathBuf)>) -> Result<usize, AppError> {
+    let root = Path::new(archive_path);
+    let mut relinked = 0usize;
+    for (id, path) in known {
+        let Some(img) = db.get_image(&id)? else { continue };
+        if root.join(&img.file_path).exists() { continue; }
+
+        let filename = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+        let final_path = relocate_if_misplaced(archive_path, &path, &img.taken_at, &filename)
+            .map(|(abs, _)| abs)
+            .unwrap_or(path);
+        let Ok(rel) = final_path.strip_prefix(root) else { continue };
+        let final_name = final_path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or(filename);
+        // Found outside Trash/ (rescan never walks it), so it is live again
+        db.set_image_location(&id, &rel.to_string_lossy(), &final_name, None)?;
+        relinked += 1;
+    }
+    Ok(relinked)
 }
 
 #[derive(Debug, Serialize)]
@@ -277,10 +316,20 @@ pub fn remove_missing_images(ids: &[String], db: &Database) -> Result<usize, App
     Ok(ids.len())
 }
 
+/// Settings key marking the one-time backfill below as done for this archive.
+const BACKFILL_DONE: &str = "backfill_exif_gps_v1";
+
+/// One-time backfill (EXIF dates, GPS) for rows imported before those were extracted.
+/// Runs once per archive, not on every open: it re-reads every file lacking EXIF or GPS
+/// (all videos, PNGs, most photos), which made opening a large archive slow each time.
+/// Rescan runs the same repairs on demand.
 pub fn run_migrations(archive_path: &str, db: &Database) -> Result<(), AppError> {
+    if db.get_setting(BACKFILL_DONE)?.is_some() {
+        return Ok(());
+    }
     repair_missing_exif_dates(archive_path, db)?;
     repair_missing_gps(archive_path, db)?;
-    Ok(())
+    db.set_setting(BACKFILL_DONE, "1")
 }
 
 fn collect_image_paths(dir: &Path) -> Result<Vec<PathBuf>, AppError> {
@@ -297,9 +346,10 @@ fn collect_image_paths_inner(dir: &Path, paths: &mut Vec<PathBuf>) -> Result<(),
 
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.is_dir() {
+        if entry.file_type().is_ok_and(|t| t.is_dir()) { // never follows symlinks (loops)
             let dir_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-            if dir_name == ".archivist" { continue; }
+            // Trashed files must stay put: relocating them would silently restore them
+            if dir_name == ".archivist" || dir_name == TRASH_DIR { continue; }
             collect_image_paths_inner(&path, paths)?;
         } else if is_image_file(&path) {
             paths.push(path);
@@ -422,7 +472,7 @@ fn repair_missing_gps(archive_path: &str, db: &Database) -> Result<usize, AppErr
     Ok(repaired)
 }
 
-fn unique_dest(dir: &Path, filename: &str) -> PathBuf {
+pub(crate) fn unique_dest(dir: &Path, filename: &str) -> PathBuf {
     let dest = dir.join(filename);
     if !dest.exists() { return dest; }
     let stem = Path::new(filename).file_stem().and_then(|s| s.to_str()).unwrap_or("file");
@@ -475,9 +525,9 @@ fn collect_dirs_inner(dir: &Path, dirs: &mut Vec<PathBuf>) -> Result<(), AppErro
     })?;
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.is_dir() {
+        if entry.file_type().is_ok_and(|t| t.is_dir()) { // never follows symlinks (loops)
             let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-            if name == ".archivist" { continue; }
+            if name == ".archivist" || name == TRASH_DIR { continue; }
             collect_dirs_inner(&path, dirs)?;
             dirs.push(path); // push after recursing = children before parents
         }
@@ -485,24 +535,30 @@ fn collect_dirs_inner(dir: &Path, dirs: &mut Vec<PathBuf>) -> Result<(), AppErro
     Ok(())
 }
 
+/// Removes empty folders of the archive layout (`YYYY`, `MM - Month`, `No Date`), left
+/// behind when files move. Other empty folders are the user's: they stay.
 fn remove_empty_dirs(root: &Path) -> Result<usize, AppError> {
     let mut dirs: Vec<PathBuf> = Vec::new();
     collect_dirs_inner(root, &mut dirs)?;
     let mut removed = 0usize;
     for dir in dirs {
-        let mut entries = fs::read_dir(&dir).map_err(|e| AppError::FileRead {
-            path: dir.to_string_lossy().to_string(),
-            message: e.to_string(),
-        })?;
-        if entries.next().is_none() {
-            fs::remove_dir(&dir).map_err(|e| AppError::FileRead {
-                path: dir.to_string_lossy().to_string(),
-                message: e.to_string(),
-            })?;
+        let is_layout = dir.file_name().and_then(|n| n.to_str()).is_some_and(is_layout_folder);
+        let is_empty = fs::read_dir(&dir).is_ok_and(|mut entries| entries.next().is_none());
+        // Best-effort: a folder that can't be removed must not fail the whole rescan
+        if is_layout && is_empty && fs::remove_dir(&dir).is_ok() {
             removed += 1;
         }
     }
     Ok(removed)
+}
+
+/// Folder names `destination_path` creates: year, `MM - Month`, `No Date`.
+fn is_layout_folder(name: &str) -> bool {
+    let is_year = name.len() == 4 && name.bytes().all(|b| b.is_ascii_digit());
+    let is_month = name.len() > 5
+        && name.as_bytes()[..2].iter().all(|b| b.is_ascii_digit())
+        && name[2..].starts_with(" - ");
+    is_year || is_month || name == "No Date"
 }
 
 fn compute_image_id(path: &Path) -> Result<String, AppError> {
@@ -574,6 +630,71 @@ mod tests {
     /// is missing from disk must be reported, never deleted, by a plain
     /// rescan. Deletion only happens via `remove_missing_images`, after the
     /// frontend has shown the user an explicit confirmation.
+    /// Regression test: a file the user moved inside the archive was skipped (hash known)
+    /// and its row reported "missing", whose confirmation deleted groups and favourite.
+    #[test]
+    fn rescan_relinks_moved_file_keeping_groups() {
+        let archive_dir = tempfile::tempdir().unwrap();
+        let archive_path = archive_dir.path().to_str().unwrap().to_string();
+        let db = Database::new(&archive_dir.path().join(".archivist/archivist.db")).unwrap();
+
+        let moved = archive_dir.path().join("misc/a.jpg");
+        fs::create_dir_all(moved.parent().unwrap()).unwrap();
+        fs::write(&moved, b"photo").unwrap();
+        let id = compute_image_id(&moved).unwrap();
+        db.insert_image(&NewImage {
+            id: id.clone(),
+            file_path: "2024/03 - March/a.jpg".into(), // where it was before the user moved it
+            taken_at: Some("2024-03-10T12:00:00+00:00".into()),
+            ..ghost_image("a")
+        }).unwrap();
+        let group = db.create_group("Trip").unwrap();
+        db.add_image_to_group(&id, group).unwrap();
+        db.set_image_favourite(&id, true).unwrap();
+
+        let result = rescan_archive(&archive_path, &db).unwrap();
+
+        assert_eq!((result.relinked, result.added), (1, 0));
+        assert!(result.missing.is_empty());
+        let img = db.get_image(&id).unwrap().unwrap();
+        assert_eq!(img.file_path, "2024/03 - March/a.jpg", "relinked files follow the date layout");
+        assert!(archive_dir.path().join("2024/03 - March/a.jpg").exists());
+        assert!(img.is_favourite);
+        assert_eq!(db.get_images_in_group(group).unwrap(), vec![id]);
+    }
+
+    /// The backfill re-reads every EXIF-less file: it must run once per archive, not on every open.
+    #[test]
+    fn migrations_run_once_per_archive() {
+        let archive_dir = tempfile::tempdir().unwrap();
+        let archive_path = archive_dir.path().to_str().unwrap().to_string();
+        let db = Database::new(&archive_dir.path().join(".archivist/archivist.db")).unwrap();
+
+        run_migrations(&archive_path, &db).unwrap();
+        assert!(db.get_setting(BACKFILL_DONE).unwrap().is_some());
+
+        // Running the backfill again would now fail on the missing table: the next open must skip it
+        db.connection().execute("DROP TABLE images", []).unwrap();
+        run_migrations(&archive_path, &db).expect("second open must not query images at all");
+    }
+
+    /// Rescan removes empty layout folders it left behind, never the user's own empty folders.
+    #[test]
+    fn rescan_removes_only_empty_layout_folders() {
+        let archive_dir = tempfile::tempdir().unwrap();
+        let archive_path = archive_dir.path().to_str().unwrap().to_string();
+        let db = Database::new(&archive_dir.path().join(".archivist/archivist.db")).unwrap();
+        for dir in ["2023/05 - May", "No Date", "Da sistemare", "2024/Viaggio"] {
+            fs::create_dir_all(archive_dir.path().join(dir)).unwrap();
+        }
+
+        let result = rescan_archive(&archive_path, &db).unwrap();
+
+        assert_eq!(result.folders_removed, 3); // 05 - May, then 2023, No Date
+        assert!(archive_dir.path().join("Da sistemare").exists());
+        assert!(archive_dir.path().join("2024/Viaggio").exists());
+    }
+
     #[test]
     fn rescan_reports_missing_without_deleting() {
         let archive_dir = tempfile::tempdir().unwrap();

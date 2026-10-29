@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
+import { LoaderCircleIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { open } from '@tauri-apps/plugin-dialog';
-import { invoke } from '@tauri-apps/api/core';
+import { pickAndOpenArchive } from '@/lib/openArchive';
 import { getVersion } from '@tauri-apps/api/app';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { useTimelineStore } from '../stores/timelineStore';
@@ -10,12 +10,13 @@ import { useMapStore } from '../stores/mapStore';
 import { useImportStore } from '../stores/importStore';
 import { useRescan } from '../hooks/useRescan';
 import { useRegenerateThumbnails } from '../hooks/useRegenerateThumbnails';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ProgressBar } from '@/components/ProgressBar';
+import { PathField } from '@/components/PathField';
 
 export function SettingsPage() {
   const { t, i18n } = useTranslation();
@@ -37,19 +38,7 @@ export function SettingsPage() {
 
   const selectArchiveFolder = async () => {
     if (isImportActive) { setShowImportWarning(true); return; }
-    const selected = await open({ directory: true, title: t('settings.selectArchiveFolder') });
-    if (selected) {
-      clearImages();
-      selectImage(null);
-      clearGroups();
-      clearLocations();
-      try {
-        await invoke('init_archive', { archivePath: selected });
-      } catch (e) {
-        console.error('Failed to init archive:', e);
-      }
-      setConfig({ archive_path: selected as string });
-    }
+    await pickAndOpenArchive(t('settings.selectArchiveFolder'));
   };
 
   const handleCloseArchive = () => {
@@ -62,25 +51,25 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="relative p-6 h-full overflow-y-auto">
-      <h1 className="text-[22px] font-medium text-foreground mb-6">{t('settings.title')}</h1>
+    // Scrollbar track kept clear of the panel's rounded corners
+    <div className="scroll-inset relative p-5 h-full overflow-y-auto [--scroll-inset-top:20px] [--scroll-inset-bottom:20px]">
+      <div className="flex items-baseline justify-between gap-2 mb-6">
+        <h1 className="text-[22px] font-medium text-foreground">{t('settings.title')}</h1>
+        {appVersion && (
+          <span className="text-xs text-muted-foreground tabular-nums select-none">v{appVersion}</span>
+        )}
+      </div>
 
       <div className="space-y-6">
         {/* Archive Path */}
         <div className="space-y-2">
           <Label>{t('settings.archivePath')}</Label>
-          <div className="flex gap-2">
-            <Input
-              type="text"
-              value={config.archive_path}
-              onChange={(e) => setConfig({ archive_path: e.target.value })}
-              placeholder="/path/to/archive"
-              className="flex-1"
-            />
-            <Button variant="default" onClick={selectArchiveFolder}>
-              {t('common.browse')}
-            </Button>
-          </div>
+          <PathField
+            path={config.archive_path}
+            placeholder={t('settings.noArchive')}
+            actionLabel={config.archive_path ? t('common.change') : t('common.browse')}
+            onAction={selectArchiveFolder}
+          />
         </div>
 
         {/* Language */}
@@ -101,6 +90,25 @@ export function SettingsPage() {
               <SelectItem value="it">Italiano</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+
+        {/* Theme */}
+        <div className="space-y-2">
+          <Label>{t('settings.theme')}</Label>
+          <ToggleGroup
+            type="single"
+            variant="segmented"
+            spacing={0.5}
+            value={config.theme}
+            onValueChange={(v) => { if (v) setConfig({ theme: v as typeof config.theme }); }}
+            className="w-full bg-muted rounded-full p-[3px]"
+          >
+            {(['system', 'light', 'dark'] as const).map(v => (
+              <ToggleGroupItem key={v} value={v} className="flex-1 text-xs">
+                {t(`settings.theme${v.charAt(0).toUpperCase() + v.slice(1)}`)}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
         </div>
 
         {/* Thumbnail Size */}
@@ -148,43 +156,31 @@ export function SettingsPage() {
               <Button
                 onClick={handleRescan}
                 disabled={isRescanning || isImportActive || !config.archive_path}
-                variant="default"
+                variant="secondary"
                 className="gap-2 w-full"
               >
                 {isRescanning && (
-                  <svg className="animate-spin size-4" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                  </svg>
+                  <LoaderCircleIcon className="animate-spin size-4" />
                 )}
                 {isRescanning ? t('common.loading') : t('settings.rescanArchive')}
               </Button>
               <p className="mt-1 text-[11px] text-muted-foreground">{t('settings.rescanArchiveDesc')}</p>
             </div>
 
-            <div>
-              <Button
-                onClick={() => setShowRegenConfirm(true)}
-                disabled={isRegenerating || isImportActive || isRescanning || !config.archive_path}
-                variant="default"
-                className="gap-2 w-full"
-              >
-                {isRegenerating ? t('common.loading') : t('settings.regenerateThumbnails')}
-              </Button>
-              <p className="mt-1 text-[11px] text-muted-foreground">{t('settings.regenerateThumbnailsDesc')}</p>
-            </div>
+            <Button
+              onClick={() => setShowRegenConfirm(true)}
+              disabled={isRegenerating || isImportActive || isRescanning || !config.archive_path}
+              variant="secondary"
+              className="gap-2 w-full"
+            >
+              {isRegenerating ? t('common.loading') : t('settings.regenerateThumbnails')}
+            </Button>
 
+            {/* Not destructive: only disconnects, no file or DB record is touched */}
             {config.archive_path && (
-              <div>
-                <Button
-                  onClick={handleCloseArchive}
-                  variant="destructive"
-                  className="w-full"
-                >
-                  {t('settings.closeArchive')}
-                </Button>
-                <p className="mt-1 text-[11px] text-muted-foreground">{t('settings.closeArchiveDesc')}</p>
-              </div>
+              <Button onClick={handleCloseArchive} variant="outline" className="w-full">
+                {t('settings.closeArchive')}
+              </Button>
             )}
           </div>
 
@@ -197,12 +193,6 @@ export function SettingsPage() {
         </div>
 
       </div>
-
-      {appVersion && (
-        <p className="absolute bottom-4 right-6 text-xs text-muted-foreground select-none">
-          v{appVersion}
-        </p>
-      )}
 
       <Dialog open={showImportWarning} onOpenChange={(open) => { if (!open) setShowImportWarning(false); }}>
         <DialogContent className="w-96">
