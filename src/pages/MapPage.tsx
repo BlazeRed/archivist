@@ -24,8 +24,10 @@ import type { Image } from '../types';
 maplibregl.setWorkerUrl(maplibreWorkerUrl);
 
 const CLUSTER_SOURCE_ID = 'image-locations';
-// Symbol layers (cluster counts) need a glyph server; the raster OSM style has none of its own
-const GLYPHS_URL = 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf';
+// OpenFreeMap: free vector basemap meant for apps, no API key (the repo is public), fonts included.
+// Light/dark styles follow the app theme.
+const basemapUrl = (dark: boolean) => `https://tiles.openfreemap.org/styles/${dark ? 'dark' : 'positron'}`;
+const isDarkTheme = () => document.documentElement.classList.contains('dark');
 
 function locationsToGeoJSON(locations: ImageLocation[]): GeoJSON.FeatureCollection {
   return {
@@ -222,19 +224,7 @@ export function MapPage() {
 
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
-      style: {
-        version: 8,
-        glyphs: GLYPHS_URL,
-        sources: {
-          osm: {
-            type: 'raster',
-            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-            tileSize: 256,
-            attribution: '&copy; OpenStreetMap contributors',
-          },
-        },
-        layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
-      },
+      style: basemapUrl(isDarkTheme()),
       center: [12, 42],
       zoom: 1.6,
       attributionControl: false,
@@ -251,7 +241,9 @@ export function MapPage() {
       toast.error(t('map.tileLoadError'), { id: 'map-tile-error' });
     });
 
-    map.on('load', () => {
+    // Photo source + layers on top of the basemap. `style.load` fires on the first style and
+    // again after each theme swap (setStyle drops everything not in the new basemap style).
+    map.on('style.load', () => {
       map.addSource(CLUSTER_SOURCE_ID, {
         type: 'geojson',
         data: locationsToGeoJSON(locationsRef.current),
@@ -280,7 +272,7 @@ export function MapPage() {
         filter: ['has', 'point_count'],
         layout: {
           'text-field': '{point_count_abbreviated}',
-          'text-font': ['Open Sans Semibold'],
+          'text-font': ['Noto Sans Bold'], // a font OpenFreeMap serves
           'text-size': 12,
         },
       });
@@ -302,7 +294,10 @@ export function MapPage() {
 
       applyThemeColors(map);
       highlightPin(map, useTimelineStore.getState().previewImage?.id ?? null);
+    });
 
+    // Listeners are on the map, not the style: register them once
+    map.once('load', () => {
       map.on('click', 'clusters', (e: maplibregl.MapLayerMouseEvent) => {
         const features = map.queryRenderedFeatures(e.point, { layers: ['clusters'] });
         const clusterId = features[0]?.properties?.cluster_id;
@@ -337,8 +332,14 @@ export function MapPage() {
       frameView(map, locationsRef.current);
     });
 
-    // Theme switch (Settings or OS while on 'system') toggles `.dark` on <html>
-    const themeObserver = new MutationObserver(() => applyThemeColors(map));
+    // Theme switch (Settings or OS while on 'system') toggles `.dark` on <html>:
+    // swap the basemap (style.load then rebuilds the photo layers), else just recolor them
+    let dark = isDarkTheme();
+    const themeObserver = new MutationObserver(() => {
+      if (isDarkTheme() === dark) { applyThemeColors(map); return; }
+      dark = isDarkTheme();
+      map.setStyle(basemapUrl(dark), { diff: false });
+    });
     themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 
     return () => {
