@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { FolderIcon, XIcon } from 'lucide-react';
+import { useState, useEffect, type ReactNode } from 'react';
+import { CalendarIcon, FolderIcon, MapPinIcon, XIcon, type LucideIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
@@ -10,7 +10,9 @@ import type { Image, GroupWithCount } from '../types';
 import { formatDuration } from '@/lib/formatDuration';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 export function formatDate(dateStr: string | null, fallback: string) {
   if (!dateStr) return fallback;
@@ -126,6 +128,57 @@ export function useBulkGroups(imageIds: string[]): ImageGroups {
   };
 }
 
+/** Metadata row, same look as `Field`. With `onClick` the whole row is a ghost button (cross-link to another
+ *  page): value in the link tone, small trailing icon, tinted fill on hover. The fill bleeds 8px past the text
+ *  (-mx-2 px-2), which the preview's scroll container leaves room for (its px-3); radius lg = card xl (24) − 8 inset. */
+function LinkRow({ label, onClick, tooltip, icon: Icon, valueClassName, hoverClassName, children }: {
+  label: string;
+  onClick?: () => void;
+  tooltip: string;
+  icon: LucideIcon;
+  valueClassName: string;
+  hoverClassName: string;
+  children: ReactNode;
+}) {
+  const value = cn('flex flex-wrap items-center gap-2', valueClassName);
+  if (!onClick) {
+    return (
+      <div>
+        <p className="text-[11px] text-muted-foreground mb-0.5">{label}</p>
+        <p className={value}>{children}</p>
+      </div>
+    );
+  }
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {/* -mt-1.5 py-1.5 mb-1.5: the fill grows 6px up/down while the rows' 12px rhythm (space-y = own bottom margin) holds */}
+        <Button
+          variant="ghost"
+          onClick={onClick}
+          className={cn(
+            '-mx-2 -mt-1.5 mb-1.5 h-auto w-[calc(100%+1rem)] flex-col items-start gap-0 rounded-lg border-0 px-2 py-1.5 text-left text-sm font-normal whitespace-normal active:not-aria-[haspopup]:scale-100',
+            hoverClassName,
+          )}
+        >
+          <span className="text-[11px] text-muted-foreground mb-0.5">{label}</span>
+          <span className={value}>
+            {children}
+            <Icon className="size-3.5 -ml-0.5" />
+          </span>
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="top">{tooltip}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function formatCoords(image: Image) {
+  return image.latitude != null && image.longitude != null
+    ? `${image.latitude.toFixed(5)}, ${image.longitude.toFixed(5)}`
+    : '—';
+}
+
 function Field({ label, value, truncate }: { label: string; value: string; truncate?: boolean }) {
   return (
     <div>
@@ -141,10 +194,14 @@ export function ImageMetadata({ image, hideGroups }: { image: Image; hideGroups?
   return <ImageMetadataView image={image} groups={groups} hideGroups={hideGroups} />;
 }
 
-export function ImageMetadataView({ image, groups, hideGroups, readOnly }: {
+export function ImageMetadataView({ image, groups, hideGroups, readOnly, onShowOnMap, onShowInTimeline }: {
   image: Image;
   groups: ImageGroups;
   hideGroups?: boolean;
+  /** Makes the whole location row a button (Timeline preview: open the photo on the map). */
+  onShowOnMap?: () => void;
+  /** Makes the whole date row a button (Map preview: open the photo in the Timeline). */
+  onShowInTimeline?: () => void;
   /** Display only: no "Show in folder", no group add/remove (the preview card has its own action pills). */
   readOnly?: boolean;
 }) {
@@ -158,27 +215,29 @@ export function ImageMetadataView({ image, groups, hideGroups, readOnly }: {
       <div className="space-y-3 text-sm">
         <Field label={t('detail.filename')} value={image.filename} truncate />
 
-        <div>
-          <p className="text-[11px] text-muted-foreground mb-0.5">
-            {t('detail.dateTaken')}
-          </p>
-          <p className="text-foreground flex items-center gap-2 flex-wrap">
-            {image.taken_at
-              ? formatDate(image.taken_at, t('detail.noDate'))
-              : <span className="text-muted-foreground">{t('detail.noDate')}</span>
-            }
-            {image.taken_at && image.date_source === 'filename' && (
-              <span className="text-[11px] font-semibold bg-primary/12 text-primary-ink px-2 py-0.5 rounded-full">
-                {t('common.dateFromFilename')}
-              </span>
-            )}
-            {image.taken_at && image.date_source === 'mtime' && (
-              <span className="text-[11px] font-semibold bg-warning/15 text-warning-ink px-2 py-0.5 rounded-full">
-                {t('detail.noExif')}
-              </span>
-            )}
-          </p>
-        </div>
+        <LinkRow
+          label={t('detail.dateTaken')}
+          onClick={onShowInTimeline}
+          tooltip={t('map.showInTimeline')}
+          icon={CalendarIcon}
+          valueClassName={onShowInTimeline ? 'text-primary-ink' : 'text-foreground'}
+          hoverClassName="hover:bg-primary/12"
+        >
+          {image.taken_at
+            ? formatDate(image.taken_at, t('detail.noDate'))
+            : <span className="text-muted-foreground">{t('detail.noDate')}</span>
+          }
+          {image.taken_at && image.date_source === 'filename' && (
+            <span className="text-[11px] font-semibold bg-primary/12 text-primary-ink px-2 py-0.5 rounded-full">
+              {t('common.dateFromFilename')}
+            </span>
+          )}
+          {image.taken_at && image.date_source === 'mtime' && (
+            <span className="text-[11px] font-semibold bg-warning/15 text-warning-ink px-2 py-0.5 rounded-full">
+              {t('detail.noExif')}
+            </span>
+          )}
+        </LinkRow>
 
         {image.media_type === 'video' && image.duration_ms != null && (
           <Field label={t('detail.duration')} value={formatDuration(image.duration_ms)} />
@@ -189,11 +248,17 @@ export function ImageMetadataView({ image, groups, hideGroups, readOnly }: {
 
         <Field label={t('detail.fileSize')} value={formatSize(image.file_size)} />
 
-        <Field
+        {/* Violet = places (like the map pins) */}
+        <LinkRow
           label={t('detail.location')}
-          value={image.latitude != null && image.longitude != null ? `${image.latitude.toFixed(5)}, ${image.longitude.toFixed(5)}` : '—'}
-        />
-
+          onClick={onShowOnMap}
+          tooltip={t('preview.showOnMap')}
+          icon={MapPinIcon}
+          valueClassName={image.latitude != null ? 'text-violet-ink' : 'text-foreground'}
+          hoverClassName="hover:bg-violet-soft"
+        >
+          <span className="tabular-nums">{formatCoords(image)}</span>
+        </LinkRow>
 
         <Field label={t('detail.imported')} value={formatDate(image.imported_at, '—')} />
 

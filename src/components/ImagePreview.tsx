@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ChevronLeftIcon, ChevronRightIcon, ChevronUpIcon, FolderIcon, ImageIcon, LoaderCircleIcon, Maximize2Icon, PlayIcon, StarIcon, Trash2Icon, XIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
@@ -9,6 +10,7 @@ import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { useGroupUIStore } from '../stores/groupUIStore';
 import { useUIStore } from '../stores/uiStore';
+import { useMapStore } from '../stores/mapStore';
 import { useTrashImages } from '../hooks/useTrash';
 import { ImageMetadataView, useImageGroups, useShowInFolder, type ImageGroups } from './ImageMetadata';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -29,6 +31,8 @@ export const CHROME_BUTTON = 'pointer-events-auto bg-popover text-popover-foregr
 // Content layer of the card: swaps between skeleton and preview, fading in on each swap.
 // The card itself (frame, shadow) never moves.
 const CONTENT = 'absolute inset-0 flex flex-col gap-3 p-3 animate-in fade-in duration-200';
+// Bottom pills concentric with the card corner: inset = card radius (xl, 24) − pill radius (h-9, 18) = 6px
+const ACTION_BAR = 'pointer-events-none absolute bottom-1.5 inset-x-1.5 flex items-center justify-end gap-1.5';
 
 /** Always-visible preview column: the selected item, or a static skeleton with the same geometry. */
 export function ImagePreview() {
@@ -38,7 +42,9 @@ export function ImagePreview() {
     <aside className="flex-1 min-w-0 h-full pr-3 pb-3">
       <div className="squircle relative h-full rounded-xl bg-popover shadow-float ring-1 ring-frame overflow-hidden">
         {/* ponytail: multi-select shows the skeleton (the selection bar holds the actions); stacked thumbs + count if that proves too bare */}
-        {previewImage && !isSelectionMode ? <PreviewCard image={previewImage} /> : <PreviewSkeleton />}
+        {previewImage && !isSelectionMode
+          ? <PreviewCard image={previewImage} showOnMap />
+          : <PreviewSkeleton />}
       </div>
     </aside>
   );
@@ -77,7 +83,7 @@ function PreviewSkeleton() {
         </div>
       </div>
 
-      <div className="pointer-events-none absolute bottom-3 inset-x-3 flex items-center justify-end gap-2">
+      <div className={ACTION_BAR}>
         <Button variant="secondary" disabled className="h-9 px-4">{t('preview.folder')}</Button>
         <Button variant="violet" disabled className="h-9 pl-3.5 pr-3">{t('nav.groups')}</Button>
       </div>
@@ -85,9 +91,19 @@ function PreviewSkeleton() {
   );
 }
 
-function PreviewCard({ image: previewImage }: { image: Image }) {
+/** `navImages`: what prev/next walk over (default: the Timeline's filtered images).
+ *  Cross-links live in the metadata rows: `showOnMap` = location row opens the map (Timeline → Map),
+ *  `onShowInTimeline` = date row opens the Timeline on this photo (Map → Timeline). */
+export function PreviewCard({ image: previewImage, navImages, showOnMap, onShowInTimeline }: {
+  image: Image;
+  navImages?: Image[];
+  onShowInTimeline?: () => void;
+  showOnMap?: boolean;
+}) {
+  const showOnMapHandler = useShowOnMap(previewImage);
   const { t } = useTranslation();
-  const { selectImage, setPreviewImage, updateImageWebPath, images } = useTimelineStore();
+  const { selectImage, setPreviewImage, updateImageWebPath, images: timelineImages } = useTimelineStore();
+  const images = navImages ?? timelineImages;
   const groups = useImageGroups(previewImage.id);
   const { config } = useAppConfigStore();
   const trashImages = useTrashImages();
@@ -241,18 +257,28 @@ function PreviewCard({ image: previewImage }: { image: Image }) {
         )}
       </div>
 
-      {/* Scrollable metadata — bottom padding keeps the last rows clear of the floating bar */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-1 pb-14 scroll-inset [--scroll-inset-bottom:2.75rem]">
-        <ImageMetadataView image={previewImage} groups={groups} readOnly />
+      {/* Scrollable metadata — bottom padding keeps the last rows clear of the floating bar.
+          -mx-2 px-3: reaches into the card padding (text stays put) so link rows' hover fill has 8px each side unclipped */}
+      <div className="flex-1 min-h-0 overflow-y-auto -mx-2 px-3 pb-14 scroll-inset [--scroll-inset-bottom:2.75rem]">
+        <ImageMetadataView image={previewImage} groups={groups} readOnly onShowOnMap={showOnMap ? showOnMapHandler : undefined} onShowInTimeline={onShowInTimeline} />
       </div>
 
       {/* Floating actions: two separate pills, each styled by its role (DS §7) */}
-      <div className="pointer-events-none absolute bottom-3 inset-x-3 flex items-center justify-end gap-2">
+      <div className={ACTION_BAR}>
         <FolderButton image={previewImage} />
         <GroupsButton groups={groups} side="top" />
       </div>
     </div>
   );
+}
+
+/** Opens the map zoomed on this photo; undefined when the photo has no location. */
+function useShowOnMap(image: Image): (() => void) | undefined {
+  const navigate = useNavigate();
+  // Map pins also cover the dev mock coordinates, which never reach the Image record
+  const hasPin = useMapStore((s) => s.locations.some((l) => l.id === image.id));
+  if (!hasPin && (image.latitude == null || image.longitude == null)) return undefined;
+  return () => navigate('/map', { state: { focusImageId: image.id } });
 }
 
 /** Favourite toggle laid over the photo (preview card, fullscreen viewer). */

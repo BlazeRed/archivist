@@ -352,13 +352,23 @@ export function MonthGrid({
   }, [rows]);
   if (gridRowsRef) gridRowsRef.current = gridRows;
 
-  // Keep the previewed item in view, whatever moved it (keys, preview arrows, fullscreen navigation)
+  // Keep the previewed item in view, whatever moved it (keys, preview arrows, fullscreen navigation,
+  // the Map's date row). Once per id: a preview set before mount waits for the measured rows, then one more
+  // frame so the list has re-laid out at the real cell size (else 'smart' works on stale heights and overshoots).
+  const scrolledToIdRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!previewImageId) return;
+    if (!previewImageId) { scrolledToIdRef.current = null; return; }
+    if (scrolledToIdRef.current === previewImageId || containerWidth === 0) return;
     const r = gridRows.findIndex(row => row.some(img => img.id === previewImageId));
-    if (r !== -1) listRef.current?.scrollToRow({ index: listIndex[r], align: 'smart' });
+    if (r === -1) return;
+    // Marked done inside the frame: a re-run (rows re-laid out) cancels this frame and schedules a fresh one
+    const id = requestAnimationFrame(() => {
+      listRef.current?.scrollToRow({ index: listIndex[r], align: 'smart' });
+      scrolledToIdRef.current = previewImageId;
+    });
+    return () => cancelAnimationFrame(id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [previewImageId]);
+  }, [previewImageId, gridRows, containerWidth]);
 
   const rowProps = useMemo<RowProps>(
     () => ({

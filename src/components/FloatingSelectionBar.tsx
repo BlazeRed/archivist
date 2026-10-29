@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { XIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { FLOATING_BOTTOM } from './ThumbnailGrid';
 import { Button } from '@/components/ui/button';
@@ -60,9 +61,9 @@ export function SelectionCountPill({ count, onClear, tooltipSide = 'bottom' }: {
 }
 
 /** Read-only info pill of the floating row (item count, trash summary) */
-export function InfoPill({ children }: { children: ReactNode }) {
+export function InfoPill({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <Badge variant="outline" className="cursor-default select-none h-9 px-4 border-0 bg-popover shadow-float text-xs font-normal text-muted-foreground tabular-nums">
+    <Badge variant="outline" className={cn('cursor-default select-none h-9 px-4 border-0 bg-popover shadow-float text-xs font-normal text-muted-foreground tabular-nums', className)}>
       {children}
     </Badge>
   );

@@ -9,7 +9,6 @@ export interface TimelineFilter {
   noDate: boolean;
   groupId: number | null;
   mediaType: 'all' | 'images' | 'videos';
-  location: { lat: number; lng: number } | null;
 }
 
 interface TimelineState {
@@ -32,19 +31,8 @@ interface TimelineState {
   clearImages: () => void;
 }
 
-const LOCATION_MATCH_EPSILON = 1e-4; // ~11m, absorbs float round-trip noise
-
 export function applyClientFilter(all: Image[], filter: TimelineFilter, groupIds: Set<string> | null): Image[] {
   let result = all;
-
-  if (filter.location !== null) {
-    const { lat, lng } = filter.location;
-    result = result.filter(img =>
-      img.latitude != null && img.longitude != null &&
-      Math.abs(img.latitude - lat) < LOCATION_MATCH_EPSILON &&
-      Math.abs(img.longitude - lng) < LOCATION_MATCH_EPSILON
-    );
-  }
 
   if (filter.mediaType !== 'all') {
     result = result.filter(img =>
@@ -77,7 +65,7 @@ export function applyClientFilter(all: Image[], filter: TimelineFilter, groupIds
   return result;
 }
 
-export const EMPTY_FILTER: TimelineFilter = { yearFrom: null, yearTo: null, month: null, noDate: false, groupId: null, mediaType: 'all', location: null };
+export const EMPTY_FILTER: TimelineFilter = { yearFrom: null, yearTo: null, month: null, noDate: false, groupId: null, mediaType: 'all' };
 
 /** Merges a filter change and keeps it consistent. Shared with filters that live outside the store (AddMediaModal). */
 export function normalizeFilter(prev: TimelineFilter, partial: Partial<TimelineFilter>): TimelineFilter {

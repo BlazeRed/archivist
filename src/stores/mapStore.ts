@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
+import type { Image } from '../types';
 
 export interface ImageLocation {
   id: string;
@@ -22,12 +23,11 @@ export const useMapStore = create<MapState>((set) => ({
 
   fetchLocations: async () => {
     set({ loading: true, error: null });
-    if (import.meta.env.DEV && import.meta.env.VITE_MOCK_LOCATIONS) {
-      set({ locations: mockLocations(), loading: false });
-      return;
-    }
     try {
-      const locations = await invoke<ImageLocation[]>('get_image_locations');
+      let locations = await invoke<ImageLocation[]>('get_image_locations');
+      if (import.meta.env.DEV && locations.length === 0) {
+        locations = mockLocations(await invoke<Image[]>('get_all_images'));
+      }
       set({ locations, loading: false });
     } catch (e) {
       set({ error: String(e), loading: false });
@@ -37,11 +37,11 @@ export const useMapStore = create<MapState>((set) => ({
   clearLocations: () => set({ locations: [] }),
 }));
 
-// ponytail: dev-only fake pins to test the map without geotagged photos.
-// Run with `VITE_MOCK_LOCATIONS=1 npm run tauri dev`. Clicking a single pin opens an empty Timeline (ids are fake).
-function mockLocations(): ImageLocation[] {
+// ponytail: dev-only fake coordinates for the archive's real media, so the map (pins, clusters, preview)
+// can be tested without geotagged photos. Kicks in only in `tauri dev` and only when no media has GPS.
+function mockLocations(images: Image[]): ImageLocation[] {
   const places: [number, number, number][] = [
-    // lat, lng, photo count
+    // lat, lng, weight
     [45.4642, 9.19, 40],    // Milano
     [41.9028, 12.4964, 25], // Roma
     [43.7696, 11.2558, 12], // Firenze
@@ -52,7 +52,10 @@ function mockLocations(): ImageLocation[] {
   ];
   let seed = 1;
   const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647 - 0.5;
-  return places.flatMap(([lat, lng, n], p) =>
-    Array.from({ length: n }, (_, i) => ({ id: `mock-${p}-${i}`, latitude: lat + rand() * 0.08, longitude: lng + rand() * 0.08 }))
-  );
+  // Each place gets a share of the media proportional to its weight
+  const slots = places.flatMap(([lat, lng, n]) => Array.from({ length: n }, () => [lat, lng] as const));
+  return images.map((img, i) => {
+    const [lat, lng] = slots[i % slots.length];
+    return { id: img.id, latitude: lat + rand() * 0.08, longitude: lng + rand() * 0.08 };
+  });
 }

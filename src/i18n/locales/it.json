@@ -103,6 +103,7 @@
     "transcoding": "Conversione video in corso, potrebbe richiedere qualche minuto…",
     "transcodeError": "Conversione video fallita",
     "folder": "Cartella",
+    "showOnMap": "Mostra sulla mappa",
     "group": "Gruppo"
   },
   "favourites": {
@@ -118,7 +119,8 @@
     "located": "{{count}} con posizione",
     "zoomIn": "Ingrandisci",
     "zoomOut": "Riduci",
-    "fitAll": "Mostra tutte"
+    "fitAll": "Mostra tutte",
+    "showInTimeline": "Mostra nella cronologia"
   },
   "groups": {
     "title": "Gruppi",

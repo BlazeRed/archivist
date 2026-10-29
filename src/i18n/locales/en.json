@@ -103,6 +103,7 @@
     "transcoding": "Transcoding video, this may take a while…",
     "transcodeError": "Video transcode failed",
     "folder": "Folder",
+    "showOnMap": "Show on map",
     "group": "Group"
   },
   "favourites": {
@@ -118,7 +119,8 @@
     "located": "{{count}} with location",
     "zoomIn": "Zoom in",
     "zoomOut": "Zoom out",
-    "fitAll": "Show all"
+    "fitAll": "Show all",
+    "showInTimeline": "Show in timeline"
   },
   "groups": {
     "title": "Groups",
