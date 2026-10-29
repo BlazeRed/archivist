@@ -54,16 +54,16 @@ export function Topbar() {
   const activeNav = navItems.find(n => isActive(n.to))?.to ?? '';
 
   return (
-    <header className="fixed top-3 inset-x-3 z-40 h-[52px] rounded-full bg-popover shadow-float ring-1 ring-frame grid grid-cols-[1fr_auto_1fr] items-center gap-3 pl-2.5 pr-2">
+    <header className="fixed top-3 inset-x-3 z-40 h-[52px] rounded-full bg-popover shadow-float ring-1 ring-frame grid grid-cols-[1fr_auto_1fr] items-center gap-3 pl-1 pr-2">
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
             variant="ghost"
             onClick={handleOpenArchive}
             disabled={isImportActive}
-            className="h-auto min-w-0 justify-self-start gap-2.5 pl-0.5 pr-3 py-0.5"
+            className="h-11 min-w-0 justify-self-start gap-3 pl-[5px] pr-5"
           >
-            <span className="squircle w-[34px] h-[34px] rounded-[11px] bg-linear-145 from-primary to-violet flex items-center justify-center shrink-0">
+            <span className="w-[34px] h-[34px] rounded-full bg-linear-145 from-primary to-violet flex items-center justify-center shrink-0">
               <ArchiveIcon className="size-5! text-white" />
             </span>
             <span className="flex flex-col leading-none text-left">

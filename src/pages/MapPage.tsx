@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, type ReactNode } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
@@ -135,15 +135,31 @@ export function MapPage() {
   const { locations, loading, fetchLocations, clearLocations } = useMapStore();
   const { isRescanning, handleRescan } = useRescan();
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const previewImage = useTimelineStore((s) => s.previewImage);
+  const allImages = useTimelineStore((s) => s.allImages);
   const navigate = useNavigate();
+  const location = useLocation();
   // Set by the Timeline's "Map" pill: open zoomed on that photo instead of framing all pins (consumed once)
-  const focusImageIdRef = useRef<string | null>((useLocation().state as { focusImageId?: string } | null)?.focusImageId ?? null);
-  // The "Timeline" pill hands the preview over to the Timeline: the unmount cleanup must not clear it
-  const keepPreviewRef = useRef(false);
+  const focusImageIdRef = useRef<string | null>(null);
+
+  // The pin preview is the map's own (the Timeline keeps its preview while both pages stay mounted).
+  // The record comes from the store, so favourite/transcode updates and trashing reach the card.
+  const [pin, setPin] = useState<ImageLocation | null>(null);
+  const pinRef = useRef(pin);
+  pinRef.current = pin;
+  const previewImage = useMemo(() => {
+    const image = pin && allImages.find((img) => img.id === pin.id);
+    // Pin coords win: identical for real GPS, and they show the dev mock coords in the metadata
+    return image ? { ...image, latitude: pin.latitude, longitude: pin.longitude } : null;
+  }, [pin, allImages]);
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
+  // The map outlives the page being hidden: rebuilt only for another archive
+  const mapArchiveRef = useRef<string | null>(null);
+  // Pins framed once per map: later refreshes (each visit, rescan) keep the user's view
+  const framedRef = useRef(false);
+  // Basemap the map shows (dark/light), to catch theme switches made while the page was hidden
+  const mapDarkRef = useRef(false);
   // Read by the map's load handler, which runs after locations may already have changed
   const locationsRef = useRef(locations);
   locationsRef.current = locations;
@@ -166,8 +182,7 @@ export function MapPage() {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || e.defaultPrevented) return;
       if ((e.target as Element | null)?.closest?.('[role="listbox"], [role="dialog"], [role="menu"]')) return;
-      const { previewImage, selectedImage, setPreviewImage } = useTimelineStore.getState();
-      if (previewImage && !selectedImage) setPreviewImage(null);
+      if (pinRef.current && !useTimelineStore.getState().selectedImage) setPin(null);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -177,34 +192,39 @@ export function MapPage() {
   const frameView = useCallback((map: maplibregl.Map, locs: ImageLocation[]) => {
     const focus = focusImageIdRef.current && locs.find((l) => l.id === focusImageIdRef.current);
     if (!focus) {
-      // A refresh (late fetch, rescan) must not yank the view away from an open preview
-      if (!useTimelineStore.getState().previewImage) fitToLocations(map, locs);
+      if (!framedRef.current && locs.length > 0) {
+        fitToLocations(map, locs);
+        framedRef.current = true;
+      }
       return;
     }
     focusImageIdRef.current = null;
+    framedRef.current = true;
     // Offset: centre the pin in the area left free by the preview card
     map.easeTo({ center: [focus.longitude, focus.latitude], zoom: FOCUS_ZOOM, offset: [-(PREVIEW_W + 24) / 2, 0], duration: 0 });
-    const { allImages, setPreviewImage } = useTimelineStore.getState();
-    const image = allImages.find((img) => img.id === focus.id);
-    if (image) setPreviewImage({ ...image, latitude: focus.latitude, longitude: focus.longitude });
+    setPin(focus);
   }, []);
 
   const showInTimeline = (image: Image) => {
     const { allImages, images, setFilter, setPreviewImage } = useTimelineStore.getState();
     // Active filters could hide the photo: drop them so the grid can scroll to it
     if (!images.some((img) => img.id === image.id)) setFilter(EMPTY_FILTER);
-    keepPreviewRef.current = true;
     // The stored record, without the pin coords (dev mock coords must not reach the Timeline)
     setPreviewImage(allImages.find((img) => img.id === image.id) ?? image);
     navigate('/');
   };
 
-  // The preview shares the Timeline's store slot: start empty and don't leak the map's pick back to the Timeline
+  // Each arrival from a "Map" pill focuses its photo; plain visits (topbar) carry no state and keep the view
   useEffect(() => {
-    const { setPreviewImage } = useTimelineStore.getState();
-    setPreviewImage(null);
-    return () => { if (!keepPreviewRef.current) setPreviewImage(null); };
-  }, []);
+    const id = (location.state as { focusImageId?: string } | null)?.focusImageId;
+    if (!id) return;
+    focusImageIdRef.current = id;
+    const map = mapRef.current;
+    // Map not built or not loaded yet: its load handler frames the focus
+    if (!map?.getSource(CLUSTER_SOURCE_ID)) return;
+    map.resize(); // the container was display:none while the page was hidden
+    frameView(map, locationsRef.current);
+  }, [location.key, frameView]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (config.archive_path) {
@@ -220,133 +240,143 @@ export function MapPage() {
   const canShowMap = !!config.archive_path && isOnline;
 
   useEffect(() => {
+    // The map outlives the page being hidden (this effect re-runs on every show): it's rebuilt
+    // only when its container went away (offline, archive closed) or another archive is open
+    if (mapRef.current && (!canShowMap || mapArchiveRef.current !== config.archive_path)) {
+      mapRef.current.remove();
+      mapRef.current = null;
+    }
     if (!canShowMap || !mapContainerRef.current) return;
 
-    const map = new maplibregl.Map({
-      container: mapContainerRef.current,
-      style: basemapUrl(isDarkTheme()),
-      center: [12, 42],
-      zoom: 1.6,
-      attributionControl: false,
-    });
+    const reused = !!mapRef.current;
+    const map = mapRef.current ?? createMap(mapContainerRef.current);
     mapRef.current = map;
+    mapArchiveRef.current = config.archive_path;
 
-    // Bottom-left: the bottom-right corner hosts the zoom pill
-    map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left');
-
-    map.on('error', (e) => {
-      // Tile fetch failures (flaky connection, captive portal, etc.) — one toast (fixed id),
-      // not one per failed tile, instead of leaving blank tiles with no explanation.
-      console.error('MapLibre error:', e.error);
-      toast.error(t('map.tileLoadError'), { id: 'map-tile-error' });
-    });
-
-    // Photo source + layers on top of the basemap. `style.load` fires on the first style and
-    // again after each theme swap (setStyle drops everything not in the new basemap style).
-    map.on('style.load', () => {
-      map.addSource(CLUSTER_SOURCE_ID, {
-        type: 'geojson',
-        data: locationsToGeoJSON(locationsRef.current),
-        cluster: true,
-        clusterRadius: 50,
-        clusterMaxZoom: 14,
+    function createMap(container: HTMLDivElement) {
+      framedRef.current = false;
+      setPin(null);
+      mapDarkRef.current = isDarkTheme();
+      const map = new maplibregl.Map({
+        container,
+        style: basemapUrl(mapDarkRef.current),
+        center: [12, 42],
+        zoom: 1.6,
+        attributionControl: false,
       });
 
-      // Colors are placeholders, set from the theme tokens by applyThemeColors
-      map.addLayer({
-        id: 'clusters',
-        type: 'circle',
-        source: CLUSTER_SOURCE_ID,
-        filter: ['has', 'point_count'],
-        paint: {
-          'circle-radius': ['step', ['get', 'point_count'], 18, 10, 22, 50, 28],
-          'circle-stroke-width': 3,
-          'circle-stroke-opacity': 0.95,
-        },
+      // Bottom-left: the bottom-right corner hosts the zoom pill
+      map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left');
+
+      map.on('error', (e) => {
+        // Tile fetch failures (flaky connection, captive portal, etc.) — one toast (fixed id),
+        // not one per failed tile, instead of leaving blank tiles with no explanation.
+        console.error('MapLibre error:', e.error);
+        toast.error(t('map.tileLoadError'), { id: 'map-tile-error' });
       });
 
-      map.addLayer({
-        id: 'cluster-count',
-        type: 'symbol',
-        source: CLUSTER_SOURCE_ID,
-        filter: ['has', 'point_count'],
-        layout: {
-          'text-field': '{point_count_abbreviated}',
-          'text-font': ['Noto Sans Bold'], // a font OpenFreeMap serves
-          'text-size': 12,
-        },
-      });
-
-      // Tip of the teardrop on the photo's coordinates; never hidden by collisions (clusters handle density)
-      map.addLayer({
-        id: 'unclustered-point',
-        type: 'symbol',
-        source: CLUSTER_SOURCE_ID,
-        filter: ['!', ['has', 'point_count']],
-        layout: {
-          'icon-image': PIN_IMAGE,
-          'icon-anchor': 'bottom',
-          'icon-offset': [0, 3], // the shadow padding below the tip
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true,
-        },
-      });
-
-      applyThemeColors(map);
-      highlightPin(map, useTimelineStore.getState().previewImage?.id ?? null);
-    });
-
-    // Listeners are on the map, not the style: register them once
-    map.once('load', () => {
-      map.on('click', 'clusters', (e: maplibregl.MapLayerMouseEvent) => {
-        const features = map.queryRenderedFeatures(e.point, { layers: ['clusters'] });
-        const clusterId = features[0]?.properties?.cluster_id;
-        if (clusterId == null) return;
-        const source = map.getSource(CLUSTER_SOURCE_ID) as maplibregl.GeoJSONSource;
-        source.getClusterExpansionZoom(clusterId).then((zoom: number) => {
-          const coords = (features[0].geometry as GeoJSON.Point).coordinates as [number, number];
-          map.easeTo({ center: coords, zoom });
+      // Photo source + layers on top of the basemap. `style.load` fires on the first style and
+      // again after each theme swap (setStyle drops everything not in the new basemap style).
+      map.on('style.load', () => {
+        map.addSource(CLUSTER_SOURCE_ID, {
+          type: 'geojson',
+          data: locationsToGeoJSON(locationsRef.current),
+          cluster: true,
+          clusterRadius: 50,
+          clusterMaxZoom: 14,
         });
+
+        // Colors are placeholders, set from the theme tokens by applyThemeColors
+        map.addLayer({
+          id: 'clusters',
+          type: 'circle',
+          source: CLUSTER_SOURCE_ID,
+          filter: ['has', 'point_count'],
+          paint: {
+            'circle-radius': ['step', ['get', 'point_count'], 18, 10, 22, 50, 28],
+            'circle-stroke-width': 3,
+            'circle-stroke-opacity': 0.95,
+          },
+        });
+
+        map.addLayer({
+          id: 'cluster-count',
+          type: 'symbol',
+          source: CLUSTER_SOURCE_ID,
+          filter: ['has', 'point_count'],
+          layout: {
+            'text-field': '{point_count_abbreviated}',
+            'text-font': ['Noto Sans Bold'], // a font OpenFreeMap serves
+            'text-size': 12,
+          },
+        });
+
+        // Tip of the teardrop on the photo's coordinates; never hidden by collisions (clusters handle density)
+        map.addLayer({
+          id: 'unclustered-point',
+          type: 'symbol',
+          source: CLUSTER_SOURCE_ID,
+          filter: ['!', ['has', 'point_count']],
+          layout: {
+            'icon-image': PIN_IMAGE,
+            'icon-anchor': 'bottom',
+            'icon-offset': [0, 3], // the shadow padding below the tip
+            'icon-allow-overlap': true,
+            'icon-ignore-placement': true,
+          },
+        });
+
+        applyThemeColors(map);
+        highlightPin(map, pinRef.current?.id ?? null);
       });
 
-      map.on('click', (e: maplibregl.MapMouseEvent) => {
-        const { allImages, setPreviewImage } = useTimelineStore.getState();
-        const feature = map.queryRenderedFeatures(e.point, { layers: ['unclustered-point'] })[0];
-        // Click on empty map closes the preview; cluster clicks are handled above
-        if (!feature) {
-          if (map.queryRenderedFeatures(e.point, { layers: ['clusters'] }).length === 0) setPreviewImage(null);
-          return;
-        }
-        const image = allImages.find((img) => img.id === feature.properties?.id);
-        if (!image) return;
-        const [longitude, latitude] = (feature.geometry as GeoJSON.Point).coordinates as [number, number];
-        // Pin coords win: identical for real GPS, and they show the dev mock coords in the metadata
-        setPreviewImage({ ...image, latitude, longitude });
+      // Listeners are on the map, not the style: register them once
+      map.once('load', () => {
+        map.on('click', 'clusters', (e: maplibregl.MapLayerMouseEvent) => {
+          const features = map.queryRenderedFeatures(e.point, { layers: ['clusters'] });
+          const clusterId = features[0]?.properties?.cluster_id;
+          if (clusterId == null) return;
+          const source = map.getSource(CLUSTER_SOURCE_ID) as maplibregl.GeoJSONSource;
+          source.getClusterExpansionZoom(clusterId).then((zoom: number) => {
+            const coords = (features[0].geometry as GeoJSON.Point).coordinates as [number, number];
+            map.easeTo({ center: coords, zoom });
+          });
+        });
+
+        map.on('click', (e: maplibregl.MapMouseEvent) => {
+          const feature = map.queryRenderedFeatures(e.point, { layers: ['unclustered-point'] })[0];
+          // Click on empty map closes the preview; cluster clicks are handled above
+          if (!feature) {
+            if (map.queryRenderedFeatures(e.point, { layers: ['clusters'] }).length === 0) setPin(null);
+            return;
+          }
+          const [longitude, latitude] = (feature.geometry as GeoJSON.Point).coordinates as [number, number];
+          setPin({ id: feature.properties?.id, latitude, longitude });
+        });
+
+        map.on('mouseenter', 'clusters', () => { map.getCanvas().style.cursor = 'pointer'; });
+        map.on('mouseleave', 'clusters', () => { map.getCanvas().style.cursor = ''; });
+        map.on('mouseenter', 'unclustered-point', () => { map.getCanvas().style.cursor = 'pointer'; });
+        map.on('mouseleave', 'unclustered-point', () => { map.getCanvas().style.cursor = ''; });
+
+        frameView(map, locationsRef.current);
       });
-
-      map.on('mouseenter', 'clusters', () => { map.getCanvas().style.cursor = 'pointer'; });
-      map.on('mouseleave', 'clusters', () => { map.getCanvas().style.cursor = ''; });
-      map.on('mouseenter', 'unclustered-point', () => { map.getCanvas().style.cursor = 'pointer'; });
-      map.on('mouseleave', 'unclustered-point', () => { map.getCanvas().style.cursor = ''; });
-
-      frameView(map, locationsRef.current);
-    });
+      return map;
+    }
 
     // Theme switch (Settings or OS while on 'system') toggles `.dark` on <html>:
     // swap the basemap (style.load then rebuilds the photo layers), else just recolor them
-    let dark = isDarkTheme();
-    const themeObserver = new MutationObserver(() => {
-      if (isDarkTheme() === dark) { applyThemeColors(map); return; }
-      dark = isDarkTheme();
-      map.setStyle(basemapUrl(dark), { diff: false });
-    });
+    const syncTheme = () => {
+      if (isDarkTheme() === mapDarkRef.current) { applyThemeColors(map); return; }
+      mapDarkRef.current = isDarkTheme();
+      map.setStyle(basemapUrl(mapDarkRef.current), { diff: false });
+    };
+    // The theme may have changed while the page was hidden
+    if (reused && isDarkTheme() !== mapDarkRef.current) syncTheme();
+    const themeObserver = new MutationObserver(syncTheme);
     themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 
-    return () => {
-      themeObserver.disconnect();
-      map.remove();
-      mapRef.current = null;
-    };
+    return () => themeObserver.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canShowMap, config.archive_path]);
 

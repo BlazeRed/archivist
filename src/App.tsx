@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
+import { Activity, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { Topbar } from './components/Topbar';
 import { Toaster } from './components/ui/sonner';
 import { TooltipProvider } from './components/ui/tooltip';
@@ -17,8 +17,42 @@ import { openArchive } from './lib/openArchive';
 import { useUIStore } from './stores/uiStore';
 import { cn } from './lib/utils';
 
+const PAGES: { path: string; element: ReactNode }[] = [
+  { path: '/', element: <TimelinePage /> },
+  { path: '/map', element: <MapPage /> },
+  { path: '/groups', element: <GroupsPage /> },
+  { path: '/import', element: <ImportPage /> },
+  { path: '/favourites', element: <FavouritesPage /> },
+  { path: '/trash', element: <TrashPage /> },
+];
+
+/** Restores the scroll offsets of a page's scrollers when its Activity is shown again:
+ *  display:none can reset them. Offsets read while hidden (0×0 box) are ignored. */
+function KeepScroll({ children }: { children: ReactNode }) {
+  const offsets = useRef(new Map<Element, number>());
+  // Layout effects re-run each time the Activity becomes visible
+  useLayoutEffect(() => {
+    for (const [el, top] of offsets.current) {
+      if (el.isConnected) el.scrollTop = top;
+      else offsets.current.delete(el);
+    }
+  }, []);
+  return (
+    <div
+      className="contents"
+      onScrollCapture={(e) => {
+        const el = e.target as Element;
+        if (el.clientHeight > 0) offsets.current.set(el, el.scrollTop);
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
 function App() {
   const { i18n } = useTranslation();
+  const { pathname } = useLocation();
   const { config, setConfig } = useAppConfigStore();
   const { settingsOpen, closeSettings } = useUIStore();
 
@@ -77,15 +111,13 @@ function App() {
       <Topbar />
       {/* Topbar is fixed: pages start below it (Timeline opts out to scroll underneath) */}
       <main className="flex-1 relative pt-[var(--topbar-offset)]">
-        <Routes>
-          <Route path="/" element={<TimelinePage />} />
-          <Route path="/map" element={<MapPage />} />
-          <Route path="/groups" element={<GroupsPage />} />
-          <Route path="/import" element={<ImportPage />} />
-          <Route path="/favourites" element={<FavouritesPage />} />
-          <Route path="/trash" element={<TrashPage />} />
-          <Route path="/settings" element={<Navigate to="/" replace />} />
-        </Routes>
+        {/* Pages stay mounted: switching keeps their state (scroll, selection, map view). Hidden ones run no
+            effects (no fetches, no map, no keyboard listeners); effects re-run each time a page is shown */}
+        {PAGES.map(({ path, element }) => (
+          <Activity key={path} mode={(path === '/' ? pathname === '/' : pathname.startsWith(path)) ? 'visible' : 'hidden'}>
+            <KeepScroll>{element}</KeepScroll>
+          </Activity>
+        ))}
       </main>
 
       {/* Settings backdrop */}

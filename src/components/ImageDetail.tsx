@@ -19,7 +19,9 @@ const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)'
 
 /** Where the photo is drawn inside the Timeline preview frame (object-contain); null off the Timeline. */
 function previewPhotoRect(img: HTMLImageElement): DOMRect | null {
-  const frame = document.querySelector('[data-preview-media]')?.getBoundingClientRect();
+  // Hidden pages stay mounted (display:none, no client rects): only the visible page's frame counts
+  const frame = [...document.querySelectorAll('[data-preview-media]')]
+    .find((el) => el.getClientRects().length > 0)?.getBoundingClientRect();
   if (!frame || !img.naturalWidth) return null;
   const s = Math.min(frame.width / img.naturalWidth, frame.height / img.naturalHeight);
   const w = img.naturalWidth * s;

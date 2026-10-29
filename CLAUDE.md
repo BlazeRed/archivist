@@ -48,6 +48,8 @@ Tauri v2 desktop app. Two runtimes communicate via `invoke()`:
 
 **Config**: JSON at `{app_data}/app_config.json`, managed by `appConfigStore.ts` via `save_config`/`load_config` Tauri commands.
 
+**Pages stay mounted**: `App.tsx` renders every page inside React `<Activity>` (visible = current path), not `<Routes>`, so switching keeps local state; `KeepScroll` restores scroll offsets. Hidden pages run no effects, and **every effect re-runs each time its page is shown**: page effects must be safe to repeat (no view resets, no clearing state on mount). Global `document.querySelector` must skip hidden pages (`getClientRects().length > 0`). The Map owns its pin preview (local state), separate from the Timeline's `previewImage`; its maplibre instance survives hiding.
+
 ## State Stores (Zustand)
 
 | Store | Owns |
