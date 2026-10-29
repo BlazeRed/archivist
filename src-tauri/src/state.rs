@@ -85,6 +85,14 @@ impl AppState {
 mod tests {
     use super::*;
 
+    /// Before an archive is opened the state works on an in-memory DB, writing nothing to disk.
+    #[test]
+    fn boot_db_is_in_memory() {
+        let state = AppState::new(std::path::PathBuf::from(":memory:")).unwrap();
+        assert!(state.db().get_all_images().unwrap().is_empty());
+        assert!(!std::path::Path::new(":memory:").exists());
+    }
+
     /// Import into another archive must hit that archive's DB, never the open one.
     #[test]
     fn db_for_picks_destination_archive() {

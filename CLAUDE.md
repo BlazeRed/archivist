@@ -44,7 +44,7 @@ Tauri v2 desktop app. Two runtimes communicate via `invoke()`:
 - `state.rs` — `Arc<AppState>` shared across commands (holds DB handle + archive path)
 - `error.rs` — unified `AppError` type, serde-serialized to frontend
 
-**DB**: SQLite at `{archive_path}/.archivist/archivist.db`. Dev DB hardcoded to `/tmp/archivist.db` in `lib.rs:run()`.
+**DB**: SQLite at `{archive_path}/.archivist/archivist.db`. Before an archive is opened, `AppState` holds an in-memory DB (`lib.rs:run()`).
 
 **Config**: JSON at `{app_data}/app_config.json`, managed by `appConfigStore.ts` via `save_config`/`load_config` Tauri commands.
 

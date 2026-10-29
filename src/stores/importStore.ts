@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { toast } from 'sonner';
+import i18n from '@/i18n';
 import { useUIStore } from './uiStore';
 
 export interface ScannedImage {
@@ -142,7 +144,10 @@ export const useImportStore = create<ImportState>((set, get) => ({
     );
 
     try {
-      const analyzed = await invoke<AnalyzedImage[]>('analyze_images', { scanned: scannedImages });
+      const { images: analyzed, failed } = await invoke<{ images: AnalyzedImage[]; failed: string[] }>(
+        'analyze_images', { scanned: scannedImages },
+      );
+      if (failed.length > 0) warnUnreadable(failed);
       await planAndThumbnail(analyzed, archivePath, set, get);
     } catch (e) {
       set({ error: String(e), phase: 'error' });
@@ -228,6 +233,16 @@ function discardUnimportedThumbnails(analyzed: AnalyzedImage[], archivePath: str
     hashes: analyzed.map(img => img.hash),
     archivePath,
   }).catch(() => {});
+}
+
+/** Files the analysis could not read are left out of the import: say which, not just how many. */
+function warnUnreadable(paths: string[]) {
+  console.error('Unreadable files:', paths);
+  const names = paths.slice(0, 5).map((p) => p.split(/[\\/]/).pop()).join(', ');
+  toast.warning(i18n.t('import.unreadable', { count: paths.length }), {
+    description: paths.length > 5 ? `${names}…` : names,
+    duration: 10000,
+  });
 }
 
 type SetState = (partial: Partial<ImportState>) => void;

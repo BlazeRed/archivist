@@ -28,6 +28,7 @@
     "dateFromFilename": "Data dal nome del file"
   },
   "import": {
+    "unreadable": "{{count}} file non leggibili: non verranno importati",
     "selectDestination": "Seleziona cartella archivio",
     "analyzing": "Analizzo i media...",
     "analyzingProgress": "Analizzo {{current}} di {{total}}",
@@ -158,6 +159,8 @@
     "rescanFound": "Trovate {{count}} nuove immagini",
     "rescanRepaired": "Date corrette per {{count}} immagini",
     "rescanMoved": "Spostate {{count}} immagini fuori posto",
+    "rescanRelinked": "Ritrovate {{count}} immagini spostate",
+    "archiveOpenError": "Impossibile aprire l'archivio",
     "rescanThumbnailed": "Generate {{count}} miniature mancanti",
     "rescanFoldersRemoved": "Eliminate {{count}} cartelle vuote",
     "rescanGpsRepaired": "Recuperata posizione per {{count}} immagini",

@@ -129,7 +129,11 @@ fn scan_directory(dir: &Path, images: &mut Vec<ScannedImage>) -> Result<(), AppE
 
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.is_dir() {
+        // file_type() doesn't follow symlinks: a linked folder is never entered, so a link
+        // loop can't recurse forever (stack overflow). Linked files are still imported.
+        let is_dir = entry.file_type().is_ok_and(|t| t.is_dir());
+        if is_dir {
+            if is_archive_internal(&path) { continue; }
             scan_directory(&path, images)?;
         } else if is_supported_media(&path) {
             if let Ok(metadata) = std::fs::metadata(&path) {
@@ -145,6 +149,17 @@ fn scan_directory(dir: &Path, images: &mut Vec<ScannedImage>) -> Result<(), AppE
     }
 
     Ok(())
+}
+
+/// An Archivist archive's own folders inside a source (e.g. importing from a folder that
+/// contains an archive): `.archivist/` holds thumbnails, which would import as photos,
+/// and that archive's `Trash/` holds what its user threw away.
+fn is_archive_internal(dir: &Path) -> bool {
+    match dir.file_name().and_then(|n| n.to_str()) {
+        Some(".archivist") => true,
+        Some(crate::commands::trash::TRASH_DIR) => dir.parent().is_some_and(|p| p.join(".archivist").is_dir()),
+        _ => false,
+    }
 }
 
 fn is_supported_media(path: &Path) -> bool {
@@ -219,32 +234,50 @@ pub fn analyze_image(scanned: &ScannedImage) -> Result<AnalyzedImage, AppError> 
     })
 }
 
+/// Analysis of a whole scan. Files that could not be read are listed in `failed`
+/// (source paths) rather than silently left out, so the user knows they won't be imported.
+#[derive(Debug, Serialize)]
+pub struct AnalysisResult {
+    pub images: Vec<AnalyzedImage>,
+    pub failed: Vec<String>,
+}
+
 pub fn analyze_images_batch(
     scanned: Vec<ScannedImage>,
     app: &tauri::AppHandle,
-) -> Result<Vec<AnalyzedImage>, AppError> {
-    use rayon::prelude::*;
+) -> Result<AnalysisResult, AppError> {
     use tauri::Emitter;
 
     let total = scanned.len();
-    let counter = AtomicUsize::new(0);
-    let app = app.clone();
+    Ok(analyze_all(&scanned, |current, filename| {
+        let _ = app.emit("analyze_progress", ProgressPayload { current, total, filename: filename.to_string() });
+    }))
+}
 
-    let results = scanned
+fn analyze_all(scanned: &[ScannedImage], on_progress: impl Fn(usize, &str) + Sync) -> AnalysisResult {
+    use rayon::prelude::*;
+
+    let counter = AtomicUsize::new(0);
+    let results: Vec<Result<AnalyzedImage, String>> = scanned
         .par_iter()
-        .filter_map(|s| {
-            let res = analyze_image(s).ok();
-            let n = counter.fetch_add(1, Ordering::SeqCst) + 1;
-            let _ = app.emit("analyze_progress", ProgressPayload {
-                current: n,
-                total,
-                filename: s.filename.clone(),
+        .map(|s| {
+            let res = analyze_image(s).map_err(|e| {
+                eprintln!("analyze failed for {}: {e}", s.path);
+                s.path.clone()
             });
+            on_progress(counter.fetch_add(1, Ordering::SeqCst) + 1, &s.filename);
             res
         })
         .collect();
 
-    Ok(results)
+    let mut analysis = AnalysisResult { images: Vec::new(), failed: Vec::new() };
+    for r in results {
+        match r {
+            Ok(img) => analysis.images.push(img),
+            Err(path) => analysis.failed.push(path),
+        }
+    }
+    analysis
 }
 
 pub fn create_import_plan(images: Vec<AnalyzedImage>, db: &crate::db::Database) -> Result<ImportPlan, AppError> {
@@ -769,6 +802,50 @@ mod tests {
         assert!(result.is_err());
         assert!(!dest_path.exists(), "copied file must be rolled back when the DB insert fails");
         assert!(source_path.exists(), "original source file must never be touched");
+    }
+
+    /// A symlink loop in the source must not recurse forever, and an archive found inside
+    /// the source must not bring in its thumbnails or its Trash.
+    #[cfg(unix)]
+    #[test]
+    fn scan_skips_symlinked_dirs_and_archive_internals() {
+        let src = tempfile::tempdir().unwrap();
+        let root = src.path();
+        std::fs::create_dir_all(root.join("photos")).unwrap();
+        std::fs::write(root.join("photos/a.jpg"), b"a").unwrap();
+        std::os::unix::fs::symlink(root, root.join("photos/loop")).unwrap();
+        std::fs::create_dir_all(root.join("old archive/.archivist/thumbnails")).unwrap();
+        std::fs::write(root.join("old archive/.archivist/thumbnails/x.jpg"), b"t").unwrap();
+        std::fs::create_dir_all(root.join("old archive/Trash")).unwrap();
+        std::fs::write(root.join("old archive/Trash/thrown.jpg"), b"t").unwrap();
+        std::fs::create_dir_all(root.join("old archive/2024")).unwrap();
+        std::fs::write(root.join("old archive/2024/b.jpg"), b"b").unwrap();
+        std::fs::create_dir_all(root.join("Trash")).unwrap(); // a plain folder named Trash is the user's
+        std::fs::write(root.join("Trash/c.jpg"), b"c").unwrap();
+
+        let mut names: Vec<String> = scan_source(root.to_str().unwrap()).unwrap()
+            .into_iter().map(|s| s.filename).collect();
+        names.sort();
+        assert_eq!(names, vec!["a.jpg", "b.jpg", "c.jpg"]);
+    }
+
+    /// Regression test: files that fail analysis were dropped silently; they must be reported.
+    #[test]
+    fn analysis_reports_unreadable_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let ok = dir.path().join("ok.jpg");
+        std::fs::write(&ok, b"bytes").unwrap();
+        let scanned = |p: &Path| ScannedImage {
+            path: p.to_string_lossy().to_string(),
+            filename: p.file_name().unwrap().to_string_lossy().to_string(),
+            size: 5,
+        };
+        let gone = dir.path().join("gone.jpg"); // listed by the scan, unreadable by analysis
+
+        let result = analyze_all(&[scanned(&ok), scanned(&gone)], |_, _| {});
+
+        assert_eq!(result.images.len(), 1);
+        assert_eq!(result.failed, vec![gone.to_string_lossy().to_string()]);
     }
 
     /// Regression test for the same-name overwrite bug: a new photo whose filename is

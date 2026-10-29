@@ -2,12 +2,11 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { StarIcon, Trash2Icon, XIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
-import { open } from '@tauri-apps/plugin-dialog';
+import { pickAndOpenArchive } from '@/lib/openArchive';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { useGroupUIStore } from '../stores/groupUIStore';
 import { useImportStore } from '../stores/importStore';
-import { useGroupStore } from '../stores/dataStore';
 import { TimelineNavbar } from '../components/TimelineNavbar';
 import { ThumbnailGrid } from '../components/ThumbnailGrid';
 import { ImageDetail } from '../components/ImageDetail';
@@ -160,8 +159,7 @@ function SelectionActionBar() {
 
 export function TimelinePage() {
   const { t } = useTranslation();
-  const { fetchImages, fetchGroups, clearImages, selectImage, setPreviewImage, selectedImage, images } = useTimelineStore();
-  const clearGroups = useGroupStore((s) => s.clearGroups);
+  const { fetchImages, fetchGroups, setPreviewImage, selectedImage, images } = useTimelineStore();
   const { config, setConfig } = useAppConfigStore();
   const { isSelectionMode } = useGroupUIStore();
   const phase = useImportStore((s) => s.phase);
@@ -184,18 +182,7 @@ export function TimelinePage() {
 
   const handleOpenArchive = async () => {
     if (isImportActive) { setShowImportWarning(true); return; }
-    const selected = await open({ directory: true });
-    if (selected) {
-      clearImages();
-      selectImage(null);
-      clearGroups();
-      try {
-        await invoke('init_archive', { archivePath: selected });
-      } catch (e) {
-        console.error('Failed to init archive:', e);
-      }
-      setConfig({ archive_path: selected as string });
-    }
+    await pickAndOpenArchive();
   };
 
   useEffect(() => {

@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { LoaderCircleIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { open } from '@tauri-apps/plugin-dialog';
-import { invoke } from '@tauri-apps/api/core';
+import { pickAndOpenArchive } from '@/lib/openArchive';
 import { getVersion } from '@tauri-apps/api/app';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { useTimelineStore } from '../stores/timelineStore';
@@ -39,19 +38,7 @@ export function SettingsPage() {
 
   const selectArchiveFolder = async () => {
     if (isImportActive) { setShowImportWarning(true); return; }
-    const selected = await open({ directory: true, title: t('settings.selectArchiveFolder') });
-    if (selected) {
-      clearImages();
-      selectImage(null);
-      clearGroups();
-      clearLocations();
-      try {
-        await invoke('init_archive', { archivePath: selected });
-      } catch (e) {
-        console.error('Failed to init archive:', e);
-      }
-      setConfig({ archive_path: selected as string });
-    }
+    await pickAndOpenArchive(t('settings.selectArchiveFolder'));
   };
 
   const handleCloseArchive = () => {

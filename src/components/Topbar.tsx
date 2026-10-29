@@ -3,13 +3,9 @@ import { ArchiveIcon, RefreshCwIcon, SettingsIcon, Trash2Icon, UploadIcon } from
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { invoke } from '@tauri-apps/api/core';
-import { open } from '@tauri-apps/plugin-dialog';
+import { pickAndOpenArchive } from '@/lib/openArchive';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { useImportStore } from '../stores/importStore';
-import { useTimelineStore } from '../stores/timelineStore';
-import { useMapStore } from '../stores/mapStore';
-import { useGroupStore } from '../stores/dataStore';
 import { useUIStore } from '../stores/uiStore';
 import { useRescan } from '../hooks/useRescan';
 import { Button } from '@/components/ui/button';
@@ -20,13 +16,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 
 export function Topbar() {
   const { t } = useTranslation();
-  const { config, setConfig } = useAppConfigStore();
+  const { config } = useAppConfigStore();
   const navigate = useNavigate();
   const location = useLocation();
   const { phase } = useImportStore();
-  const { clearImages, selectImage } = useTimelineStore();
-  const clearGroups = useGroupStore((s) => s.clearGroups);
-  const clearLocations = useMapStore((s) => s.clearLocations);
   const { settingsOpen, toggleSettings, trashCount, refreshTrashCount } = useUIStore();
   const { isRescanning, handleRescan } = useRescan();
   const [pendingPath, setPendingPath] = useState<string | null>(null);
@@ -47,17 +40,7 @@ export function Topbar() {
     return () => { unlisten?.(); };
   }, [isImportActive]);
 
-  const handleOpenArchive = async () => {
-    const selected = await open({ directory: true });
-    if (selected) {
-      clearImages();
-      selectImage(null);
-      clearGroups();
-      clearLocations();
-      try { await invoke('init_archive', { archivePath: selected }); } catch {}
-      setConfig({ archive_path: selected as string });
-    }
-  };
+  const handleOpenArchive = () => pickAndOpenArchive();
 
   const handleNav = (to: string) => navigate(to);
   const isActive = (to: string) => to === '/' ? location.pathname === '/' : location.pathname.startsWith(to);

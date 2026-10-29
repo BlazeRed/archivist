@@ -13,6 +13,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { FavouritesPage } from './pages/FavouritesPage';
 import { TrashPage } from './pages/TrashPage';
 import { useAppConfigStore } from './stores/appConfigStore';
+import { openArchive } from './lib/openArchive';
 import { useUIStore } from './stores/uiStore';
 import { cn } from './lib/utils';
 
@@ -36,12 +37,7 @@ function App() {
 
         if (typeof archive_path === 'string' && archive_path) {
           const exists = await invoke<boolean>('path_exists', { path: archive_path });
-          if (exists) {
-            await invoke('init_archive', { archivePath: archive_path });
-            setConfig({ archive_path });
-          } else {
-            setConfig({ archive_path: '' });
-          }
+          if (!exists || !(await openArchive(archive_path))) setConfig({ archive_path: '' });
         }
       } catch (e) {
         console.error('Failed to load config:', e);

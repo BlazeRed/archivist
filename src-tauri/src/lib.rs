@@ -30,11 +30,17 @@ async fn init_archive(
     state.reinit_db(&archive_path)?;
     state.set_archive_path(archive_path.clone());
     let db = state.db();
-    tauri::async_runtime::spawn_blocking(move || {
+    // Best-effort: the archive is already open at this point, a failed backfill must not
+    // report the open as failed (it is retried next open; rescan repairs the same things)
+    let migrated = tauri::async_runtime::spawn_blocking(move || {
         commands::run_migrations(&archive_path, &*db)
     })
-    .await
-    .map_err(|e| error::AppError::Internal { message: e.to_string() })??;
+    .await;
+    match migrated {
+        Ok(Ok(())) => {}
+        Ok(Err(e)) => eprintln!("archive backfill failed: {e}"),
+        Err(e) => eprintln!("archive backfill failed: {e}"),
+    }
     Ok(())
 }
 
@@ -99,7 +105,7 @@ async fn scan_source(source_path: String) -> Result<Vec<commands::ScannedImage>,
 async fn analyze_images(
     app: tauri::AppHandle,
     scanned: Vec<commands::ScannedImage>,
-) -> Result<Vec<commands::AnalyzedImage>, error::AppError> {
+) -> Result<commands::AnalysisResult, error::AppError> {
     tauri::async_runtime::spawn_blocking(move || commands::analyze_images_batch(scanned, &app))
         .await
         .map_err(|e| error::AppError::Internal { message: e.to_string() })?
@@ -388,8 +394,10 @@ fn get_image_locations(state: tauri::State<'_, Arc<AppState>>) -> Result<Vec<com
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // In-memory until an archive is opened (init_archive swaps in the archive's own DB):
+    // nothing is written to a shared temp path before then
     let app_state = Arc::new(
-        AppState::new(std::path::PathBuf::from("/tmp/archivist.db")).expect("Failed to init db")
+        AppState::new(std::path::PathBuf::from(":memory:")).expect("Failed to init db")
     );
     let media = tauri::async_runtime::block_on(media_server::start(Arc::clone(&app_state)));
 

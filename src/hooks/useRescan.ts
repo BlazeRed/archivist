@@ -14,6 +14,7 @@ type RescanResult = {
   missing: MissingImage[];
   repaired: number;
   moved: number;
+  relinked: number;
   thumbnailed: number;
   folders_removed: number;
   gps_repaired: number;
@@ -38,6 +39,7 @@ export function useRescan() {
       let msg = t('settings.rescanFound', { count: result.added });
       if (result.repaired > 0)        msg += ` · ${t('settings.rescanRepaired',       { count: result.repaired })}`;
       if (result.moved > 0)           msg += ` · ${t('settings.rescanMoved',          { count: result.moved })}`;
+      if (result.relinked > 0)        msg += ` · ${t('settings.rescanRelinked',       { count: result.relinked })}`;
       if (result.thumbnailed > 0)     msg += ` · ${t('settings.rescanThumbnailed',    { count: result.thumbnailed })}`;
       if (result.folders_removed > 0) msg += ` · ${t('settings.rescanFoldersRemoved', { count: result.folders_removed })}`;
       if (result.gps_repaired > 0)    msg += ` · ${t('settings.rescanGpsRepaired',    { count: result.gps_repaired })}`;

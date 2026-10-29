@@ -28,6 +28,7 @@
     "dateFromFilename": "Date from filename"
   },
   "import": {
+    "unreadable": "{{count}} files could not be read and will not be imported",
     "selectDestination": "Select archive folder",
     "analyzing": "Analyzing media...",
     "analyzingProgress": "Analyzing {{current}} of {{total}}",
@@ -158,6 +159,8 @@
     "rescanFound": "Found {{count}} new images",
     "rescanRepaired": "Fixed dates for {{count}} images",
     "rescanMoved": "Relocated {{count}} misplaced images",
+    "rescanRelinked": "Found {{count}} moved images again",
+    "archiveOpenError": "Could not open the archive",
     "rescanThumbnailed": "Generated {{count}} missing thumbnails",
     "rescanFoldersRemoved": "Deleted {{count}} empty folders",
     "rescanGpsRepaired": "Recovered location data for {{count}} images",
