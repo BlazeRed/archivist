@@ -13,11 +13,11 @@ import { useRescan } from '../hooks/useRescan';
 import { useRegenerateThumbnails } from '../hooks/useRegenerateThumbnails';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ProgressBar } from '@/components/ProgressBar';
+import { PathField } from '@/components/PathField';
 
 export function SettingsPage() {
   const { t, i18n } = useTranslation();
@@ -77,18 +77,12 @@ export function SettingsPage() {
         {/* Archive Path */}
         <div className="space-y-2">
           <Label>{t('settings.archivePath')}</Label>
-          <div className="flex gap-2">
-            <Input
-              type="text"
-              value={config.archive_path}
-              onChange={(e) => setConfig({ archive_path: e.target.value })}
-              placeholder="/path/to/archive"
-              className="flex-1"
-            />
-            <Button variant="default" size="lg" onClick={selectArchiveFolder}>
-              {t('common.browse')}
-            </Button>
-          </div>
+          <PathField
+            path={config.archive_path}
+            placeholder={t('settings.noArchive')}
+            actionLabel={config.archive_path ? t('common.change') : t('common.browse')}
+            onAction={selectArchiveFolder}
+          />
         </div>
 
         {/* Language */}

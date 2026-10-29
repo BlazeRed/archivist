@@ -130,6 +130,7 @@ Key components in `src/components/`:
 | `pages/FavouritesPage.tsx` | Favourites: `FloatingScroll` + `PlainGrid` over `allImages` filtered by `is_favourite` (fetches them itself if the Timeline hasn't). Idle = count pill + Select; selection mode = count ✕ pill + Remove from favourites |
 | `FloatingSelectionBar.tsx` | Selection chrome. `FloatingSelectionBar` (Timeline only: count pill + full-width bottom bar with `BottomFade`; `BAR_BUTTON`/`BAR_LABEL` = icon only below @2xl). `SelectionCountPill` (count + ✕ clear), `InfoPill` (read-only pill), `ROW_BUTTON` (compact floating-row button, opaque when disabled), `BottomFade` (bottom scroll-edge fade under bottom chrome) |
 | `ArchiveNotSet.tsx` | "No archive" card + Open archive (Favourites, Groups, Trash) |
+| `PathField.tsx` | Folder path pill + change button (middle-truncated path, full path in tooltip): Import From/To, Settings archive |
 | `ProgressBar.tsx` | Import progress indicator |
 | `ConflictReview.tsx` | Duplicate conflict resolution UI |
 | `Toast.tsx` / `ui/sonner.tsx` | Toast notification display |

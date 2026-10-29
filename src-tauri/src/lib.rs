@@ -115,8 +115,9 @@ async fn analyze_images(
 async fn create_import_plan(
     state: tauri::State<'_, Arc<AppState>>,
     images: Vec<commands::AnalyzedImage>,
+    archive_path: String,
 ) -> Result<commands::ImportPlan, error::AppError> {
-    let db = state.db();
+    let db = state.db_for(&archive_path)?;
     tauri::async_runtime::spawn_blocking(move || commands::create_import_plan(images, &*db))
         .await
         .map_err(|e| error::AppError::Internal { message: e.to_string() })?
@@ -130,7 +131,7 @@ async fn execute_import(
     resolutions: Vec<commands::ImportResolution>,
     archive_path: String,
 ) -> Result<commands::ImportResult, error::AppError> {
-    let db = state.db();
+    let db = state.db_for(&archive_path)?;
     tauri::async_runtime::spawn_blocking(move || {
         commands::execute_import(plan, resolutions, &archive_path, &*db, &app)
     })
@@ -181,7 +182,7 @@ async fn cleanup_unimported_thumbnails(
     hashes: Vec<String>,
     archive_path: String,
 ) -> Result<(), error::AppError> {
-    let db = state.db();
+    let db = state.db_for(&archive_path)?;
     tauri::async_runtime::spawn_blocking(move || {
         commands::cleanup_unimported_thumbnails(hashes, &archive_path, &*db)
     })

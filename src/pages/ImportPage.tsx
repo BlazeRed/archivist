@@ -1,39 +1,25 @@
-import { useState, useEffect, useRef } from 'react';
-import { CheckIcon, FileIcon, FolderIcon, LoaderCircleIcon, UploadIcon } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import {
+  ArrowRightIcon, CheckIcon, ChevronDownIcon, FileIcon, FolderIcon, FolderOpenIcon,
+  LoaderCircleIcon, Trash2Icon, TriangleAlertIcon, UploadIcon,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { open } from '@tauri-apps/plugin-dialog';
+import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'sonner';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
-import { useImportStore } from '../stores/importStore';
+import { isBusyPhase, useImportStore } from '../stores/importStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { ConflictReview } from '../components/ConflictReview';
 import { ProgressBar } from '../components/ProgressBar';
+import { PathField } from '../components/PathField';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
-function StepIndicator({ current }: { current: number }) {
-  return (
-    <div className="flex items-center justify-center gap-2 mb-8">
-      {[1, 2, 3, 4].map((s) => (
-        <div key={s} className="flex items-center">
-          <div
-            className={cn(
-              'w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors',
-              current >= s ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground'
-            )}
-          >
-            {s}
-          </div>
-          {s < 4 && (
-            <div className={cn('w-16 h-0.5 transition-colors', current > s ? 'bg-primary' : 'bg-border')} />
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
+const samePath = (a: string, b: string) => a.replace(/\/+$/, '') === b.replace(/\/+$/, '');
 
 function DropZone({
   isDragging,
@@ -47,12 +33,12 @@ function DropZone({
 }: {
   isDragging: boolean;
   onSelectFolder: () => void;
-  onSelectFile?: () => void;
+  onSelectFile: () => void;
   dragLabel: string;
   dropLabel: string;
   subLabel: string;
   folderLabel: string;
-  fileLabel?: string;
+  fileLabel: string;
 }) {
   return (
     <div
@@ -74,63 +60,69 @@ function DropZone({
       </div>
 
       {!isDragging && (
-        <div className={cn('flex gap-2 px-4 pb-4', !onSelectFile && 'justify-center')}>
-          <button
-            onClick={onSelectFolder}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-muted hover:bg-muted/80 rounded-lg text-xs font-medium text-foreground transition-colors"
-          >
-            <FolderIcon className="w-3.5 h-3.5 text-muted-foreground" />
+        <div className="flex gap-2 px-4 pb-4">
+          <Button variant="secondary" size="sm" onClick={onSelectFolder} className="flex-1">
+            <FolderIcon />
             {folderLabel}
-          </button>
-          {onSelectFile && fileLabel && (
-            <button
-              onClick={onSelectFile}
-              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-muted hover:bg-muted/80 rounded-lg text-xs font-medium text-foreground transition-colors"
-            >
-              <FileIcon className="w-3.5 h-3.5 text-muted-foreground" />
-              {fileLabel}
-            </button>
-          )}
+          </Button>
+          <Button variant="secondary" size="sm" onClick={onSelectFile} className="flex-1">
+            <FileIcon />
+            {fileLabel}
+          </Button>
         </div>
       )}
     </div>
   );
 }
 
+function Stat({ value, label, className }: { value: number; label: string; className?: string }) {
+  return (
+    <div>
+      <p className={cn('text-3xl font-bold tabular-nums', className)}>{value}</p>
+      <p className="text-xs text-muted-foreground mt-1">{label}</p>
+    </div>
+  );
+}
+
 export function ImportPage() {
   const { t } = useTranslation();
-  const [cleanupDismissed, setCleanupDismissed] = useState(false);
+  const navigate = useNavigate();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [cleanup, setCleanup] = useState<{ failed: number } | null>(null);
+  const [showErrors, setShowErrors] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
   const { config } = useAppConfigStore();
 
   const {
     phase,
-    step,
-    setStep,
     sourcePath,
     archivePath,
     importPlan,
+    resolutions,
     progress,
     result,
     error,
     setSourcePath,
     setArchivePath,
-    startScan,
-    startAnalyze,
+    startAnalysis,
     startImport,
     reset,
   } = useImportStore();
 
-  const stepRef = useRef<number>(step);
-  stepRef.current = step;
+  const isBusy = isBusyPhase(phase);
+  // Paths stay on screen after the import as a record of what went where
+  const pathsLocked = isBusy || phase === 'complete';
 
+  // Destination defaults to the open archive
   useEffect(() => {
-    if (step === 2 && !archivePath && config.archive_path) {
-      setArchivePath(config.archive_path);
-    }
-  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!archivePath && config.archive_path) setArchivePath(config.archive_path);
+  }, [archivePath, config.archive_path]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Analysis starts on its own once both paths are set
+  useEffect(() => {
+    if (phase === 'idle' && sourcePath && archivePath) startAnalysis();
+  }, [phase, sourcePath, archivePath]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSelectSource = async () => {
     const sel = await open({ directory: true });
@@ -150,29 +142,26 @@ export function ImportPage() {
     if (sel) setArchivePath(sel as string);
   };
 
-  const handleStartAnalysis = async () => {
-    await startScan();
-    await startAnalyze();
-  };
-
+  // A drop anywhere on the window sets the source, unless a run is locked or its outcome is on screen
   useEffect(() => {
     const appWindow = getCurrentWebviewWindow();
     let unlisten: (() => void) | undefined;
     let cancelled = false;
+    const acceptsDrop = () => {
+      const p = useImportStore.getState().phase;
+      return !isBusyPhase(p) && p !== 'complete' && p !== 'error';
+    };
 
     appWindow.onDragDropEvent((event) => {
       const type = event.payload.type;
       if (type === 'enter' || type === 'over') {
-        if (stepRef.current === 1 || stepRef.current === 2) setIsDragging(true);
+        if (acceptsDrop()) setIsDragging(true);
       } else if (type === 'leave') {
         setIsDragging(false);
       } else if (type === 'drop') {
         setIsDragging(false);
         const paths = (event.payload as { type: 'drop'; paths: string[]; position: unknown }).paths;
-        if (paths.length > 0) {
-          if (stepRef.current === 1) setSourcePath(paths[0]);
-          else if (stepRef.current === 2) setArchivePath(paths[0]);
-        }
+        if (paths.length > 0 && acceptsDrop()) setSourcePath(paths[0]);
       }
     }).then(fn => {
       if (cancelled) fn();
@@ -185,72 +174,132 @@ export function ImportPage() {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    if (step !== 1 && step !== 2) setIsDragging(false);
-  }, [step]);
-
   const handleReset = () => {
     reset();
-    setCleanupDismissed(false);
+    setCleanup(null);
+    setShowErrors(false);
+  };
+
+  const handleShowInTimeline = () => {
+    handleReset();
+    navigate('/');
   };
 
   const handleDeleteSources = async () => {
-    if (result?.imported_sources) {
+    if (!result?.imported_sources) return;
+    try {
       const res = await invoke<{ deleted: number; failed: string[] }>('delete_files', {
         paths: result.imported_sources,
       });
-      if (res.failed.length > 0) {
-        toast.error(t('import.deleteSourcesFailed', { count: res.failed.length }));
-      }
+      setCleanup({ failed: res.failed.length });
+    } catch {
+      toast.error(t('import.deleteSourcesFailed', { count: result.imported_sources.length }));
     }
-    setCleanupDismissed(true);
   };
 
-  const isAnalyzing = phase === 'scanning' || phase === 'analyzing' || phase === 'thumbnailing';
-
-  if (phase === 'complete') {
-    const canCleanup = result !== null && result.errors.length === 0 && result.imported > 0 && (result.imported_sources?.length ?? 0) > 0;
-    const showCleanupBanner = canCleanup && !cleanupDismissed;
+  if (phase === 'error') {
     return (
-      <>
-      <div className="p-6 max-w-2xl mx-auto">
-        <div className="bg-card p-8 rounded-xl text-center">
-          <div className="w-12 h-12 rounded-full bg-success/15 flex items-center justify-center mx-auto mb-4">
-            <CheckIcon className="size-5 text-success-ink" />
-          </div>
-          <h2 className="text-xl font-semibold text-foreground mb-4">{t('import.complete')}</h2>
-          <div className="flex justify-center gap-8 mb-6">
-            <div>
-              <p className="text-3xl font-bold text-primary">{result?.imported ?? 0}</p>
-              <p className="text-xs text-muted-foreground mt-1">{t('import.imported')}</p>
-            </div>
-            <div className="w-px bg-border" />
-            <div>
-              <p className="text-3xl font-bold text-muted-foreground">{result?.skipped ?? 0}</p>
-              <p className="text-xs text-muted-foreground mt-1">{t('import.skipped')}</p>
-            </div>
-          </div>
-          {result && result.errors.length > 0 && (
-            <p className="text-sm text-destructive mb-4">{t('import.errors', { count: result.errors.length })}</p>
-          )}
-          {showCleanupBanner && (
-            <div className="mb-4 p-4 bg-muted rounded-xl text-left">
-              <p className="text-sm font-medium text-foreground mb-3">
-                {t('import.sourceCleanup', { count: result!.imported_sources.length })}
-              </p>
-              <div className="flex gap-2">
-                <Button variant="destructive" size="sm" onClick={() => setShowDeleteConfirm(true)}>
-                  {t('import.deleteSource')}
-                </Button>
-                <Button variant="outline" size="sm" autoFocus onClick={() => setCleanupDismissed(true)}>
-                  {t('import.keepSource')}
-                </Button>
-              </div>
-            </div>
-          )}
-          <Button onClick={handleReset}>{t('common.confirm')}</Button>
+      <div className="p-6 max-w-3xl mx-auto">
+        <div className="squircle bg-card p-6 rounded-xl">
+          <h2 className="text-base font-semibold text-destructive mb-2">{t('status.error')}</h2>
+          <pre className="text-sm text-foreground mb-5 bg-muted p-3 rounded-lg overflow-x-auto whitespace-pre-wrap break-all">
+            {error}
+          </pre>
+          <Button onClick={handleReset}>{t('common.back')}</Button>
         </div>
       </div>
+    );
+  }
+
+  const importCount = importPlan
+    ? importPlan.images.length - resolutions.filter(r => r.action === 'Skip').length
+    : 0;
+  const isFinalizing = phase === 'importing' && progress.total > 0 && progress.current >= progress.total;
+  const hasConflicts = phase === 'review' && (importPlan?.conflicts_count ?? 0) > 0;
+
+  return (
+    // No page title: the topbar names the page (spec §10)
+    <div className="flex flex-col px-6 pt-2 pb-6 max-w-3xl mx-auto w-full h-[calc(100vh-var(--topbar-offset))]">
+      {/* Paths: editable in any order, locked while a run is in progress */}
+      <div className="squircle bg-card p-3 rounded-xl shrink-0">
+        {!sourcePath || isDragging ? (
+          <div className="space-y-3">
+            <DropZone
+              isDragging={isDragging}
+              onSelectFolder={handleSelectSource}
+              onSelectFile={handleSelectSourceFile}
+              dragLabel={t('import.dragOrClick')}
+              dropLabel={t('import.dropHere')}
+              subLabel={t('import.dragOrClickSub')}
+              folderLabel={t('import.selectFolder')}
+              fileLabel={t('import.selectFile')}
+            />
+            {archivePath && (
+              <PathField label={t('import.to')} path={archivePath} actionLabel={t('common.change')} onAction={handleSelectArchive} disabled={pathsLocked} />
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <PathField label={t('import.from')} path={sourcePath} actionLabel={t('common.change')} onAction={() => setSourcePath('')} disabled={pathsLocked} />
+            <ArrowRightIcon className="size-4 shrink-0 text-muted-foreground" />
+            <PathField
+              label={t('import.to')}
+              path={archivePath}
+              placeholder={t('import.selectDestination')}
+              actionLabel={archivePath ? t('common.change') : t('import.selectFolder')}
+              onAction={handleSelectArchive}
+              disabled={pathsLocked}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Status: progress while running, then review + Import, then the outcome */}
+      {sourcePath && archivePath && phase !== 'idle' && (
+        <div className={cn(
+          'squircle bg-card p-6 rounded-xl mt-3 flex flex-col min-h-0',
+          (hasConflicts || (phase === 'complete' && showErrors)) && 'flex-1'
+        )}>
+          {phase === 'review' ? (
+            <>
+              <ConflictReview />
+              <div className="flex justify-end gap-2 mt-4 shrink-0">
+                <Button variant="outline" onClick={handleReset}>{t('common.cancel')}</Button>
+                <Button onClick={startImport} disabled={importCount === 0}>
+                  {t('import.importCount', { count: importCount })}
+                </Button>
+              </div>
+            </>
+          ) : phase === 'complete' && result ? (
+            <CompleteSummary
+              result={result}
+              inOpenArchive={samePath(archivePath, config.archive_path)}
+              cleanup={cleanup}
+              showErrors={showErrors}
+              onToggleErrors={() => setShowErrors(v => !v)}
+              onDeleteSources={() => setShowDeleteConfirm(true)}
+              onOpenFolder={() => revealItemInDir(archivePath).catch(() => {})}
+              onShowInTimeline={handleShowInTimeline}
+              onNewImport={handleReset}
+            />
+          ) : (
+            <>
+              <ProgressBar
+                current={progress.current}
+                total={progress.total}
+                currentFile={progress.currentFile}
+                phase={phase}
+              />
+              {isFinalizing && (
+                <div className="flex items-center gap-2 mt-3 text-sm text-muted-foreground">
+                  <LoaderCircleIcon className="animate-spin size-4 shrink-0" />
+                  <span>{t('import.finalizing')}</span>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <DialogContent>
@@ -270,213 +319,100 @@ export function ImportPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      </>
-    );
-  }
+    </div>
+  );
+}
 
-  if (phase === 'error') {
-    return (
-      <div className="p-6 max-w-2xl mx-auto">
-        <div className="bg-card p-6 rounded-xl">
-          <h2 className="text-base font-semibold text-destructive mb-2">{t('status.error')}</h2>
-          <pre className="text-sm text-foreground mb-5 bg-muted p-3 rounded-lg overflow-x-auto whitespace-pre-wrap break-all">
-            {error}
-          </pre>
-          <Button onClick={handleReset}>{t('common.back')}</Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (phase === 'importing') {
-    const isFinalizing = progress.total > 0 && progress.current >= progress.total;
-    return (
-      <div className="p-6 max-w-2xl mx-auto">
-        <h1 className="text-[22px] font-medium text-foreground mb-6">{t('import.title')}</h1>
-        <StepIndicator current={4} />
-        <div className="bg-card p-6 rounded-xl">
-          <h3 className="text-base font-semibold text-foreground mb-5">{t('import.importing')}</h3>
-          <ProgressBar
-            current={progress.current}
-            total={progress.total}
-            currentFile={progress.currentFile}
-            phase={phase}
-          />
-          {isFinalizing && (
-            <div className="flex items-center gap-2 mt-3 text-sm text-muted-foreground">
-              <LoaderCircleIcon className="animate-spin size-4 shrink-0" />
-              <span>{t('import.finalizing')}</span>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  if (step === 4) {
-    return (
-      <div
-        className="flex flex-col overflow-hidden px-6 pt-4 pb-6 max-w-2xl mx-auto w-full"
-        style={{ height: 'calc(100vh - var(--topbar-offset))' }}
-      >
-        <h1 className="text-[22px] font-medium text-foreground mb-3 shrink-0">{t('import.title')}</h1>
-        <div className="shrink-0">
-          <StepIndicator current={4} />
-        </div>
-        <ConflictReview onImport={startImport} onBack={() => setStep(3)} />
-      </div>
-    );
-  }
+/** Outcome of a finished import. Source cleanup is an optional action, not a question:
+ *  leaving it alone keeps the files. */
+function CompleteSummary({
+  result, inOpenArchive, cleanup, showErrors,
+  onToggleErrors, onDeleteSources, onOpenFolder, onShowInTimeline, onNewImport,
+}: {
+  result: { imported: number; skipped: number; errors: string[]; imported_sources: string[] };
+  inOpenArchive: boolean;
+  cleanup: { failed: number } | null;
+  showErrors: boolean;
+  onToggleErrors: () => void;
+  onDeleteSources: () => void;
+  onOpenFolder: () => void;
+  onShowInTimeline: () => void;
+  onNewImport: () => void;
+}) {
+  const { t } = useTranslation();
+  const errorCount = result.errors.length;
+  const canCleanup = errorCount === 0 && result.imported > 0 && (result.imported_sources?.length ?? 0) > 0;
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
-      <h1 className="text-[22px] font-medium text-foreground mb-6">{t('import.title')}</h1>
+    <>
+      <div className="flex items-center gap-3 mb-5 shrink-0">
+        <div className="size-9 rounded-full bg-success/15 flex items-center justify-center shrink-0">
+          <CheckIcon className="size-4.5 text-success-ink" />
+        </div>
+        <h2 className="text-base font-semibold text-foreground">{t('import.complete')}</h2>
+      </div>
 
-      <StepIndicator current={step} />
-
-      {/* Step 1 – Select source */}
-      {step === 1 && (
-        <div className="bg-card p-6 rounded-xl">
-          <h3 className="text-base font-semibold text-foreground mb-1">{t('import.step1Title')}</h3>
-          <p className="text-sm text-muted-foreground mb-5">{t('import.step1Desc')}</p>
-
-          <div className="mb-5">
-            {sourcePath ? (
-              <div className="p-3 bg-muted rounded-lg flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground mb-0.5">{t('import.source')}</p>
-                  <p className="text-sm text-foreground truncate font-mono">{sourcePath}</p>
-                </div>
-                <Button variant="link" size="xs" onClick={() => setSourcePath('')} className="shrink-0 p-0 h-auto">
-                  {t('common.change')}
-                </Button>
-              </div>
-            ) : (
-              <DropZone
-                isDragging={isDragging}
-                onSelectFolder={handleSelectSource}
-                onSelectFile={handleSelectSourceFile}
-                dragLabel={t('import.dragOrClick')}
-                dropLabel={t('import.dropHere')}
-                subLabel={t('import.dragOrClickSub')}
-                folderLabel={t('import.selectFolder')}
-                fileLabel={t('import.selectFile')}
-              />
-            )}
-          </div>
-
-          <div className="flex justify-end">
-            <Button onClick={() => setStep(2)} disabled={!sourcePath}>
-              {t('common.next')} →
+      <div className="flex gap-10 mb-5 shrink-0">
+        <Stat value={result.imported} label={t('import.imported')} className="text-primary-ink" />
+        <Stat value={result.skipped} label={t('import.skipped')} className="text-muted-foreground" />
+        {errorCount > 0 && (
+          <div>
+            <p className="text-3xl font-bold tabular-nums text-destructive">{errorCount}</p>
+            <Button variant="link" size="xs" onClick={onToggleErrors} aria-expanded={showErrors} className="h-auto p-0 mt-1 text-xs text-muted-foreground">
+              {t('import.errorsLabel')}
+              <ChevronDownIcon className={cn('transition-transform', showErrors && 'rotate-180')} />
             </Button>
           </div>
-        </div>
+        )}
+      </div>
+
+      {showErrors && errorCount > 0 && (
+        <ul className="flex-1 min-h-0 overflow-y-auto mb-5 p-3 bg-muted rounded-lg space-y-1 text-xs font-mono text-foreground">
+          {result.errors.map((e, i) => <li key={i} className="break-all">{e}</li>)}
+        </ul>
       )}
 
-      {/* Step 2 – Select archive folder */}
-      {step === 2 && (
-        <div className="bg-card p-6 rounded-xl">
-          <h3 className="text-base font-semibold text-foreground mb-1">{t('import.step2Title')}</h3>
-          <p className="text-sm text-muted-foreground mb-5">{t('import.step2Desc')}</p>
-
-          <div className="space-y-2 mb-5">
-            <div className="p-3 bg-muted rounded-lg">
-              <p className="text-xs text-muted-foreground mb-0.5">{t('import.source')}</p>
-              <p className="text-sm text-foreground truncate font-mono">{sourcePath}</p>
-            </div>
-
-            {archivePath ? (
-              <div className="p-3 bg-muted rounded-lg flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground mb-0.5">{t('import.archive')}</p>
-                  <p className="text-sm text-foreground truncate font-mono">{archivePath}</p>
-                </div>
-                <Button variant="link" size="xs" onClick={() => setArchivePath('')} className="shrink-0 p-0 h-auto">
-                  {t('common.change')}
-                </Button>
-              </div>
-            ) : (
-              <DropZone
-                isDragging={isDragging}
-                onSelectFolder={handleSelectArchive}
-                dragLabel={t('import.selectDestination')}
-                dropLabel={t('import.dropHere')}
-                subLabel={t('import.dragOrClickSub')}
-                folderLabel={t('import.selectFolder')}
-              />
-            )}
-          </div>
-
-          <div className="flex justify-between items-center">
-            <Button variant="outline" onClick={() => setStep(1)}>← {t('common.back')}</Button>
-            <Button onClick={() => setStep(3)} disabled={!archivePath}>{t('common.next')} →</Button>
-          </div>
-        </div>
+      {!inOpenArchive && (
+        <p className="mb-4 text-sm text-warning-ink shrink-0">{t('import.otherArchiveNote')}</p>
       )}
 
-      {/* Step 3 – Analyze media */}
-      {step === 3 && (
-        <div className="bg-card p-6 rounded-xl">
-          <h3 className="text-base font-semibold text-foreground mb-1">{t('import.step3Title')}</h3>
-          <p className="text-sm text-muted-foreground mb-5">{t('import.step3Desc')}</p>
-
-          <div className="space-y-2 mb-5">
-            <div className="p-3 bg-muted rounded-lg">
-              <p className="text-xs text-muted-foreground mb-0.5">{t('import.source')}</p>
-              <p className="text-sm text-foreground truncate font-mono">{sourcePath}</p>
-            </div>
-            <div className="p-3 bg-muted rounded-lg">
-              <p className="text-xs text-muted-foreground mb-0.5">{t('import.archive')}</p>
-              <p className="text-sm text-foreground truncate font-mono">{archivePath}</p>
-            </div>
-          </div>
-
-          {(phase === 'idle' || isAnalyzing) && (
-            <div className="flex justify-between items-center">
-              <Button variant="outline" onClick={() => setStep(2)} disabled={isAnalyzing}>← {t('common.back')}</Button>
-              <Button onClick={handleStartAnalysis} disabled={isAnalyzing} className="gap-2">
-                {isAnalyzing && (
-                  <LoaderCircleIcon className="animate-spin size-4" />
-                )}
-                {isAnalyzing
-                  ? (phase === 'scanning' ? t('import.scanningFolder') : t('import.analyzing'))
-                  : t('import.startAnalysis')}
-              </Button>
-            </div>
-          )}
-
-          {isAnalyzing && (
-            <div className="mt-3">
-              <ProgressBar
-                current={progress.current}
-                total={progress.total}
-                currentFile={progress.currentFile}
-                phase={phase}
-              />
-            </div>
-          )}
-
-          {phase === 'review' && importPlan && (
+      {canCleanup && (
+        <div className="mb-5 px-4 py-3 bg-muted rounded-lg border border-border flex items-center gap-3 shrink-0">
+          {cleanup === null ? (
             <>
-              <div className="p-4 bg-success/12 rounded-xl mb-4">
-                <p className="text-sm font-medium text-success-ink">
-                  {t('import.analysisComplete', { count: importPlan.images.length })}
-                </p>
-                {importPlan.conflicts_count > 0 && (
-                  <p className="text-xs text-warning-ink mt-1">
-                    {t('import.conflicts', { count: importPlan.conflicts_count })}
-                  </p>
-                )}
-              </div>
-              <div className="flex justify-between items-center">
-                <Button variant="outline" onClick={() => setStep(2)}>← {t('common.back')}</Button>
-                <Button onClick={() => setStep(4)}>{t('common.next')} →</Button>
-              </div>
+              <Trash2Icon className="size-4 text-muted-foreground shrink-0" />
+              <p className="flex-1 text-sm text-foreground">
+                {t('import.sourceStillThere', { count: result.imported_sources.length })}
+              </p>
+              <Button variant="outline" size="sm" onClick={onDeleteSources} className="shrink-0 text-destructive hover:text-destructive">
+                {t('import.deleteFromSource')}
+              </Button>
+            </>
+          ) : cleanup.failed === 0 ? (
+            <>
+              <CheckIcon className="size-4 text-success-ink shrink-0" />
+              <p className="text-sm text-foreground">{t('import.sourceDeleted')}</p>
+            </>
+          ) : (
+            <>
+              <TriangleAlertIcon className="size-4 text-warning-ink shrink-0" />
+              <p className="text-sm text-foreground">{t('import.deleteSourcesFailed', { count: cleanup.failed })}</p>
             </>
           )}
         </div>
       )}
 
-    </div>
+      <div className="flex justify-end gap-2 mt-auto shrink-0">
+        <Button variant="outline" onClick={onNewImport}>{t('import.newImport')}</Button>
+        {inOpenArchive ? (
+          <Button onClick={onShowInTimeline}>{t('import.showInTimeline')}</Button>
+        ) : (
+          <Button onClick={onOpenFolder}>
+            <FolderOpenIcon />
+            {t('import.openFolder')}
+          </Button>
+        )}
+      </div>
+    </>
   );
 }

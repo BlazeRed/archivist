@@ -28,35 +28,16 @@
     "dateFromFilename": "Date from filename"
   },
   "import": {
-    "title": "Import",
     "selectDestination": "Select archive folder",
     "analyzing": "Analyzing media...",
     "analyzingProgress": "Analyzing {{current}} of {{total}}",
-    "importing": "Importing...",
     "finalizing": "Saving to library…",
     "importProgress": "Importing {{current}} of {{total}}",
     "complete": "Import complete",
     "imported": "Imported",
     "skipped": "Skipped",
-    "sourceCleanup": "Delete the {{count}} source files?",
     "selectFolder": "Select Folder",
     "selectFile": "Select File",
-    "step1Title": "Select Source",
-    "step1Desc": "Choose a folder or a single image file to import",
-    "step2Title": "Select Archive Folder",
-    "step2Desc": "Choose where to store your archived media",
-    "step3Title": "Analyze Media",
-    "step3Desc": "Scan your media and extract date information from EXIF data",
-    "startAnalysis": "Start Analysis",
-    "scanningFolder": "Scanning folder...",
-    "analysisComplete": "{{count}} files ready to import",
-    "importMedia": "Import Media",
-    "source": "Source",
-    "archive": "Archive",
-    "errors": "{{count}} error(s)",
-    "conflicts": "{{count}} conflict(s) to review",
-    "deleteSource": "Delete source files",
-    "keepSource": "Keep",
     "deleteConfirmTitle": "Delete source files?",
     "deleteConfirmBody": "{{count}} files will be permanently deleted from the source folder. Empty folders will also be removed. This cannot be undone.",
     "deleteConfirmAction": "Delete permanently",
@@ -67,7 +48,21 @@
     "thumbnailingProgress": "Generating preview {{current}} of {{total}}",
     "dragOrClick": "Drag a folder or file here",
     "dragOrClickSub": "or use the buttons below",
-    "dropHere": "Drop to import"
+    "dropHere": "Drop to import",
+    "importCount_one": "Import {{count}} item",
+    "importCount_other": "Import {{count}} items",
+    "noMediaFound": "No media found in the source.",
+    "from": "From",
+    "to": "To",
+    "errorsLabel": "errors",
+    "otherArchiveNote": "Imported into an archive other than the open one: these items won't appear in the Timeline until you open that archive.",
+    "sourceStillThere_one": "The imported file is still in the source.",
+    "sourceStillThere_other": "The {{count}} imported files are still in the source.",
+    "deleteFromSource": "Delete from source…",
+    "sourceDeleted": "Source files deleted",
+    "newImport": "New import",
+    "showInTimeline": "Show in Timeline",
+    "openFolder": "Open folder"
   },
   "timeline": {
     "noMedia": "No media in archive",
@@ -186,7 +181,8 @@
     "theme": "Theme",
     "themeSystem": "System",
     "themeLight": "Light",
-    "themeDark": "Dark"
+    "themeDark": "Dark",
+    "noArchive": "No archive open"
   },
   "detail": {
     "title": "Details",
@@ -206,15 +202,15 @@
     "location": "Location"
   },
   "conflicts": {
-    "title": "Review Conflicts",
     "keepExisting": "Keep existing",
     "replace": "Replace with new",
     "keepBoth": "Keep both",
     "applyToAll": "Apply to all:",
     "noConflicts": "No conflicts — all {{count}} files ready to import.",
-    "conflictsFound": "{{count}} conflict(s) — choose how to handle each:",
     "incoming": "New",
-    "inArchive": "In archive"
+    "inArchive": "In archive",
+    "duplicates_one": "{{count}} duplicate",
+    "duplicates_other": "{{count}} duplicates"
   },
   "status": {
     "error": "Error"

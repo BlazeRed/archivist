@@ -1,15 +1,14 @@
 import { useMemo, useCallback } from 'react';
-import { ArrowRightIcon, ImageOffIcon } from 'lucide-react';
+import { ImageOffIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { List, RowComponentProps } from 'react-window';
 import { useImportStore, ImportAction, AnalyzedImage } from '../stores/importStore';
-import { useAppConfigStore } from '../stores/appConfigStore';
-import { ProgressBar } from './ProgressBar';
-import { Button } from '@/components/ui/button';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 const ACTIONS: ImportAction[] = ['Skip', 'KeepBoth', 'Replace'];
-const ROW_HEIGHT = 192;
+// Card (10 + 76 + 10) + 2px top / 8px bottom spacing around it
+const ROW_HEIGHT = 106;
 
 function actionLabel(action: ImportAction, t: (k: string) => string): string {
   if (action === 'KeepBoth') return t('conflicts.keepBoth');
@@ -17,43 +16,47 @@ function actionLabel(action: ImportAction, t: (k: string) => string): string {
   return t('conflicts.keepExisting');
 }
 
-function ActionPill({
-  action,
-  selected,
-  onClick,
+/** Resolution choice: segmented pill control, same as the topbar nav (spec §10 "Conflict review card"). */
+function ActionToggle({
+  value,
+  onChange,
 }: {
-  action: ImportAction;
-  selected: boolean;
-  onClick: () => void;
+  value: ImportAction | null;
+  onChange: (action: ImportAction) => void;
 }) {
   const { t } = useTranslation();
   return (
-    <button
-      onClick={onClick}
-      className={`px-3 py-1 text-xs rounded-full border transition-colors ${
-        selected
-          ? 'bg-primary/12 border-primary text-primary font-medium'
-          : 'bg-transparent border-border text-muted-foreground hover:border-primary/50'
-      }`}
+    <ToggleGroup
+      type="single"
+      variant="segmented"
+      spacing={0.5}
+      value={value ?? ''}
+      onValueChange={(v) => { if (v) onChange(v as ImportAction); }}
+      className="bg-muted rounded-full p-[3px]"
     >
-      {actionLabel(action, t)}
-    </button>
+      {ACTIONS.map((action) => (
+        <ToggleGroupItem key={action} value={action} className="h-7 px-3 text-xs">
+          {actionLabel(action, t)}
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
   );
 }
 
+/** 64px thumb; the label sits on the image (same badge as the grid's video duration) to save a line. */
 function PreviewThumb({ src, label, filename }: { src: string; label: string; filename: string }) {
   return (
-    <div className="flex flex-col items-center gap-1 w-[90px] shrink-0">
-      <div className="w-[90px] h-[90px] rounded-md overflow-hidden bg-card border border-border">
-        {src ? (
-          <img src={src} alt={filename} className="w-full h-full object-cover" loading="lazy" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-            <ImageOffIcon className="w-6 h-6" strokeWidth={1.5} />
-          </div>
-        )}
-      </div>
-      <span className="text-[10px] text-muted-foreground font-medium">{label}</span>
+    <div className="relative size-16 shrink-0 rounded-md overflow-hidden bg-media">
+      {src ? (
+        <img src={src} alt={filename} className="w-full h-full object-cover" loading="lazy" />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+          <ImageOffIcon className="size-5" strokeWidth={1.5} />
+        </div>
+      )}
+      <span className="absolute bottom-1 left-1 text-[9px] font-semibold text-white bg-[rgba(0,20,45,.55)] rounded-full px-1.5 leading-4 pointer-events-none">
+        {label}
+      </span>
     </div>
   );
 }
@@ -74,38 +77,21 @@ function ConflictRowInner({
   const existingUrl = img.conflict?.existing_id
     ? convertFileSrc(`${archivePath}/.archivist/thumbnails/${img.conflict.existing_id}.jpg`)
     : '';
+  const existing = [
+    img.conflict?.existing_path,
+    img.conflict?.existing_date && new Date(img.conflict.existing_date).toLocaleDateString(),
+  ].filter(Boolean).join(' · ');
 
   return (
-    <div className="px-3 pt-3 pb-4 bg-background rounded-lg border border-border">
-      <div className="flex gap-3 mb-2.5">
+    <div className="squircle p-2.5 bg-popover rounded-lg shadow-raised flex items-center gap-3">
+      <div className="flex gap-2 shrink-0">
         <PreviewThumb src={incomingUrl} label={t('conflicts.incoming')} filename={img.filename} />
-        <div className="flex items-center self-center text-muted-foreground">
-          <ArrowRightIcon className="w-4 h-4" />
-        </div>
         <PreviewThumb src={existingUrl} label={t('conflicts.inArchive')} filename={img.conflict?.existing_path ?? ''} />
-        <div className="flex-1 min-w-0 self-center">
-          <p className="text-sm font-medium text-foreground truncate">{img.filename}</p>
-          {img.conflict?.existing_path && (
-            <p className="text-[11px] text-muted-foreground truncate mt-0.5">
-              {img.conflict.existing_path}
-            </p>
-          )}
-          {img.conflict?.existing_date && (
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              {new Date(img.conflict.existing_date).toLocaleDateString()}
-            </p>
-          )}
-        </div>
       </div>
-      <div className="flex flex-wrap gap-2">
-        {ACTIONS.map((action) => (
-          <ActionPill
-            key={action}
-            action={action}
-            selected={selected === action}
-            onClick={() => onSelect(action)}
-          />
-        ))}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-foreground truncate">{img.filename}</p>
+        <p className="text-[11px] text-muted-foreground truncate mb-1.5">{existing}</p>
+        <ActionToggle value={selected} onChange={onSelect} />
       </div>
     </div>
   );
@@ -128,7 +114,7 @@ function ConflictRowRenderer({
 }: RowComponentProps<RowData>) {
   const img = conflicts[index];
   return (
-    <div style={{ ...style, paddingBottom: 8 }}>
+    <div style={{ ...style, padding: '2px 4px 8px' }}>
       <ConflictRowInner
         img={img}
         archivePath={archivePath}
@@ -139,31 +125,19 @@ function ConflictRowRenderer({
   );
 }
 
-export function ConflictReview({ onImport, onBack }: { onImport: () => void; onBack: () => void }) {
+/** Review body: summary + duplicate list. Card, progress and Import button belong to the page. */
+export function ConflictReview() {
   const { t } = useTranslation();
-  const { importPlan, analyzedImages, resolutions, setResolution, setAllResolutions, phase, progress } =
-    useImportStore();
-  const archivePath = useAppConfigStore((s) => s.config.archive_path).replace(/\/+$/, '');
+  const { importPlan, analyzedImages, resolutions, setResolution, setAllResolutions } = useImportStore();
+  // Import destination, not the open archive: thumbnails are pre-generated there
+  const archivePath = useImportStore((s) => s.archivePath).replace(/\/+$/, '');
 
-  if (!importPlan) return null;
-
-  const conflicts = analyzedImages.filter((img) => img.conflict);
+  const conflicts = useMemo(() => analyzedImages.filter((img) => img.conflict), [analyzedImages]);
 
   const getAction = useCallback(
     (hash: string): ImportAction => resolutions.find((r) => r.hash === hash)?.action ?? 'Skip',
     [resolutions]
   );
-
-  const globalAction = (): ImportAction | null => {
-    if (conflicts.length === 0) return null;
-    const first = getAction(conflicts[0].hash);
-    return conflicts.every((img) => getAction(img.hash) === first) ? first : null;
-  };
-
-  const formatSize = (bytes: number) =>
-    bytes < 1024 * 1024
-      ? `${(bytes / 1024).toFixed(1)} KB`
-      : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 
   const rowData = useMemo<RowData>(
     () => ({ conflicts, archivePath, getAction, setResolution }),
@@ -172,51 +146,45 @@ export function ConflictReview({ onImport, onBack }: { onImport: () => void; onB
 
   const rowHeight = useCallback(() => ROW_HEIGHT, []);
 
-  const isImporting = phase === 'importing';
-  const global = globalAction();
+  if (!importPlan) return null;
+
+  const first = conflicts.length > 0 ? getAction(conflicts[0].hash) : null;
+  const global = first && conflicts.every((img) => getAction(img.hash) === first) ? first : null;
+
+  const formatSize = (bytes: number) =>
+    bytes < 1024 * 1024
+      ? `${(bytes / 1024).toFixed(1)} KB`
+      : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 
   return (
-    <div className="bg-card p-6 rounded-xl flex flex-col flex-1 min-h-0">
-      <h3 className="text-base font-semibold text-foreground mb-1 shrink-0">{t('conflicts.title')}</h3>
-
-      <div className="flex items-center justify-between p-3 bg-muted rounded-lg mb-4 shrink-0">
-        <span className="text-sm text-foreground">
+    <div className="flex flex-col flex-1 min-h-0">
+      {/* One toolbar: summary left, apply-to-all right */}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 mb-3 shrink-0">
+        <p className="text-sm text-foreground tabular-nums">
           {importPlan.images.length} {t('timeline.items')}
-        </span>
-        <span className="text-sm text-muted-foreground">{formatSize(importPlan.total_size)}</span>
+          <span className="text-muted-foreground"> · {formatSize(importPlan.total_size)}</span>
+          {conflicts.length > 0 && (
+            <span className="text-warning-ink"> · {t('conflicts.duplicates', { count: conflicts.length })}</span>
+          )}
+        </p>
+        {conflicts.length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">{t('conflicts.applyToAll')}</span>
+            <ActionToggle value={global} onChange={setAllResolutions} />
+          </div>
+        )}
       </div>
 
-      {conflicts.length === 0 ? (
-        <div className="flex-1 mb-5 flex items-start">
-          <div className="p-4 bg-success/12 rounded-xl w-full">
-            <p className="text-sm text-success-ink">
-              {t('conflicts.noConflicts', { count: importPlan.images.length })}
-            </p>
-          </div>
+      {importPlan.images.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{t('import.noMediaFound')}</p>
+      ) : conflicts.length === 0 ? (
+        <div className="p-4 bg-success/12 rounded-lg">
+          <p className="text-sm text-success-ink">
+            {t('conflicts.noConflicts', { count: importPlan.images.length })}
+          </p>
         </div>
       ) : (
-        <div className="flex flex-col flex-1 min-h-0 mb-5">
-          <p className="text-sm text-warning-ink mb-3 shrink-0">
-            {t('conflicts.conflictsFound', { count: conflicts.length })}
-          </p>
-
-          {/* Apply to all bar */}
-          <div className="flex items-center gap-2 mb-3 p-2 bg-muted rounded-lg shrink-0">
-            <span className="text-xs text-muted-foreground shrink-0">
-              {t('conflicts.applyToAll')}
-            </span>
-            <div className="flex gap-1.5">
-              {ACTIONS.map((action) => (
-                <ActionPill
-                  key={action}
-                  action={action}
-                  selected={global === action}
-                  onClick={() => setAllResolutions(action)}
-                />
-              ))}
-            </div>
-          </div>
-
+        <div className="flex flex-col flex-1 min-h-0">
           {/* Virtualized conflict list — fills remaining space */}
           <div className="flex-1 min-h-0">
             <List
@@ -229,26 +197,6 @@ export function ConflictReview({ onImport, onBack }: { onImport: () => void; onB
           </div>
         </div>
       )}
-
-      {isImporting && (
-        <div className="mb-4 shrink-0">
-          <ProgressBar
-            current={progress.current}
-            total={progress.total}
-            currentFile={progress.currentFile}
-            phase={phase}
-          />
-        </div>
-      )}
-
-      <div className="flex justify-between items-center shrink-0">
-        <Button variant="outline" onClick={onBack} disabled={isImporting}>
-          ← {t('common.back')}
-        </Button>
-        <Button onClick={onImport} disabled={isImporting}>
-          {isImporting ? t('import.importing') : t('import.importMedia')}
-        </Button>
-      </div>
     </div>
   );
 }

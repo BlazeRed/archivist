@@ -293,11 +293,12 @@ export function GroupsPage() {
             onImageClick={handleImageClick}
             onToggleSelect={toggle}
             // Cover marker: violet, the groups color (gold is reserved for favourites)
-            overlay={img => selectedGroup?.cover_image_id === img.id && (
+            overlay={img => selectedGroup?.cover_image_id === img.id && (<>
+              <div className="absolute inset-0 rounded-sm ring-2 ring-inset ring-violet pointer-events-none" />
               <Badge className="absolute bottom-1.5 right-1.5 h-5 px-2 bg-violet text-violet-foreground text-[10px] font-semibold shadow-[0_1px_3px_rgba(0,0,0,.4)] pointer-events-none">
                 {t('groups.cover')}
               </Badge>
-            )}
+            </>)}
           />
         )}
       </FloatingScroll>
@@ -376,7 +377,7 @@ function GroupCard({ group, coverUrl, onOpen, onRename, onDelete }: {
   return (
     <div
       onClick={onOpen}
-      className="group/card squircle cursor-pointer rounded-lg overflow-hidden bg-card shadow-raised transition-transform duration-150 active:scale-[.97]"
+      className="group/card squircle cursor-pointer rounded-lg overflow-hidden bg-card shadow-raised ring-violet transition-[transform,box-shadow] duration-150 hover:ring-2 active:scale-[.97]"
     >
       <div className="aspect-[4/3] bg-muted overflow-hidden relative">
         {coverUrl ? (

@@ -251,6 +251,8 @@ pub fn create_import_plan(images: Vec<AnalyzedImage>, db: &crate::db::Database) 
 
     let mut resolved = Vec::with_capacity(images.len());
     for mut img in images {
+        // Replanning against another archive: drop the old archive's conflict first
+        img.conflict = None;
         if db.image_exists(&img.hash)? {
             if let Some(existing) = db.get_image(&img.hash)? {
                 img.conflict = Some(ConflictInfo {
