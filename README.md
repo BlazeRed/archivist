@@ -36,7 +36,7 @@ Archivist is a desktop media archive organizer that imports, indexes, and browse
   </tr>
   <tr>
     <td><img src="screenshots/map.png" alt="Map" /></td>
-    <td><img src="screenshots/timeline-dark.png" alt="Dark theme" /></td>
+    <td><img src="screenshots/dark-theme.png" alt="Dark theme" /></td>
   </tr>
   <tr>
     <td align="center"><em>Map — photos placed by GPS location</em></td>
