@@ -124,6 +124,10 @@ export function GroupsPage() {
       try {
         const result = await invoke<ExportResult>('export_group', { groupId, destPath: dest });
         toast.success(t('groups.exportSuccess', { count: result.copied, path: result.dest_path }));
+        if (result.errors.length > 0) {
+          toast.warning(t('groups.exportPartial', { count: result.errors.length }));
+          console.error('Export errors:', result.errors);
+        }
       } catch (e) {
         toast.error(t('groups.exportError'));
         console.error('Export failed:', e);

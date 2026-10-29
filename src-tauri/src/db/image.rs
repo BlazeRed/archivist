@@ -77,14 +77,25 @@ const SELECT_COLS: &str =
     "id, filename, file_path, taken_at, imported_at, width, height, file_size, has_exif, date_source, thumbnail_path, is_favourite, media_type, duration_ms, codec, rotation, web_path, latitude, longitude, trashed_at";
 
 impl super::Database {
+    /// Inserts, or updates the row in place when the id exists (import "Replace").
+    /// Never `INSERT OR REPLACE`: that deletes the row first, and the FK cascade would
+    /// drop its groups, while favourite would reset. Updating also brings it out of the trash.
     pub fn insert_image(&self, image: &NewImage) -> Result<(), super::AppError> {
         let conn = self.connection();
         let imported_at = Utc::now().to_rfc3339();
 
         conn.execute(
-            "INSERT OR REPLACE INTO images \
+            "INSERT INTO images \
              (id, filename, file_path, taken_at, imported_at, width, height, file_size, has_exif, date_source, thumbnail_path, media_type, duration_ms, codec, rotation, web_path, latitude, longitude) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18) \
+             ON CONFLICT(id) DO UPDATE SET \
+             filename = excluded.filename, file_path = excluded.file_path, taken_at = excluded.taken_at, \
+             width = excluded.width, height = excluded.height, file_size = excluded.file_size, \
+             has_exif = excluded.has_exif, date_source = excluded.date_source, \
+             thumbnail_path = COALESCE(excluded.thumbnail_path, thumbnail_path), \
+             media_type = excluded.media_type, duration_ms = excluded.duration_ms, codec = excluded.codec, \
+             rotation = excluded.rotation, web_path = COALESCE(excluded.web_path, web_path), \
+             latitude = excluded.latitude, longitude = excluded.longitude, trashed_at = NULL",
             params![
                 image.id,
                 image.filename,

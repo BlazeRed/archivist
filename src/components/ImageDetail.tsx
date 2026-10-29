@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { ArrowLeftIcon, ChevronLeftIcon, ChevronRightIcon, InfoIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { convertFileSrc, invoke } from '@tauri-apps/api/core';
+import { convertFileSrc } from '@tauri-apps/api/core';
 import { toast } from 'sonner';
 import { trimArchivePath } from '@/lib/archivePath';
-import { makeVideoUrl } from '@/lib/mediaServer';
+import { makeVideoUrl, transcodeVideo, transcodeToastId, isTranscodeCancelled } from '@/lib/mediaServer';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { ImageMetadataView, useImageGroups, formatDate } from './ImageMetadata';
@@ -72,7 +72,7 @@ function Viewer({ image, hideGroups, navImages }: { image: Image; hideGroups?: b
     if (image.media_type === 'video') {
       if (!image.web_path) { setImgSrc(''); return; }
       let cancelled = false;
-      makeVideoUrl(archivePath, image.web_path).then(url => {
+      makeVideoUrl(image.web_path).then(url => {
         if (!cancelled) setImgSrc(url);
       });
       return () => { cancelled = true; };
@@ -88,18 +88,16 @@ function Viewer({ image, hideGroups, navImages }: { image: Image; hideGroups?: b
 
     let cancelled = false;
     setTranscoding(true);
-    toast.info(t('preview.transcoding'));
+    toast.info(t('preview.transcoding'), { id: transcodeToastId(image.id) });
 
-    invoke<string>('transcode_video', {
-      imageId: image.id,
-      filePath: image.file_path,
-    }).then((webPath) => {
+    transcodeVideo(image.id).then((webPath) => {
       if (cancelled) return;
       useTimelineStore.getState().updateImageWebPath(image.id, webPath);
     }).catch((e) => {
+      if (isTranscodeCancelled(e)) { toast.dismiss(transcodeToastId(image.id)); return; }
       if (cancelled) return;
       console.error('[transcode] detail failed:', e);
-      toast.error(t('preview.transcodeError'));
+      toast.error(t('preview.transcodeError'), { id: transcodeToastId(image.id) });
     }).finally(() => {
       if (!cancelled) setTranscoding(false);
     });

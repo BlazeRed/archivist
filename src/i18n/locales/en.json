@@ -132,6 +132,7 @@
     "allMediaAdded": "All items are already in this group",
     "exportSuccess": "{{count}} files exported to {{path}}",
     "exportError": "Export failed",
+    "exportPartial": "{{count}} files not exported (missing or unreadable)",
     "sortByDate": "Date taken",
     "sortByRecent": "Recently added",
     "setCover": "Set as cover",

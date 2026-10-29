@@ -25,6 +25,10 @@ pub enum AppError {
 
     #[error("Internal error: {message}")]
     Internal { message: String },
+
+    /// Superseded by a newer request (e.g. another video's transcode). Not a failure to show.
+    #[error("Cancelled")]
+    Cancelled,
 }
 
 impl serde::Serialize for AppError {

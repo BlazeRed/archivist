@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::{exif, hasher, thumbnail, error::AppError};
@@ -283,6 +284,8 @@ struct PreparedImport {
     entry_id: String,
     thumbnail_abs: PathBuf,
     thumbnail_rel: String,
+    /// Replace: absolute path of the archived duplicate, moved into place instead of copied.
+    replaces: Option<PathBuf>,
 }
 
 pub fn execute_import(
@@ -295,69 +298,7 @@ pub fn execute_import(
     use rayon::prelude::*;
     use tauri::Emitter;
 
-    let resolution_map: std::collections::HashMap<String, &ImportResolution> =
-        resolutions.iter().map(|r| (r.hash.clone(), r)).collect();
-
-    // Phase 1 — serial: compute destinations and unique filenames (filesystem-order matters)
-    let mut skipped = 0usize;
-    let mut prepared: Vec<PreparedImport> = Vec::new();
-
-    for image in &plan.images {
-        let resolution = resolution_map.get(&image.hash);
-
-        let should_skip = match resolution {
-            Some(r) => matches!(r.action, ImportAction::Skip),
-            None => image.conflict.is_some(),
-        };
-        if should_skip {
-            skipped += 1;
-            continue;
-        }
-
-        let dest_dir = destination_path(archive_path, &image.taken_at);
-
-        let final_filename = if let Some(res) = resolution {
-            match res.action {
-                ImportAction::KeepBoth => generate_unique_filename(&dest_dir, &image.filename),
-                ImportAction::Replace => image.filename.clone(),
-                ImportAction::Skip => {
-                    skipped += 1;
-                    continue;
-                }
-            }
-        } else {
-            image.filename.clone()
-        };
-
-        let is_keep_both = resolution.map_or(false, |r| matches!(r.action, ImportAction::KeepBoth));
-        let dest_path = PathBuf::from(&dest_dir).join(&final_filename);
-
-        let thumbnail_abs = PathBuf::from(archive_path)
-            .join(".archivist/thumbnails")
-            .join(format!("{}.jpg", &image.hash));
-        let thumbnail_rel = format!(".archivist/thumbnails/{}.jpg", &image.hash);
-
-        let entry_id = if is_keep_both {
-            let stem = Path::new(&final_filename)
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or(final_filename.as_str());
-            format!("{}_{}", image.hash, stem)
-        } else {
-            image.hash.clone()
-        };
-
-        prepared.push(PreparedImport {
-            source_path: image.path.clone(),
-            dest_path,
-            dest_dir,
-            final_filename,
-            image: image.clone(),
-            entry_id,
-            thumbnail_abs,
-            thumbnail_rel,
-        });
-    }
+    let (prepared, skipped) = prepare_imports(&plan, &resolutions, archive_path);
 
     // Phase 2 — parallel: copy + thumbnail + DB insert, one item at a time.
     // `import_one` is atomic per item (rolls back the copy if the DB insert
@@ -396,12 +337,112 @@ pub fn execute_import(
     Ok(ImportResult { imported, skipped, errors, imported_sources })
 }
 
+/// Phase 1 — serial: destinations and filenames for every item to import, plus the skipped count.
+/// Every item gets a name free both on disk and among the names already handed out in this
+/// batch, so a photo never lands on another one that merely shares its filename.
+fn prepare_imports(
+    plan: &ImportPlan,
+    resolutions: &[ImportResolution],
+    archive_path: &str,
+) -> (Vec<PreparedImport>, usize) {
+    let resolution_map: HashMap<&str, &ImportAction> =
+        resolutions.iter().map(|r| (r.hash.as_str(), &r.action)).collect();
+
+    let mut skipped = 0usize;
+    let mut prepared: Vec<PreparedImport> = Vec::new();
+    let mut reserved: HashSet<PathBuf> = HashSet::new();
+    let mut seen_hashes: HashSet<&str> = HashSet::new();
+
+    for image in &plan.images {
+        let action = resolution_map.get(image.hash.as_str()).copied();
+        let should_skip = match action {
+            Some(a) => matches!(a, ImportAction::Skip),
+            None => image.conflict.is_some(),
+        };
+        // Same file twice in the source: a second copy would only leave an orphan behind
+        if should_skip || !seen_hashes.insert(image.hash.as_str()) {
+            skipped += 1;
+            continue;
+        }
+
+        let is_keep_both = matches!(action, Some(ImportAction::KeepBoth));
+        let dest_dir = destination_path(archive_path, &image.taken_at);
+
+        let replaces = match (action, &image.conflict) {
+            (Some(ImportAction::Replace), Some(c)) => Some(Path::new(archive_path).join(&c.existing_path)),
+            _ => None,
+        };
+        // The duplicate already sitting where the new one goes keeps its name (it is reused in place)
+        let final_filename = if replaces.as_deref() == Some(Path::new(&dest_dir).join(&image.filename).as_path()) {
+            image.filename.clone()
+        } else {
+            generate_unique_filename(&dest_dir, &image.filename, is_keep_both, &reserved)
+        };
+        let dest_path = PathBuf::from(&dest_dir).join(&final_filename);
+        reserved.insert(dest_path.clone());
+
+        let thumbnail_abs = PathBuf::from(archive_path)
+            .join(".archivist/thumbnails")
+            .join(format!("{}.jpg", &image.hash));
+        let thumbnail_rel = format!(".archivist/thumbnails/{}.jpg", &image.hash);
+
+        let entry_id = if is_keep_both {
+            let stem = Path::new(&final_filename)
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or(final_filename.as_str());
+            format!("{}_{}", image.hash, stem)
+        } else {
+            image.hash.clone()
+        };
+
+        prepared.push(PreparedImport {
+            source_path: image.path.clone(),
+            dest_path,
+            dest_dir,
+            final_filename,
+            image: image.clone(),
+            entry_id,
+            thumbnail_abs,
+            thumbnail_rel,
+            replaces,
+        });
+    }
+
+    (prepared, skipped)
+}
+
+/// Copies into a file that must not exist yet: a name taken since phase 1 fails the item
+/// instead of being overwritten. A partial copy is removed, since it was created here.
+pub(crate) fn copy_new(source: &str, dest: &Path) -> std::io::Result<()> {
+    let mut from = std::fs::File::open(source)?;
+    let mut to = std::fs::OpenOptions::new().write(true).create_new(true).open(dest)?;
+    if let Err(e) = std::io::copy(&mut from, &mut to) {
+        drop(to);
+        let _ = std::fs::remove_file(dest);
+        return Err(e);
+    }
+    Ok(())
+}
+
+/// Renames onto a path that must not exist yet (rename would silently overwrite it).
+fn rename_new(from: &Path, to: &Path) -> std::io::Result<()> {
+    if to.exists() {
+        return Err(std::io::Error::from(std::io::ErrorKind::AlreadyExists));
+    }
+    std::fs::rename(from, to)
+}
+
 /// Copies one prepared item into the archive and records it in the DB.
 ///
 /// Copy and DB-insert are made atomic here: if the insert fails (disk full,
 /// DB locked), the just-copied file is deleted rather than left behind as an
 /// untracked orphan. Import dedup only checks the DB by hash, so an orphan
 /// would otherwise silently re-import as a "new" duplicate next time.
+///
+/// Replace: the archived duplicate holds the same bytes (checked by hash), so it is
+/// moved into place, even out of the Trash, instead of copying a second file next to
+/// it. Nothing is deleted. If it changed or is gone, the source is copied as usual.
 fn import_one(
     p: PreparedImport,
     archive_path: &str,
@@ -410,8 +451,14 @@ fn import_one(
     std::fs::create_dir_all(&p.dest_dir)
         .map_err(|e| format!("Failed to create directory {}: {}", p.dest_dir, e))?;
 
-    std::fs::copy(&p.source_path, &p.dest_path)
-        .map_err(|e| format!("Failed to copy {}: {}", p.image.filename, e))?;
+    let reused = p.replaces.as_ref()
+        .filter(|old| hasher::compute_hash(old).is_ok_and(|h| h == p.image.hash));
+    let placed = match reused {
+        Some(old) if *old == p.dest_path => Ok(()),
+        Some(old) => rename_new(old, &p.dest_path),
+        None => copy_new(&p.source_path, &p.dest_path),
+    };
+    placed.map_err(|e| format!("Failed to copy {}: {}", p.image.filename, e))?;
 
     // Preserve original mtime so rescan yields the same date if DB is rebuilt
     if let Ok(src_meta) = std::fs::metadata(&p.source_path) {
@@ -471,7 +518,11 @@ fn import_one(
     };
 
     if let Err(e) = db.insert_image(&new_image) {
-        let _ = std::fs::remove_file(&p.dest_path);
+        match reused {
+            Some(old) if *old != p.dest_path => { let _ = std::fs::rename(&p.dest_path, old); }
+            Some(_) => {}
+            None => { let _ = std::fs::remove_file(&p.dest_path); }
+        }
         return Err(format!("DB insert error for {}: {}", new_image.filename, e));
     }
 
@@ -623,8 +674,18 @@ pub fn cleanup_temp_thumbnails() -> Result<(), AppError> {
     Ok(())
 }
 
-pub fn generate_unique_filename(dir: &str, original: &str) -> String {
+/// `original` if free (unless `force_suffix`), else `stem_N.ext` with the first free N.
+/// Free = not on disk and not in `reserved` (names handed out earlier in the same batch).
+pub fn generate_unique_filename(dir: &str, original: &str, force_suffix: bool, reserved: &HashSet<PathBuf>) -> String {
     let path = Path::new(dir);
+    let is_taken = |name: &str| {
+        let candidate = path.join(name);
+        candidate.exists() || reserved.contains(&candidate)
+    };
+    if !force_suffix && !is_taken(original) {
+        return original.to_string();
+    }
+
     let stem = Path::new(original)
         .file_stem()
         .and_then(|s| s.to_str())
@@ -637,7 +698,7 @@ pub fn generate_unique_filename(dir: &str, original: &str) -> String {
     let mut counter = 1;
     let mut filename = format!("{}_{}.{}", stem, counter, ext);
 
-    while path.join(&filename).exists() {
+    while is_taken(&filename) {
         counter += 1;
         filename = format!("{}_{}.{}", stem, counter, ext);
     }
@@ -700,6 +761,7 @@ mod tests {
             entry_id: "abc123".to_string(),
             thumbnail_abs: archive_dir.path().join(".archivist/thumbnails/abc123.jpg"),
             thumbnail_rel: ".archivist/thumbnails/abc123.jpg".to_string(),
+            replaces: None,
         };
 
         let result = import_one(prepared, &archive_path, &db);
@@ -707,5 +769,118 @@ mod tests {
         assert!(result.is_err());
         assert!(!dest_path.exists(), "copied file must be rolled back when the DB insert fails");
         assert!(source_path.exists(), "original source file must never be touched");
+    }
+
+    /// Regression test for the same-name overwrite bug: a new photo whose filename is
+    /// already taken in its month folder (by the archive or by another item of the same
+    /// import) must get a free name, never replace the other photo's bytes.
+    #[test]
+    fn same_filename_never_overwrites_another_photo() {
+        let src_dir = tempfile::tempdir().unwrap();
+        let archive_dir = tempfile::tempdir().unwrap();
+        let archive_path = archive_dir.path().to_str().unwrap().to_string();
+        let db = Database::new(&archive_dir.path().join(".archivist/archivist.db")).unwrap();
+
+        let existing = archive_dir.path().join("No Date/photo.jpg");
+        std::fs::create_dir_all(existing.parent().unwrap()).unwrap();
+        std::fs::write(&existing, b"already archived").unwrap();
+
+        let source = |sub: &str, bytes: &[u8], hash: &str| {
+            let path = src_dir.path().join(sub).join("photo.jpg");
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(&path, bytes).unwrap();
+            AnalyzedImage {
+                path: path.to_string_lossy().to_string(),
+                filename: "photo.jpg".to_string(),
+                ..sample_analyzed(hash)
+            }
+        };
+        let plan = ImportPlan {
+            images: vec![
+                source("a", b"camera A", "hashA"),
+                source("b", b"camera B", "hashB"),
+                source("c", b"camera A", "hashA"), // same file twice in the source
+            ],
+            total_size: 0,
+            conflicts_count: 0,
+        };
+
+        let (prepared, skipped) = prepare_imports(&plan, &[], &archive_path);
+        assert_eq!((prepared.len(), skipped), (2, 1));
+        for p in prepared {
+            import_one(p, &archive_path, &db).unwrap();
+        }
+
+        let read = |name: &str| std::fs::read(archive_dir.path().join("No Date").join(name)).unwrap();
+        assert_eq!(read("photo.jpg"), b"already archived");
+        assert_eq!(read("photo_1.jpg"), b"camera A");
+        assert_eq!(read("photo_2.jpg"), b"camera B");
+
+        // A name taken after planning fails the copy instead of overwriting
+        assert!(copy_new(&plan.images[0].path, &existing).is_err());
+        assert_eq!(read("photo.jpg"), b"already archived");
+    }
+
+    /// Regression test for Replace wiping groups/favourite (`INSERT OR REPLACE` + FK cascade)
+    /// and orphaning the duplicate: Replace on a trashed duplicate must move that same file
+    /// to the new date folder and keep the row's groups and favourite.
+    #[test]
+    fn replace_keeps_groups_favourite_and_reuses_the_duplicate() {
+        let src_dir = tempfile::tempdir().unwrap();
+        let archive_dir = tempfile::tempdir().unwrap();
+        let archive_path = archive_dir.path().to_str().unwrap().to_string();
+        let db = Database::new(&archive_dir.path().join(".archivist/archivist.db")).unwrap();
+
+        let trashed = archive_dir.path().join("Trash/photo.jpg");
+        std::fs::create_dir_all(trashed.parent().unwrap()).unwrap();
+        std::fs::write(&trashed, b"same bytes").unwrap();
+        let hash = hasher::compute_hash(&trashed).unwrap();
+        db.insert_image(&NewImage {
+            id: hash.clone(),
+            filename: "photo.jpg".into(),
+            file_path: "Trash/photo.jpg".into(),
+            taken_at: None,
+            width: None, height: None, file_size: None, has_exif: false,
+            date_source: None, thumbnail_path: None, media_type: "image".into(),
+            duration_ms: None, codec: None, rotation: None, web_path: None,
+            latitude: None, longitude: None,
+        }).unwrap();
+        db.set_image_location(&hash, "Trash/photo.jpg", "photo.jpg", Some("2026-01-01T00:00:00+00:00")).unwrap();
+        let group = db.create_group("Trip").unwrap();
+        db.add_image_to_group(&hash, group).unwrap();
+        db.set_image_favourite(&hash, true).unwrap();
+
+        let source = src_dir.path().join("photo.jpg");
+        std::fs::write(&source, b"same bytes").unwrap();
+        let plan = ImportPlan {
+            images: vec![AnalyzedImage {
+                path: source.to_string_lossy().to_string(),
+                filename: "photo.jpg".to_string(),
+                taken_at: Some("2024-03-10T12:00:00+00:00".to_string()),
+                conflict: Some(ConflictInfo {
+                    existing_id: hash.clone(),
+                    existing_path: "Trash/photo.jpg".to_string(),
+                    existing_date: None,
+                }),
+                ..sample_analyzed(&hash)
+            }],
+            total_size: 0,
+            conflicts_count: 1,
+        };
+        let replace = [ImportResolution { hash: hash.clone(), action: ImportAction::Replace }];
+
+        let (prepared, _) = prepare_imports(&plan, &replace, &archive_path);
+        for p in prepared {
+            import_one(p, &archive_path, &db).unwrap();
+        }
+
+        assert!(!trashed.exists(), "the duplicate is moved, not left behind as an orphan");
+        assert!(archive_dir.path().join("2024/03 - March/photo.jpg").exists());
+        assert!(source.exists(), "source is never touched");
+        let img = db.get_image(&hash).unwrap().unwrap();
+        assert_eq!(img.file_path, "2024/03 - March/photo.jpg");
+        assert!(img.trashed_at.is_none());
+        assert!(img.is_favourite);
+        assert_eq!(db.get_images_in_group(group).unwrap(), vec![hash]);
     }
 }

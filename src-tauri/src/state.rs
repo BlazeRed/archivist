@@ -4,7 +4,8 @@ use crate::db::Database;
 pub struct AppState {
     db: Mutex<Arc<Database>>,
     pub archive_path: Mutex<Option<String>>,
-    media_port: u16,
+    /// Source files imported this session: the only paths `delete_files` may delete.
+    import_sources: Mutex<std::collections::HashSet<String>>,
 }
 
 /// Recovers the guard instead of panicking on a poisoned mutex — see
@@ -17,17 +18,13 @@ fn lock_recover<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 impl AppState {
-    pub fn new(db_path: std::path::PathBuf, media_port: u16) -> Result<Self, crate::error::AppError> {
+    pub fn new(db_path: std::path::PathBuf) -> Result<Self, crate::error::AppError> {
         let db = Database::new(&db_path)?;
         Ok(Self {
             db: Mutex::new(Arc::new(db)),
             archive_path: Mutex::new(None),
-            media_port,
+            import_sources: Mutex::new(std::collections::HashSet::new()),
         })
-    }
-
-    pub fn media_port(&self) -> u16 {
-        self.media_port
     }
 
     pub fn db(&self) -> Arc<Database> {
@@ -73,6 +70,15 @@ impl AppState {
     pub fn get_archive_path(&self) -> Option<String> {
         lock_recover(&self.archive_path).clone()
     }
+
+    pub fn remember_import_sources(&self, paths: &[String]) {
+        lock_recover(&self.import_sources).extend(paths.iter().cloned());
+    }
+
+    /// True (once) if `path` was imported this session, so it may be deleted.
+    pub fn take_import_source(&self, path: &str) -> bool {
+        lock_recover(&self.import_sources).remove(path)
+    }
 }
 
 #[cfg(test)]
@@ -87,7 +93,7 @@ mod tests {
         let open = open_dir.path().to_str().unwrap();
         let other = other_dir.path().to_str().unwrap();
 
-        let state = AppState::new(open_dir.path().join("boot.db"), 0).unwrap();
+        let state = AppState::new(open_dir.path().join("boot.db")).unwrap();
         state.reinit_db(open).unwrap();
         state.set_archive_path(open.to_string());
 

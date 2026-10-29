@@ -11,11 +11,22 @@ pub mod media_server;
 use std::sync::Arc;
 use state::AppState;
 
+/// Lets the webview load files of `archive_path` (photos, thumbnails) through the asset
+/// protocol. The config scope is empty: only archives the user opened or imports into are readable.
+fn allow_assets(app: &tauri::AppHandle, archive_path: &str) -> Result<(), error::AppError> {
+    use tauri::Manager;
+    app.asset_protocol_scope()
+        .allow_directory(archive_path, true)
+        .map_err(|e| error::AppError::Internal { message: e.to_string() })
+}
+
 #[tauri::command]
 async fn init_archive(
+    app: tauri::AppHandle,
     state: tauri::State<'_, Arc<AppState>>,
     archive_path: String,
 ) -> Result<(), error::AppError> {
+    allow_assets(&app, &archive_path)?;
     state.reinit_db(&archive_path)?;
     state.set_archive_path(archive_path.clone());
     let db = state.db();
@@ -28,18 +39,8 @@ async fn init_archive(
 }
 
 #[tauri::command]
-fn get_image_count(state: tauri::State<'_, Arc<AppState>>) -> Result<i64, error::AppError> {
-    state.db().get_image_count()
-}
-
-#[tauri::command]
 fn get_all_images(state: tauri::State<'_, Arc<AppState>>) -> Result<Vec<db::image::Image>, error::AppError> {
     state.db().get_all_images()
-}
-
-#[tauri::command]
-fn get_images_by_date(state: tauri::State<'_, Arc<AppState>>, year: i32, month: Option<i32>) -> Result<Vec<db::image::Image>, error::AppError> {
-    state.db().get_images_by_date(year, month)
 }
 
 #[tauri::command]
@@ -95,13 +96,6 @@ async fn scan_source(source_path: String) -> Result<Vec<commands::ScannedImage>,
 }
 
 #[tauri::command]
-async fn analyze_image(scanned: commands::ScannedImage) -> Result<commands::AnalyzedImage, error::AppError> {
-    tauri::async_runtime::spawn_blocking(move || commands::analyze_image(&scanned))
-        .await
-        .map_err(|e| error::AppError::Internal { message: e.to_string() })?
-}
-
-#[tauri::command]
 async fn analyze_images(
     app: tauri::AppHandle,
     scanned: Vec<commands::ScannedImage>,
@@ -113,10 +107,13 @@ async fn analyze_images(
 
 #[tauri::command]
 async fn create_import_plan(
+    app: tauri::AppHandle,
     state: tauri::State<'_, Arc<AppState>>,
     images: Vec<commands::AnalyzedImage>,
     archive_path: String,
 ) -> Result<commands::ImportPlan, error::AppError> {
+    // Conflict review shows thumbnails from the destination, which may not be the open archive
+    allow_assets(&app, &archive_path)?;
     let db = state.db_for(&archive_path)?;
     tauri::async_runtime::spawn_blocking(move || commands::create_import_plan(images, &*db))
         .await
@@ -132,35 +129,18 @@ async fn execute_import(
     archive_path: String,
 ) -> Result<commands::ImportResult, error::AppError> {
     let db = state.db_for(&archive_path)?;
-    tauri::async_runtime::spawn_blocking(move || {
+    let result = tauri::async_runtime::spawn_blocking(move || {
         commands::execute_import(plan, resolutions, &archive_path, &*db, &app)
     })
     .await
-    .map_err(|e| error::AppError::Internal { message: e.to_string() })?
-}
-
-#[tauri::command]
-async fn generate_temp_thumbnail(source_path: String) -> Result<String, error::AppError> {
-    tauri::async_runtime::spawn_blocking(move || commands::generate_temp_thumbnail(&source_path))
-        .await
-        .map_err(|e| error::AppError::Internal { message: e.to_string() })?
+    .map_err(|e| error::AppError::Internal { message: e.to_string() })??;
+    state.remember_import_sources(&result.imported_sources);
+    Ok(result)
 }
 
 #[tauri::command]
 fn cleanup_temp_thumbnails() -> Result<(), error::AppError> {
     commands::cleanup_temp_thumbnails()
-}
-
-#[tauri::command]
-async fn generate_temp_thumbnails_batch(
-    source_paths: Vec<String>,
-    app: tauri::AppHandle,
-) -> Result<std::collections::HashMap<String, String>, error::AppError> {
-    tauri::async_runtime::spawn_blocking(move || {
-        commands::generate_temp_thumbnails_batch(source_paths, &app)
-    })
-    .await
-    .map_err(|e| error::AppError::Internal { message: e.to_string() })?
 }
 
 #[tauri::command]
@@ -244,14 +224,20 @@ struct DeleteFilesResult {
     failed: Vec<String>,
 }
 
+/// Source cleanup after import. Deletes only files imported (copied into an archive)
+/// this session: any other path is refused, whoever asks for it.
 #[tauri::command]
-fn delete_files(paths: Vec<String>) -> DeleteFilesResult {
+fn delete_files(state: tauri::State<'_, Arc<AppState>>, paths: Vec<String>) -> DeleteFilesResult {
     let mut deleted = 0;
     let mut failed = Vec::new();
     let mut parent_dirs: Vec<std::path::PathBuf> = Vec::new();
 
     for path in &paths {
         let p = std::path::Path::new(path);
+        if !state.take_import_source(path) {
+            failed.push(path.clone());
+            continue;
+        }
         match std::fs::remove_file(p) {
             Ok(()) => {
                 deleted += 1;
@@ -373,56 +359,26 @@ fn path_exists(path: String) -> bool {
 }
 
 #[tauri::command]
-async fn save_video_thumbnail(
-    state: tauri::State<'_, Arc<AppState>>,
-    image_id: String,
-    jpeg_bytes: Vec<u8>,
-) -> Result<String, error::AppError> {
-    let archive_path = state.get_archive_path().ok_or_else(|| error::AppError::ArchiveNotFound {
-        path: "No archive path set".to_string(),
-    })?;
-    let db = state.db();
-    tauri::async_runtime::spawn_blocking(move || {
-        commands::save_video_thumbnail_impl(&image_id, jpeg_bytes, &archive_path, &*db)
-    })
-    .await
-    .map_err(|e| error::AppError::Internal { message: e.to_string() })?
-}
-
-#[tauri::command]
-fn get_videos_needing_thumbnails(
-    state: tauri::State<'_, Arc<AppState>>,
-) -> Result<Vec<commands::VideoStub>, error::AppError> {
-    commands::get_videos_needing_thumbnails_impl(&*state.db())
-}
-
-#[tauri::command]
-fn get_videos_needing_transcode(
-    state: tauri::State<'_, Arc<AppState>>,
-) -> Result<Vec<commands::VideoStub>, error::AppError> {
-    commands::get_videos_needing_transcode_impl(&*state.db())
-}
-
-#[tauri::command]
 async fn transcode_video(
     state: tauri::State<'_, Arc<AppState>>,
     image_id: String,
-    file_path: String,
 ) -> Result<String, error::AppError> {
-    let archive_path = state.get_archive_path().ok_or_else(|| error::AppError::ArchiveNotFound {
-        path: "No archive path set".to_string(),
-    })?;
+    let archive_path = require_archive_path(&state)?;
     let db = state.db();
+    // Input path from the DB, never from the caller: ffmpeg must read archive files only
+    let image = db.get_image(&image_id)?.ok_or_else(|| error::AppError::Internal {
+        message: format!("Unknown image {image_id}"),
+    })?;
     tauri::async_runtime::spawn_blocking(move || {
-        commands::transcode_video_impl(&image_id, &file_path, &archive_path, &*db)
+        commands::transcode_video_impl(&image.id, &image.file_path, &archive_path, &*db)
     })
     .await
     .map_err(|e| error::AppError::Internal { message: e.to_string() })?
 }
 
 #[tauri::command]
-fn get_media_server_port(state: tauri::State<'_, Arc<AppState>>) -> u16 {
-    state.media_port()
+fn get_media_server(media: tauri::State<'_, media_server::MediaServer>) -> media_server::MediaServer {
+    media.inner().clone()
 }
 
 #[tauri::command]
@@ -432,20 +388,19 @@ fn get_image_locations(state: tauri::State<'_, Arc<AppState>>) -> Result<Vec<com
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let media_port = tauri::async_runtime::block_on(media_server::start());
     let app_state = Arc::new(
-        AppState::new(std::path::PathBuf::from("/tmp/archivist.db"), media_port).expect("Failed to init db")
+        AppState::new(std::path::PathBuf::from("/tmp/archivist.db")).expect("Failed to init db")
     );
+    let media = tauri::async_runtime::block_on(media_server::start(Arc::clone(&app_state)));
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(app_state)
+        .manage(media)
         .invoke_handler(tauri::generate_handler![
             init_archive,
-            get_image_count,
             get_all_images,
-            get_images_by_date,
             get_all_groups,
             create_group,
             delete_group,
@@ -456,12 +411,9 @@ pub fn run() {
             update_group,
             set_group_cover,
             scan_source,
-            analyze_image,
             analyze_images,
             create_import_plan,
             execute_import,
-            generate_temp_thumbnail,
-            generate_temp_thumbnails_batch,
             pre_generate_all_thumbnails_batch,
             cleanup_temp_thumbnails,
             cleanup_unimported_thumbnails,
@@ -475,11 +427,8 @@ pub fn run() {
             path_exists,
             toggle_favourite,
             get_favourite_images,
-            save_video_thumbnail,
-            get_videos_needing_thumbnails,
-            get_videos_needing_transcode,
             transcode_video,
-            get_media_server_port,
+            get_media_server,
             get_image_locations,
             set_favourite_bulk,
             add_images_to_group_bulk,

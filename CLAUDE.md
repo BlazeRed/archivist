@@ -81,10 +81,8 @@ All registered in `lib.rs` via `tauri::generate_handler![]`:
 
 | Command | Description |
 |---------|-------------|
-| `init_archive(archive_path)` | Set archive path in AppState |
-| `get_image_count()` | Total image count |
+| `init_archive(archive_path)` | Set archive path in AppState; grants the asset-protocol scope for it (config scope is empty, `create_import_plan` grants the import destination) |
 | `get_all_images()` | All images |
-| `get_images_by_date(year, month?)` | Images filtered by year/month |
 | `get_all_groups()` | Groups with image counts |
 | `create_group(name)` → `i64` | Create group, return id |
 | `update_group(id, name)` | Rename group |
@@ -94,15 +92,13 @@ All registered in `lib.rs` via `tauri::generate_handler![]`:
 | `get_images_in_group(group_id)` → `Vec<String>` | Image IDs in group |
 | `get_groups_for_image(image_id)` → `Vec<i64>` | Group IDs for image |
 | `scan_source(source_path)` | Scan folder for importable images |
-| `analyze_image(scanned)` | EXIF + hash + dimensions |
 | `create_import_plan(images)` | Build plan with conflict detection |
 | `execute_import(plan, resolutions, archive_path)` | Run import |
 | `export_group(group_id, dest_path)` | Copy group images to folder |
 | `rescan_archive()` | Re-index archive files; archive path read from AppState. Returns missing files as `RescanResult.missing` — never deletes them itself |
 | `remove_missing_images(ids)` | Delete DB records for missing files the user has explicitly confirmed |
-| `generate_temp_thumbnail(source_path)` | Generate thumbnail for preview before import |
 | `cleanup_temp_thumbnails()` | Delete temp thumbnails from previous session |
-| `delete_files(paths)` → `{deleted, failed}` | Delete source files after import |
+| `delete_files(paths)` → `{deleted, failed}` | Delete source files after import — only paths imported this session (`AppState::take_import_source`), anything else lands in `failed` |
 | `save_config(config)` | Persist app config JSON |
 | `load_config()` | Load app config JSON |
 | `path_exists(path)` | Check if path exists on disk |

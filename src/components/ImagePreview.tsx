@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { toast } from 'sonner';
 import { trimArchivePath, getThumbnailUrl } from '@/lib/archivePath';
-import { makeVideoUrl } from '@/lib/mediaServer';
+import { makeVideoUrl, transcodeVideo, transcodeToastId, isTranscodeCancelled } from '@/lib/mediaServer';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useAppConfigStore } from '../stores/appConfigStore';
 import { useGroupUIStore } from '../stores/groupUIStore';
@@ -130,7 +130,7 @@ export function PreviewCard({ image: previewImage, navImages, showOnMap, onShowI
     if (previewImage.media_type === 'video') {
       if (!previewImage.web_path) { setImgSrc(''); return; }
       let cancelled = false;
-      makeVideoUrl(archivePath, previewImage.web_path).then(url => {
+      makeVideoUrl(previewImage.web_path).then(url => {
         if (!cancelled) setImgSrc(url);
       });
       return () => { cancelled = true; };
@@ -151,18 +151,16 @@ export function PreviewCard({ image: previewImage, navImages, showOnMap, onShowI
       return;
     }
     setTranscoding(true);
-    toast.info(t('preview.transcoding'));
+    toast.info(t('preview.transcoding'), { id: transcodeToastId(previewImage.id) });
     try {
-      const webPath = await invoke<string>('transcode_video', {
-        imageId: previewImage.id,
-        filePath: previewImage.file_path,
-      });
+      const webPath = await transcodeVideo(previewImage.id);
       updateImageWebPath(previewImage.id, webPath);
-      setImgSrc(await makeVideoUrl(archivePath, webPath));
+      setImgSrc(await makeVideoUrl(webPath));
       setPlaying(true);
     } catch (e) {
+      if (isTranscodeCancelled(e)) { toast.dismiss(transcodeToastId(previewImage.id)); return; }
       console.error('[transcode] failed:', e);
-      toast.error(t('preview.transcodeError'));
+      toast.error(t('preview.transcodeError'), { id: transcodeToastId(previewImage.id) });
     } finally {
       setTranscoding(false);
     }

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { useUIStore } from './uiStore';
 
 export interface ScannedImage {
   path: string;
@@ -194,6 +195,8 @@ export const useImportStore = create<ImportState>((set, get) => ({
         phase: 'complete',
         progress: { current: result.imported, total: importPlan.images.length, currentFile: '' },
       });
+      // Replace can bring a trashed duplicate back out of the Trash
+      useUIStore.getState().refreshTrashCount();
     } catch (e) {
       set({ error: String(e), phase: 'error' });
     } finally {

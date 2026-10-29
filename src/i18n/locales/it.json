@@ -132,6 +132,7 @@
     "allMediaAdded": "Tutti gli elementi sono già in questo gruppo",
     "exportSuccess": "{{count}} file esportati in {{path}}",
     "exportError": "Esportazione fallita",
+    "exportPartial": "{{count}} file non esportati (mancanti o illeggibili)",
     "sortByDate": "Data scatto",
     "sortByRecent": "Aggiunte di recente",
     "setCover": "Imposta come copertina",
