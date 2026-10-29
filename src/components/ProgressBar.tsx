@@ -16,14 +16,14 @@ export function ProgressBar({ current, total, currentFile, phase }: ProgressBarP
     <div className="w-full">
       <div className="flex justify-between text-sm mb-2">
         <span className="text-foreground">
-          {phase === 'analyzing' && t('import.analyzingProgress').replace('{{current}}', String(current)).replace('{{total}}', String(total))}
-          {phase === 'importing' && t('import.importProgress').replace('{{current}}', String(current)).replace('{{total}}', String(total))}
+          {phase === 'analyzing' && t('import.analyzingProgress', { current, total })}
+          {phase === 'importing' && t('import.importProgress', { current, total })}
           {phase === 'scanning' && t('import.analyzing')}
-          {phase === 'thumbnailing' && t('import.thumbnailingProgress').replace('{{current}}', String(current)).replace('{{total}}', String(total))}
+          {phase === 'thumbnailing' && t('import.thumbnailingProgress', { current, total })}
         </span>
-        <span className="text-primary font-medium">{Math.round(percentage)}%</span>
+        <span className="text-primary-ink font-medium tabular-nums">{Math.round(percentage)}%</span>
       </div>
-      <Progress value={percentage} />
+      <Progress value={percentage} className="h-1.5 bg-primary/12" />
       {currentFile && (
         <p className="text-xs text-muted-foreground mt-2 truncate">{currentFile}</p>
       )}

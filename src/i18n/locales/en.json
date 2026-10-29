@@ -9,7 +9,8 @@
     "favourites": "Favourites",
     "import": "Import",
     "settings": "Settings",
-    "rescan": "Rescan archive"
+    "rescan": "Rescan archive",
+    "trash": "Trash"
   },
   "common": {
     "cancel": "Cancel",
@@ -27,35 +28,17 @@
     "dateFromFilename": "Date from filename"
   },
   "import": {
-    "title": "Import",
+    "unreadable": "{{count}} files could not be read and will not be imported",
     "selectDestination": "Select archive folder",
     "analyzing": "Analyzing media...",
     "analyzingProgress": "Analyzing {{current}} of {{total}}",
-    "importing": "Importing...",
     "finalizing": "Saving to library…",
     "importProgress": "Importing {{current}} of {{total}}",
     "complete": "Import complete",
     "imported": "Imported",
     "skipped": "Skipped",
-    "sourceCleanup": "Delete the {{count}} source files?",
     "selectFolder": "Select Folder",
     "selectFile": "Select File",
-    "step1Title": "Select Source",
-    "step1Desc": "Choose a folder or a single image file to import",
-    "step2Title": "Select Archive Folder",
-    "step2Desc": "Choose where to store your archived media",
-    "step3Title": "Analyze Media",
-    "step3Desc": "Scan your media and extract date information from EXIF data",
-    "startAnalysis": "Start Analysis",
-    "scanningFolder": "Scanning folder...",
-    "analysisComplete": "{{count}} files ready to import",
-    "importMedia": "Import Media",
-    "source": "Source",
-    "archive": "Archive",
-    "errors": "{{count}} error(s)",
-    "conflicts": "{{count}} conflict(s) to review",
-    "deleteSource": "Delete source files",
-    "keepSource": "Keep",
     "deleteConfirmTitle": "Delete source files?",
     "deleteConfirmBody": "{{count}} files will be permanently deleted from the source folder. Empty folders will also be removed. This cannot be undone.",
     "deleteConfirmAction": "Delete permanently",
@@ -66,7 +49,21 @@
     "thumbnailingProgress": "Generating preview {{current}} of {{total}}",
     "dragOrClick": "Drag a folder or file here",
     "dragOrClickSub": "or use the buttons below",
-    "dropHere": "Drop to import"
+    "dropHere": "Drop to import",
+    "importCount_one": "Import {{count}} item",
+    "importCount_other": "Import {{count}} items",
+    "noMediaFound": "No media found in the source.",
+    "from": "From",
+    "to": "To",
+    "errorsLabel": "errors",
+    "otherArchiveNote": "Imported into an archive other than the open one: these items won't appear in the Timeline until you open that archive.",
+    "sourceStillThere_one": "The imported file is still in the source.",
+    "sourceStillThere_other": "The {{count}} imported files are still in the source.",
+    "deleteFromSource": "Delete from source…",
+    "sourceDeleted": "Source files deleted",
+    "newImport": "New import",
+    "showInTimeline": "Show in Timeline",
+    "openFolder": "Open folder"
   },
   "timeline": {
     "noMedia": "No media in archive",
@@ -86,7 +83,13 @@
     "items": "items",
     "mediaAll": "All",
     "mediaImages": "Images",
-    "mediaVideos": "Videos"
+    "mediaVideos": "Videos",
+    "select": "Select",
+    "addFavourites": "Add to favourites",
+    "removeFavourites": "Remove from favourites",
+    "clearSelection": "Clear selection",
+    "selectMonth": "Select month",
+    "deselectMonth": "Deselect month"
   },
   "preview": {
     "empty": "Select an image to preview",
@@ -94,10 +97,12 @@
     "favourite": "Toggle favourite",
     "play": "Play",
     "transcoding": "Transcoding video, this may take a while…",
-    "transcodeError": "Video transcode failed"
+    "transcodeError": "Video transcode failed",
+    "folder": "Folder",
+    "showOnMap": "Show on map",
+    "group": "Group"
   },
   "favourites": {
-    "title": "Favourites",
     "empty": "No favourites yet. Add to favourites from the timeline preview."
   },
   "map": {
@@ -106,7 +111,12 @@
     "retry": "Retry",
     "tileLoadError": "Could not load the map — check your connection.",
     "noLocations": "No photos with location data in this archive yet.",
-    "noLocationsHint": "Photos already in the archive may not have had their location extracted yet — try a rescan."
+    "noLocationsHint": "Photos already in the archive may not have had their location extracted yet — try a rescan.",
+    "located": "{{count}} with location",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "fitAll": "Show all",
+    "showInTimeline": "Show in timeline"
   },
   "groups": {
     "title": "Groups",
@@ -123,10 +133,17 @@
     "allMediaAdded": "All items are already in this group",
     "exportSuccess": "{{count}} files exported to {{path}}",
     "exportError": "Export failed",
+    "exportPartial": "{{count}} files not exported (missing or unreadable)",
     "sortByDate": "Date taken",
     "sortByRecent": "Recently added",
     "setCover": "Set as cover",
-    "noCover": "No media yet"
+    "noCover": "No media yet",
+    "rename": "Rename group",
+    "cover": "Cover",
+    "deleteGroup": "Delete group",
+    "addMediaTo": "Add media to {{name}}",
+    "addMediaError": "Could not add media to the group",
+    "loadMediaError": "Could not load media"
   },
   "settings": {
     "title": "Settings",
@@ -138,10 +155,12 @@
     "sizeLarge": "Large (280px)",
     "archiveManagement": "Archive Management",
     "rescanArchive": "Rescan archive",
-    "rescanArchiveDesc": "Finds new files, fixes missing dates and thumbnails, and tries to recover GPS location for photos imported before the Map feature existed",
+    "rescanArchiveDesc": "Finds new files and repairs missing dates, thumbnails and GPS locations",
     "rescanFound": "Found {{count}} new images",
     "rescanRepaired": "Fixed dates for {{count}} images",
     "rescanMoved": "Relocated {{count}} misplaced images",
+    "rescanRelinked": "Found {{count}} moved images again",
+    "archiveOpenError": "Could not open the archive",
     "rescanThumbnailed": "Generated {{count}} missing thumbnails",
     "rescanFoldersRemoved": "Deleted {{count}} empty folders",
     "rescanGpsRepaired": "Recovered location data for {{count}} images",
@@ -149,21 +168,25 @@
     "rescanMissingTitle": "{{count}} file(s) missing from archive",
     "rescanMissingDesc": "These files could not be found on disk (moved, renamed, or on an unmounted drive?). Their records will stay until you confirm removal.",
     "rescanMissingConfirm": "Remove records",
+    "rescanMissingDismiss": "Ignore",
     "rescanMissingRemoved": "Removed {{count}} missing entries",
     "groupCoverSize": "Group cover size",
     "coverSizeSmall": "Small (140px)",
     "coverSizeMedium": "Medium (176px)",
     "coverSizeLarge": "Large (220px)",
     "closeArchive": "Close archive",
-    "closeArchiveDesc": "Disconnect from the current archive",
     "selectArchiveFolder": "Select archive folder",
     "regenerateThumbnails": "Regenerate all thumbnails",
-    "regenerateThumbnailsDesc": "Rebuild every thumbnail from the original files (fixes old rotated/incorrect thumbnails)",
     "regenConfirmTitle": "Regenerate all thumbnails?",
     "regenConfirmBody": "This rebuilds every thumbnail in the archive from the original files. It can take a while for large archives and can't be undone, but no photos or videos are modified or deleted.",
     "regenThumbnailsDone": "Regenerated {{count}} thumbnails",
     "regenThumbnailsFailed": "{{count}} could not be regenerated",
-    "regenThumbnailsError": "Error: {{error}}"
+    "regenThumbnailsError": "Error: {{error}}",
+    "theme": "Theme",
+    "themeSystem": "System",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "noArchive": "No archive open"
   },
   "detail": {
     "title": "Details",
@@ -183,15 +206,15 @@
     "location": "Location"
   },
   "conflicts": {
-    "title": "Review Conflicts",
     "keepExisting": "Keep existing",
     "replace": "Replace with new",
     "keepBoth": "Keep both",
     "applyToAll": "Apply to all:",
     "noConflicts": "No conflicts — all {{count}} files ready to import.",
-    "conflictsFound": "{{count}} conflict(s) — choose how to handle each:",
     "incoming": "New",
-    "inArchive": "In archive"
+    "inArchive": "In archive",
+    "duplicates_one": "{{count}} duplicate",
+    "duplicates_other": "{{count}} duplicates"
   },
   "status": {
     "error": "Error"
@@ -209,5 +232,22 @@
     "10": "October",
     "11": "November",
     "12": "December"
+  },
+  "trash": {
+    "title": "Trash",
+    "moveToTrash": "Move to trash",
+    "moved": "{{count}} moved to trash",
+    "undo": "Undo",
+    "moveFailed": "{{count}} could not be moved to trash",
+    "restored": "{{count}} restored",
+    "restoreError": "Some items could not be restored",
+    "restoreAll": "Restore all",
+    "restoreSelected": "Restore",
+    "restoreAllTitle": "Restore the whole trash?",
+    "restoreAllConfirm": "{{count}} items will go back to their folders and the timeline. The trash will be empty.",
+    "openFolder": "Open folder",
+    "openFolderError": "Could not open the Trash folder",
+    "summary": "{{count}} items · {{size}}",
+    "empty": "The trash is empty. Archivist never deletes files: to free space, delete them by hand from the Trash folder in your archive."
   }
 }

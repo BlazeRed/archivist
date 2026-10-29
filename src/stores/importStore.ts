@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { toast } from 'sonner';
+import i18n from '@/i18n';
+import { useUIStore } from './uiStore';
 
 export interface ScannedImage {
   path: string;
@@ -49,9 +52,12 @@ export interface ImportResult {
 
 export type ImportPhase = 'idle' | 'scanning' | 'analyzing' | 'thumbnailing' | 'review' | 'importing' | 'complete' | 'error';
 
+/** Phases that lock source/destination: changing them mid-run would mix results. */
+export const isBusyPhase = (phase: ImportPhase) =>
+  phase === 'scanning' || phase === 'analyzing' || phase === 'thumbnailing' || phase === 'importing';
+
 interface ImportState {
   phase: ImportPhase;
-  step: 1 | 2 | 3 | 4;
   sourcePath: string;
   archivePath: string;
   scannedImages: ScannedImage[];
@@ -61,11 +67,9 @@ interface ImportState {
   progress: { current: number; total: number; currentFile: string };
   result: ImportResult | null;
   error: string | null;
-  setStep: (step: 1 | 2 | 3 | 4) => void;
   setSourcePath: (path: string) => void;
-  setArchivePath: (path: string) => void;
-  startScan: () => Promise<void>;
-  startAnalyze: () => Promise<void>;
+  setArchivePath: (path: string) => Promise<void>;
+  startAnalysis: () => Promise<void>;
   setResolution: (hash: string, action: ImportAction) => void;
   setAllResolutions: (action: ImportAction) => void;
   startImport: () => Promise<void>;
@@ -76,7 +80,6 @@ export type ImportAction = 'Skip' | 'Replace' | 'KeepBoth';
 
 export const useImportStore = create<ImportState>((set, get) => ({
   phase: 'idle',
-  step: 1,
   sourcePath: '',
   archivePath: '',
   scannedImages: [],
@@ -87,35 +90,47 @@ export const useImportStore = create<ImportState>((set, get) => ({
   result: null,
   error: null,
 
-  setStep: (step) => set({ step }),
+  // New source: the previous analysis no longer applies
+  setSourcePath: (path) => {
+    if (isBusyPhase(get().phase)) return;
+    discardUnimportedThumbnails(get().analyzedImages, get().archivePath);
+    set({ sourcePath: path, ...EMPTY_ANALYSIS });
+  },
 
-  setSourcePath: (path) => set({ sourcePath: path }),
-
-  setArchivePath: (path) => set({ archivePath: path }),
-
-  startScan: async () => {
-    const { sourcePath } = get();
-    if (!sourcePath) return;
-
-    set({ phase: 'scanning', error: null });
-
+  // New destination: hashes stay valid, only conflicts and thumbnails depend on the archive
+  setArchivePath: async (path) => {
+    const { phase, analyzedImages, archivePath } = get();
+    if (isBusyPhase(phase) || path === archivePath) return;
+    if (analyzedImages.length === 0) { set({ archivePath: path }); return; }
+    // Lock at once: the current plan belongs to the old archive
+    set({ archivePath: path, phase: 'analyzing', progress: { current: 0, total: 0, currentFile: '' } });
+    discardUnimportedThumbnails(analyzedImages, archivePath);
     try {
-      const images = await invoke<ScannedImage[]>('scan_source', { sourcePath });
-      set({
-        scannedImages: images,
-        phase: 'analyzing',
-        progress: { current: 0, total: images.length, currentFile: '' }
-      });
+      await planAndThumbnail(analyzedImages, path, set, get);
     } catch (e) {
       set({ error: String(e), phase: 'error' });
     }
   },
 
-  startAnalyze: async () => {
-    const { scannedImages } = get();
-    if (scannedImages.length === 0) return;
+  startAnalysis: async () => {
+    const { sourcePath, archivePath } = get();
+    if (!sourcePath || !archivePath || isBusyPhase(get().phase)) return;
 
-    set({ progress: { current: 0, total: scannedImages.length, currentFile: '' } });
+    set({ phase: 'scanning', error: null });
+
+    let scannedImages: ScannedImage[];
+    try {
+      scannedImages = await invoke<ScannedImage[]>('scan_source', { sourcePath });
+    } catch (e) {
+      set({ error: String(e), phase: 'error' });
+      return;
+    }
+    if (scannedImages.length === 0) {
+      set({ ...EMPTY_ANALYSIS, importPlan: { images: [], total_size: 0, conflicts_count: 0 }, phase: 'review' });
+      return;
+    }
+
+    set({ scannedImages, phase: 'analyzing', progress: { current: 0, total: scannedImages.length, currentFile: '' } });
 
     const unlisten = await listen<{ current: number; total: number; filename: string }>(
       'analyze_progress',
@@ -129,42 +144,11 @@ export const useImportStore = create<ImportState>((set, get) => ({
     );
 
     try {
-      const analyzed = await invoke<AnalyzedImage[]>('analyze_images', { scanned: scannedImages });
-      const plan = await invoke<ImportPlan>('create_import_plan', { images: analyzed });
-
-      const conflictRes: ImportResolution[] = plan.images
-        .filter(img => img.conflict)
-        .map(img => ({ hash: img.hash, action: 'Skip' as ImportAction }));
-
-      set({ phase: 'thumbnailing', progress: { current: 0, total: plan.images.length, currentFile: '' } });
-
-      const unlistenThumb = await listen<{ current: number; total: number }>(
-        'thumb_progress',
-        (e) => set({
-          progress: {
-            current: Math.max(get().progress.current, e.payload.current),
-            total: e.payload.total,
-            currentFile: '',
-          },
-        })
+      const { images: analyzed, failed } = await invoke<{ images: AnalyzedImage[]; failed: string[] }>(
+        'analyze_images', { scanned: scannedImages },
       );
-
-      try {
-        await invoke('pre_generate_all_thumbnails_batch', {
-          analyzed: plan.images,
-          archivePath: get().archivePath,
-        });
-      } catch { /* non-fatal */ }
-      finally {
-        unlistenThumb();
-      }
-
-      set({
-        analyzedImages: plan.images,
-        importPlan: plan,
-        resolutions: conflictRes,
-        phase: 'review',
-      });
+      if (failed.length > 0) warnUnreadable(failed);
+      await planAndThumbnail(analyzed, archivePath, set, get);
     } catch (e) {
       set({ error: String(e), phase: 'error' });
     } finally {
@@ -216,6 +200,8 @@ export const useImportStore = create<ImportState>((set, get) => ({
         phase: 'complete',
         progress: { current: result.imported, total: importPlan.images.length, currentFile: '' },
       });
+      // Replace can bring a trashed duplicate back out of the Trash
+      useUIStore.getState().refreshTrashCount();
     } catch (e) {
       set({ error: String(e), phase: 'error' });
     } finally {
@@ -225,25 +211,73 @@ export const useImportStore = create<ImportState>((set, get) => ({
 
   reset: () => {
     invoke('cleanup_temp_thumbnails').catch(() => {});
-    const { analyzedImages, archivePath } = get();
-    if (analyzedImages.length > 0 && archivePath) {
-      invoke('cleanup_unimported_thumbnails', {
-        hashes: analyzedImages.map(img => img.hash),
-        archivePath,
-      }).catch(() => {});
-    }
-    set({
-      phase: 'idle',
-      step: 1,
-      sourcePath: '',
-      archivePath: '',
-      scannedImages: [],
-      analyzedImages: [],
-      importPlan: null,
-      resolutions: [],
-      progress: { current: 0, total: 0, currentFile: '' },
-      result: null,
-      error: null,
-    });
+    discardUnimportedThumbnails(get().analyzedImages, get().archivePath);
+    set({ sourcePath: '', archivePath: '', ...EMPTY_ANALYSIS, result: null });
   },
 }));
+
+const EMPTY_ANALYSIS = {
+  phase: 'idle' as ImportPhase,
+  scannedImages: [],
+  analyzedImages: [],
+  importPlan: null,
+  resolutions: [],
+  progress: { current: 0, total: 0, currentFile: '' },
+  error: null,
+};
+
+/** Removes thumbnails pre-generated in `archivePath` for items that were never imported. */
+function discardUnimportedThumbnails(analyzed: AnalyzedImage[], archivePath: string) {
+  if (analyzed.length === 0 || !archivePath) return;
+  invoke('cleanup_unimported_thumbnails', {
+    hashes: analyzed.map(img => img.hash),
+    archivePath,
+  }).catch(() => {});
+}
+
+/** Files the analysis could not read are left out of the import: say which, not just how many. */
+function warnUnreadable(paths: string[]) {
+  console.error('Unreadable files:', paths);
+  const names = paths.slice(0, 5).map((p) => p.split(/[\\/]/).pop()).join(', ');
+  toast.warning(i18n.t('import.unreadable', { count: paths.length }), {
+    description: paths.length > 5 ? `${names}…` : names,
+    duration: 10000,
+  });
+}
+
+type SetState = (partial: Partial<ImportState>) => void;
+
+/** Conflicts against `archivePath` + thumbnails into it, then review. Shared by analysis and destination change. */
+async function planAndThumbnail(analyzed: AnalyzedImage[], archivePath: string, set: SetState, get: () => ImportState) {
+  const plan = await invoke<ImportPlan>('create_import_plan', { images: analyzed, archivePath });
+
+  set({ phase: 'thumbnailing', progress: { current: 0, total: plan.images.length, currentFile: '' } });
+
+  const unlistenThumb = await listen<{ current: number; total: number }>(
+    'thumb_progress',
+    (e) => set({
+      progress: {
+        current: Math.max(get().progress.current, e.payload.current),
+        total: e.payload.total,
+        currentFile: '',
+      },
+    })
+  );
+
+  try {
+    await invoke('pre_generate_all_thumbnails_batch', { analyzed: plan.images, archivePath });
+  } catch { /* non-fatal */ }
+  finally {
+    unlistenThumb();
+  }
+
+  set({
+    analyzedImages: plan.images,
+    importPlan: plan,
+    // Conflicts differ per archive: choices start over at Skip
+    resolutions: plan.images
+      .filter(img => img.conflict)
+      .map(img => ({ hash: img.hash, action: 'Skip' as ImportAction })),
+    phase: 'review',
+  });
+}

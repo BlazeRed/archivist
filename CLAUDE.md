@@ -44,9 +44,11 @@ Tauri v2 desktop app. Two runtimes communicate via `invoke()`:
 - `state.rs` — `Arc<AppState>` shared across commands (holds DB handle + archive path)
 - `error.rs` — unified `AppError` type, serde-serialized to frontend
 
-**DB**: SQLite at `{archive_path}/.archivist/archivist.db`. Dev DB hardcoded to `/tmp/archivist.db` in `lib.rs:run()`.
+**DB**: SQLite at `{archive_path}/.archivist/archivist.db`. Before an archive is opened, `AppState` holds an in-memory DB (`lib.rs:run()`).
 
 **Config**: JSON at `{app_data}/app_config.json`, managed by `appConfigStore.ts` via `save_config`/`load_config` Tauri commands.
+
+**Pages stay mounted**: `App.tsx` renders every page inside React `<Activity>` (visible = current path), not `<Routes>`, so switching keeps local state; `KeepScroll` restores scroll offsets. Hidden pages run no effects, and **every effect re-runs each time its page is shown**: page effects must be safe to repeat (no view resets, no clearing state on mount). Global `document.querySelector` must skip hidden pages (`getClientRects().length > 0`). The Map owns its pin preview (local state), separate from the Timeline's `previewImage`; its maplibre instance survives hiding.
 
 ## State Stores (Zustand)
 
@@ -81,10 +83,8 @@ All registered in `lib.rs` via `tauri::generate_handler![]`:
 
 | Command | Description |
 |---------|-------------|
-| `init_archive(archive_path)` | Set archive path in AppState |
-| `get_image_count()` | Total image count |
+| `init_archive(archive_path)` | Set archive path in AppState; grants the asset-protocol scope for it (config scope is empty, `create_import_plan` grants the import destination) |
 | `get_all_images()` | All images |
-| `get_images_by_date(year, month?)` | Images filtered by year/month |
 | `get_all_groups()` | Groups with image counts |
 | `create_group(name)` → `i64` | Create group, return id |
 | `update_group(id, name)` | Rename group |
@@ -94,18 +94,22 @@ All registered in `lib.rs` via `tauri::generate_handler![]`:
 | `get_images_in_group(group_id)` → `Vec<String>` | Image IDs in group |
 | `get_groups_for_image(image_id)` → `Vec<i64>` | Group IDs for image |
 | `scan_source(source_path)` | Scan folder for importable images |
-| `analyze_image(scanned)` | EXIF + hash + dimensions |
 | `create_import_plan(images)` | Build plan with conflict detection |
 | `execute_import(plan, resolutions, archive_path)` | Run import |
 | `export_group(group_id, dest_path)` | Copy group images to folder |
 | `rescan_archive()` | Re-index archive files; archive path read from AppState. Returns missing files as `RescanResult.missing` — never deletes them itself |
 | `remove_missing_images(ids)` | Delete DB records for missing files the user has explicitly confirmed |
-| `generate_temp_thumbnail(source_path)` | Generate thumbnail for preview before import |
 | `cleanup_temp_thumbnails()` | Delete temp thumbnails from previous session |
-| `delete_files(paths)` → `{deleted, failed}` | Delete source files after import |
+| `delete_files(paths)` → `{deleted, failed}` | Delete source files after import — only paths imported this session (`AppState::take_import_source`), anything else lands in `failed` |
 | `save_config(config)` | Persist app config JSON |
 | `load_config()` | Load app config JSON |
 | `path_exists(path)` | Check if path exists on disk |
+| `trash_images(image_ids)` → `{moved, failed}` | Move files to `{archive}/Trash`, set `trashed_at` (rename undone if the DB write fails) |
+| `restore_images(image_ids)` → `{moved, failed}` | Move back to the folder `destination_path(taken_at)` maps to, clear `trashed_at` |
+| `get_trashed_images()` | Trashed items; rows whose file the user deleted by hand are dropped (with thumbnail) |
+| `get_trash_count()` | Trashed item count (topbar dot) |
+| `set_favourite_bulk(image_ids, is_favourite)` | Favourite/unfavourite many in one transaction |
+| `add_images_to_group_bulk(image_ids, group_id)` | Add many to a group in one transaction |
 
 ## UI Components
 
@@ -113,10 +117,18 @@ Key components in `src/components/`:
 
 | Component | Purpose |
 |-----------|---------|
-| `Topbar.tsx` | Nav bar — logo, page links, rescan icon button, language toggle |
-| `ThumbnailGrid.tsx` | Virtualized image grid with sticky month headers |
-| `AddMediaModal.tsx` | Full-screen group media picker (same layout as timeline) |
-| `ImageDetail.tsx` | Full image view modal with metadata panel and Show in Folder button |
+| `Topbar.tsx` | Floating pill nav bar — logo, page links, import/rescan/settings icon buttons |
+| `ThumbnailGrid.tsx` | `MonthGrid`: generic virtualized month grid under floating chrome (fade, floating row with `leading` + month pill + `toolbar`, `insetTop`, optional `onSelectMonth` clickable headers). `ThumbnailGrid` = MonthGrid wired to timelineStore (preview, keyboard nav, selection). Also exports `ThumbnailCell`, `SIZES`, `FLOATING_TOP`/`FLOATING_ROW`. `FloatingScroll` (non-virtualized page under the floating chrome: fade + floating row `leading`/`toolbar`) and `PlainGrid` (CSS grid of `ThumbnailCell`, optional `overlay`) serve Favourites/Trash/group detail; `MonthGrid` only for Timeline and AddMediaModal |
+| `FilterPopover.tsx` | Filters pill + panel, controlled (`filter`/`setFilter`): Timeline passes the store, AddMediaModal local state via `normalizeFilter`/`applyClientFilter` from timelineStore. `children` = extra panel controls |
+| `AddMediaModal.tsx` | Group media picker: near-fullscreen dialog (inset 12) with `MonthGrid` + `FilterPopover` (+ sort segmented), `useGridSelection` (click month header = select month), layered Esc, bulk add via `add_images_to_group_bulk` |
+| `ImagePreview.tsx` | Timeline preview column, always visible: selected item or static skeleton. Exports the shared media actions (favourite, folder, groups) and `PreviewCard` (`navImages`, cross-link props), reused as the Map's floating pin preview. Timeline ↔ Map via clickable metadata rows (`LinkRow` in `ImageMetadata.tsx`: same look as `Field`, whole row a ghost Button with tinted hover fill bleeding 8px; the preview scroll container is `-mx-2 px-3` to leave room — keep any bleed within its padding or the card scrolls sideways): "where" → map, "when" → Timeline. Timeline card: location row (`showOnMap`, only when the photo has a pin, violet) navigates with router state `focusImageId`. Map card: date row (`onShowInTimeline`, primary blue) hands `previewImage` over (drops filters hiding it) and the grid scrolls to it. Map pins: violet teardrop (lucide `MapPin` rasterized), focused = gold like the previewed thumbnail; violet = places + groups |
+| `ImageDetail.tsx` | Fullscreen viewer: floating chrome, ⓘ metadata panel (closed by default), ←/→/Esc, FLIP zoom from/to the preview frame (`[data-preview-media]`) |
+| `pages/TrashPage.tsx` | Trash: `FloatingScroll` + `PlainGrid`. Idle: summary pill, Restore all (confirm dialog: it undoes the whole trash history), Open folder, Select. Selection mode: count ✕ pill + Restore. Click opens the viewer |
+| `pages/GroupsPage.tsx` | Groups: `FloatingScroll`. Cards `shadow-raised` + violet count badge, rename/delete via `onMedia` icon buttons → dialogs. Detail = `PlainGrid` (cover marked by a violet badge via `overlay`): idle = count pill, Add media, Export, Delete, Select; selection mode = count ✕ pill, Set cover (1 item), Remove from group |
+| `pages/FavouritesPage.tsx` | Favourites: `FloatingScroll` + `PlainGrid` over `allImages` filtered by `is_favourite` (fetches them itself if the Timeline hasn't). Idle = count pill + Select; selection mode = count ✕ pill + Remove from favourites |
+| `FloatingSelectionBar.tsx` | Selection chrome. `FloatingSelectionBar` (Timeline only: count pill + full-width bottom bar with `BottomFade`; `BAR_BUTTON`/`BAR_LABEL` = icon only below @2xl). `SelectionCountPill` (count + ✕ clear), `InfoPill` (read-only pill), `ROW_BUTTON` (compact floating-row button, opaque when disabled), `BottomFade` (bottom scroll-edge fade under bottom chrome) |
+| `ArchiveNotSet.tsx` | "No archive" card + Open archive (Favourites, Groups, Trash) |
+| `PathField.tsx` | Folder path pill + change button (middle-truncated path, full path in tooltip): Import From/To, Settings archive |
 | `ProgressBar.tsx` | Import progress indicator |
 | `ConflictReview.tsx` | Duplicate conflict resolution UI |
 | `Toast.tsx` / `ui/sonner.tsx` | Toast notification display |
@@ -125,16 +137,27 @@ UI primitives in `src/components/ui/` are shadcn/ui components (Button, Dialog, 
 
 ### Button variants (shadcn CVA)
 
-All variants use `hover:brightness-90/95` for consistent tone-shift hover — no `[a]:hover:` prefix.
+All buttons are pills (`rounded-full`), press = `scale(.97)`, hover = `brightness-95`.
 
 | Variant | Use |
 |---------|-----|
-| `default` | Primary action (accent blue) |
-| `secondary` | Secondary actions (navy bg) |
-| `outline` | Tertiary/ghost actions |
-| `destructive` | Delete/remove actions |
+| `default` | Primary action (archive blue) |
+| `secondary` | Secondary actions (navy fill; light fill in dark theme) |
+| `violet` | Group-related actions |
+| `gold` | Favourite actions |
+| `outline` | Cancel / back (transparent + inset border) |
+| `destructive` | Delete/remove (solid red) — always paired with an `outline` Cancel |
 | `ghost` | Icon buttons, inline controls |
+| `onMedia` | Icon buttons laid over a photo (dark translucent circle, white icon) |
 | `link` | Text links |
+
+**Framework first:** build UI only from `src/components/ui/` (shadcn, style `radix-nova`). Missing component → `npx shadcn@latest add <name>` (then switch its `cn` import to `@/lib/utils`; do not add the `cn` npm package). Customize only with token classes / CVA variants, and ask the user before customizing or creating a component.
+
+**Icons:** `lucide-react` only (shadcn `iconLibrary`), imported with the `Icon` suffix (`XIcon`, `StarIcon`, `StarOffIcon`…). Never hand-draw `<svg>` icons.
+
+**Selection pages** (Favourites, Trash, group detail): `useGridSelection` (`isSelectionMode`/`setSelectionMode`/`exitSelection`, Esc exits, auto-exit when the list empties) + `SelectModeButton` (from `TimelineNavbar`). Click opens the viewer outside selection mode. Spec: design system §10 "Selection on secondary pages". Filled star = `<StarIcon fill="currentColor" />`; spinner = `<LoaderCircleIcon className="animate-spin" />`; `MediaButton` takes the icon element as children.
+
+Project variants on shadcn components: `Badge` `gold` / `violet`; `Toggle`/`ToggleGroup` `segmented` (pill segments, active = primary — topbar nav, media filter, theme); `Button` `violet` / `gold` / `onMedia`. Tooltips: `TooltipProvider delayDuration={400}` in `App.tsx`; icon-only buttons get a `Tooltip` + `aria-label`, not `title`.
 
 ## Critical Rules
 
@@ -145,6 +168,7 @@ All variants use `hover:brightness-90/95` for consistent tone-shift hover — no
 5. **Never block UI** during analysis — Tauri async commands only
 6. **Never delete** without explicit user confirmation
 7. **Folder names on disk always in English** regardless of UI language (`01 - January`, not `01 - Gennaio`)
+8. **Trash is soft**: trashed rows keep `trashed_at` set; every query that lists live images must filter `trashed_at IS NULL`. Emptying the Trash folder is always the user's manual act
 
 ## Physical Archive Layout
 
@@ -153,6 +177,7 @@ All variants use `hover:brightness-90/95` for consistent tone-shift hover — no
 ├── YYYY/
 │   └── MM - MonthName/     ← always English, always this format
 │       └── image.jpg
+├── Trash/                ← trashed files (flat). Rescan skips it; Archivist never deletes from it
 └── .archivist/
     ├── archivist.db
     └── thumbnails/
@@ -161,20 +186,19 @@ All variants use `hover:brightness-90/95` for consistent tone-shift hover — no
 
 ## Design Tokens
 
-All colors defined as CSS vars in `src/index.css`. Never hardcode hex elsewhere:
+Spec: `../Archivist_Design_System.md` (v2.0) — single source of truth. All colors are CSS vars in `src/index.css` (`:root` = light, `.dark` = dark). Never hardcode hex in components; use the Tailwind token classes:
 
-```
---color-background: #D2E8F7   (page background)
---color-text:       #002D58   (foreground / deep navy)
---color-accent:     #0084C5   (primary — buttons, active states)
---color-tertiary:   #2A9EAD   (success / teal / sparingly)
---color-card:       #E8F3FB   (card backgrounds)
---color-surface:    #F4F9FD   (inputs, dropdowns, popover)
---color-warning:    #E6A817
---color-error:      #C0392B
-```
+- Surfaces: `bg-background`, `bg-card` (static panels), `bg-popover` (floating: topbar, preview card, menus, dialogs), `bg-media` (letterbox behind photos)
+- Brand: `primary` / `text-primary-ink` (blue text), `gold` / `gold-ink` / `gold-soft` (favourites), `violet` / `violet-ink` / `violet-soft` (groups)
+- Status: `success(-ink)`, `warning(-ink)`, `destructive`. Use `-ink` variants for text, never the fill color
+- `accent` = neutral hover fill (shadcn convention), not a brand color
+- Elevation: `shadow-raised`, `shadow-float`, `shadow-overlay`. Gold frame `ring-1 ring-frame` (opaque color, whole-pixel width, no regular border) only on primary floating chrome: topbar, preview card, settings panel; selected thumbnails a solid gold ring. Everything else floating (filters popover, selection bar, count/month badges, filter button) gets no ring: opaque `bg-popover` + shadow only (the shadow blur is the floating cue; no translucent/backdrop-blur glass). Gold marks only the primary three; adding it to all floating chrome makes the UI heavy
+- Radius: `--radius: 1rem` → `rounded-sm` 10 (thumbs), `md` 12, `lg` 16 (cards), `xl` 24 (floating panels), `full` (buttons, chips)
+- `.squircle` = superellipse corners where supported (progressive enhancement)
+- Topbar is `fixed`; `<main>` has `pt-[var(--topbar-offset)]`. Page heights: `h-[calc(100vh-var(--topbar-offset))]`, never a hardcoded topbar height. Timeline opts out (`h-screen -mt-[var(--topbar-offset)]`) so the grid scrolls under the floating chrome
+- Animations: `tw-animate-css` (`animate-in fade-in slide-in-from-*`). shadcn `data-open:`/`data-closed:`/`data-checked:` classes work only through the `@custom-variant`s in `index.css` (Radix sets `data-state`); keep them when re-adding components. Panels (Popover, DropdownMenu, Select, Settings) share one motion: slide + fade, 300ms `cubic-bezier(.2,.8,.2,1)` in, 200ms `cubic-bezier(.4,0,1,1)` out; every `animate-out` needs `fill-mode-forwards` (else 1-frame flash before unmount); animate only transform/opacity, never the width of anything beside the grid (exception: the `segmented` ToggleGroup sliding pill, built into `ui/toggle-group.tsx`, animates `left`/`width`; it is absolute + out of flow, so no reflow)
 
-These map to Tailwind semantic tokens (`bg-background`, `text-foreground`, `bg-primary`, etc.) via `@theme` in `index.css`.
+Theme: `AppConfig.theme` (`system` | `light` | `dark`) toggles `.dark` on `<html>` in `App.tsx`.
 
 ## i18n
 

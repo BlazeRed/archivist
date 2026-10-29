@@ -9,7 +9,8 @@
     "favourites": "Preferiti",
     "import": "Importa",
     "settings": "Impostazioni",
-    "rescan": "Riscansiona archivio"
+    "rescan": "Riscansiona archivio",
+    "trash": "Cestino"
   },
   "common": {
     "cancel": "Annulla",
@@ -27,35 +28,17 @@
     "dateFromFilename": "Data dal nome del file"
   },
   "import": {
-    "title": "Importa",
+    "unreadable": "{{count}} file non leggibili: non verranno importati",
     "selectDestination": "Seleziona cartella archivio",
     "analyzing": "Analizzo i media...",
     "analyzingProgress": "Analizzo {{current}} di {{total}}",
-    "importing": "Importazione...",
     "finalizing": "Salvataggio nella libreria…",
     "importProgress": "Importo {{current}} di {{total}}",
     "complete": "Importazione completata",
     "imported": "Importate",
     "skipped": "Saltate",
-    "sourceCleanup": "Eliminare i {{count}} file sorgente?",
     "selectFolder": "Seleziona cartella",
     "selectFile": "Seleziona file",
-    "step1Title": "Seleziona sorgente",
-    "step1Desc": "Scegli una cartella o una singola immagine da importare",
-    "step2Title": "Seleziona cartella archivio",
-    "step2Desc": "Scegli dove archiviare i tuoi media",
-    "step3Title": "Analizza media",
-    "step3Desc": "Scansiona i tuoi media ed estrai la data dai dati EXIF",
-    "startAnalysis": "Avvia analisi",
-    "scanningFolder": "Scansione in corso...",
-    "analysisComplete": "{{count}} file pronti per l'importazione",
-    "importMedia": "Importa media",
-    "source": "Sorgente",
-    "archive": "Archivio",
-    "errors": "{{count}} errore/i",
-    "conflicts": "{{count}} conflitto/i da rivedere",
-    "deleteSource": "Elimina file sorgente",
-    "keepSource": "Mantieni",
     "deleteConfirmTitle": "Eliminare i file sorgente?",
     "deleteConfirmBody": "{{count}} file verranno eliminati definitivamente dalla cartella sorgente. Anche le cartelle vuote verranno rimosse. Questa operazione non può essere annullata.",
     "deleteConfirmAction": "Elimina definitivamente",
@@ -66,7 +49,21 @@
     "thumbnailingProgress": "Genero anteprima {{current}} di {{total}}",
     "dragOrClick": "Trascina una cartella o un file qui",
     "dragOrClickSub": "oppure usa i pulsanti qui sotto",
-    "dropHere": "Rilascia per importare"
+    "dropHere": "Rilascia per importare",
+    "importCount_one": "Importa {{count}} elemento",
+    "importCount_other": "Importa {{count}} elementi",
+    "noMediaFound": "Nessun media trovato nella sorgente.",
+    "from": "Da",
+    "to": "A",
+    "errorsLabel": "errori",
+    "otherArchiveNote": "Importati in un archivio diverso da quello aperto: non compariranno nella Timeline finché non apri quell'archivio.",
+    "sourceStillThere_one": "Il file importato è ancora nella sorgente.",
+    "sourceStillThere_other": "I {{count}} file importati sono ancora nella sorgente.",
+    "deleteFromSource": "Elimina dalla sorgente…",
+    "sourceDeleted": "File sorgente eliminati",
+    "newImport": "Nuovo import",
+    "showInTimeline": "Vedi nella Timeline",
+    "openFolder": "Apri cartella"
   },
   "timeline": {
     "noMedia": "Nessun elemento nell'archivio",
@@ -86,7 +83,13 @@
     "items": "elementi",
     "mediaAll": "Tutti",
     "mediaImages": "Immagini",
-    "mediaVideos": "Video"
+    "mediaVideos": "Video",
+    "select": "Seleziona",
+    "addFavourites": "Aggiungi ai preferiti",
+    "removeFavourites": "Togli dai preferiti",
+    "clearSelection": "Deseleziona tutto",
+    "selectMonth": "Seleziona mese",
+    "deselectMonth": "Deseleziona mese"
   },
   "preview": {
     "empty": "Seleziona un'immagine per l'anteprima",
@@ -94,10 +97,12 @@
     "favourite": "Aggiungi ai preferiti",
     "play": "Riproduci",
     "transcoding": "Conversione video in corso, potrebbe richiedere qualche minuto…",
-    "transcodeError": "Conversione video fallita"
+    "transcodeError": "Conversione video fallita",
+    "folder": "Cartella",
+    "showOnMap": "Mostra sulla mappa",
+    "group": "Gruppo"
   },
   "favourites": {
-    "title": "Preferiti",
     "empty": "Nessun preferito. Aggiungi ai preferiti dall'anteprima nella cronologia."
   },
   "map": {
@@ -106,7 +111,12 @@
     "retry": "Riprova",
     "tileLoadError": "Impossibile caricare la mappa — controlla la connessione.",
     "noLocations": "Nessuna foto con dati di posizione in questo archivio.",
-    "noLocationsHint": "Le foto già in archivio potrebbero non avere ancora i dati di posizione estratti — prova una riscansione."
+    "noLocationsHint": "Le foto già in archivio potrebbero non avere ancora i dati di posizione estratti — prova una riscansione.",
+    "located": "{{count}} con posizione",
+    "zoomIn": "Ingrandisci",
+    "zoomOut": "Riduci",
+    "fitAll": "Mostra tutte",
+    "showInTimeline": "Mostra nella cronologia"
   },
   "groups": {
     "title": "Gruppi",
@@ -123,10 +133,17 @@
     "allMediaAdded": "Tutti gli elementi sono già in questo gruppo",
     "exportSuccess": "{{count}} file esportati in {{path}}",
     "exportError": "Esportazione fallita",
+    "exportPartial": "{{count}} file non esportati (mancanti o illeggibili)",
     "sortByDate": "Data scatto",
     "sortByRecent": "Aggiunte di recente",
     "setCover": "Imposta come copertina",
-    "noCover": "Nessun elemento"
+    "noCover": "Nessun elemento",
+    "rename": "Rinomina gruppo",
+    "cover": "Copertina",
+    "deleteGroup": "Elimina gruppo",
+    "addMediaTo": "Aggiungi media a {{name}}",
+    "addMediaError": "Impossibile aggiungere i media al gruppo",
+    "loadMediaError": "Impossibile caricare i media"
   },
   "settings": {
     "title": "Impostazioni",
@@ -138,10 +155,12 @@
     "sizeLarge": "Grande (280px)",
     "archiveManagement": "Gestione archivio",
     "rescanArchive": "Riscansiona archivio",
-    "rescanArchiveDesc": "Trova nuovi file, corregge date e miniature mancanti, e prova a recuperare la posizione GPS delle foto importate prima che esistesse la funzione Mappa",
+    "rescanArchiveDesc": "Trova nuovi file e ripara date, miniature e posizioni GPS mancanti",
     "rescanFound": "Trovate {{count}} nuove immagini",
     "rescanRepaired": "Date corrette per {{count}} immagini",
     "rescanMoved": "Spostate {{count}} immagini fuori posto",
+    "rescanRelinked": "Ritrovate {{count}} immagini spostate",
+    "archiveOpenError": "Impossibile aprire l'archivio",
     "rescanThumbnailed": "Generate {{count}} miniature mancanti",
     "rescanFoldersRemoved": "Eliminate {{count}} cartelle vuote",
     "rescanGpsRepaired": "Recuperata posizione per {{count}} immagini",
@@ -149,21 +168,25 @@
     "rescanMissingTitle": "{{count}} file mancanti nell'archivio",
     "rescanMissingDesc": "Questi file non sono stati trovati sul disco (spostati, rinominati o su un'unità non montata?). I relativi dati resteranno finché non confermi la rimozione.",
     "rescanMissingConfirm": "Rimuovi dati",
+    "rescanMissingDismiss": "Ignora",
     "rescanMissingRemoved": "Rimossi {{count}} elementi mancanti",
     "groupCoverSize": "Dimensione copertina gruppi",
     "coverSizeSmall": "Piccolo (140px)",
     "coverSizeMedium": "Medio (176px)",
     "coverSizeLarge": "Grande (220px)",
     "closeArchive": "Chiudi archivio",
-    "closeArchiveDesc": "Disconnettiti dall'archivio corrente",
     "selectArchiveFolder": "Seleziona cartella archivio",
     "regenerateThumbnails": "Rigenera tutte le miniature",
-    "regenerateThumbnailsDesc": "Ricrea tutte le miniature dai file originali (corregge le miniature vecchie ruotate o errate)",
     "regenConfirmTitle": "Rigenerare tutte le miniature?",
     "regenConfirmBody": "Questa operazione ricrea tutte le miniature dell'archivio dai file originali. Per archivi grandi può richiedere tempo e non è annullabile, ma nessuna foto o video viene modificata o eliminata.",
     "regenThumbnailsDone": "Rigenerate {{count}} miniature",
     "regenThumbnailsFailed": "{{count}} non rigenerabili",
-    "regenThumbnailsError": "Errore: {{error}}"
+    "regenThumbnailsError": "Errore: {{error}}",
+    "theme": "Tema",
+    "themeSystem": "Sistema",
+    "themeLight": "Chiaro",
+    "themeDark": "Scuro",
+    "noArchive": "Nessun archivio aperto"
   },
   "detail": {
     "title": "Dettagli",
@@ -183,15 +206,15 @@
     "location": "Posizione"
   },
   "conflicts": {
-    "title": "Rivedi conflitti",
     "keepExisting": "Mantieni esistente",
     "replace": "Sostituisci con nuovo",
     "keepBoth": "Mantieni entrambi",
     "applyToAll": "Applica a tutti:",
     "noConflicts": "Nessun conflitto — {{count}} file pronti per l'importazione.",
-    "conflictsFound": "{{count}} conflitto/i — scegli come gestire ciascuno:",
     "incoming": "Nuovo",
-    "inArchive": "In archivio"
+    "inArchive": "In archivio",
+    "duplicates_one": "{{count}} duplicato",
+    "duplicates_other": "{{count}} duplicati"
   },
   "status": {
     "error": "Errore"
@@ -209,5 +232,22 @@
     "10": "Ottobre",
     "11": "Novembre",
     "12": "Dicembre"
+  },
+  "trash": {
+    "title": "Cestino",
+    "moveToTrash": "Sposta nel cestino",
+    "moved": "{{count}} spostate nel cestino",
+    "undo": "Annulla",
+    "moveFailed": "{{count}} non spostate nel cestino",
+    "restored": "{{count}} ripristinate",
+    "restoreError": "Alcuni elementi non sono stati ripristinati",
+    "restoreAll": "Ripristina tutte",
+    "restoreSelected": "Ripristina",
+    "restoreAllTitle": "Ripristinare tutto il cestino?",
+    "restoreAllConfirm": "{{count}} elementi torneranno nelle loro cartelle e nella cronologia. Il cestino resterà vuoto.",
+    "openFolder": "Apri cartella",
+    "openFolderError": "Impossibile aprire la cartella Trash",
+    "summary": "{{count}} elementi · {{size}}",
+    "empty": "Il cestino è vuoto. Archivist non cancella mai i file: per liberare spazio, eliminali a mano dalla cartella Trash del tuo archivio."
   }
 }
