@@ -24,15 +24,23 @@ Archivist is a desktop media archive organizer that imports, indexes, and browse
   </tr>
   <tr>
     <td align="center"><em>Timeline — browse by date with filters</em></td>
-    <td align="center"><em>Import — drag-drop with duplicate detection</em></td>
+    <td align="center"><em>Import — source → destination with duplicate detection</em></td>
   </tr>
   <tr>
-    <td><img src="screenshots/detail.png" alt="Image Detail" /></td>
+    <td><img src="screenshots/detail.png" alt="Fullscreen viewer" /></td>
     <td><img src="screenshots/groups.png" alt="Groups" /></td>
   </tr>
   <tr>
-    <td align="center"><em>Detail — EXIF metadata + Show in Folder</em></td>
+    <td align="center"><em>Viewer — fullscreen with EXIF metadata panel</em></td>
     <td align="center"><em>Groups — logical collections, no extra folders</em></td>
+  </tr>
+  <tr>
+    <td><img src="screenshots/map.png" alt="Map" /></td>
+    <td><img src="screenshots/timeline-dark.png" alt="Dark theme" /></td>
+  </tr>
+  <tr>
+    <td align="center"><em>Map — photos placed by GPS location</em></td>
+    <td align="center"><em>Light and dark theme</em></td>
   </tr>
 </table>
 
@@ -57,11 +65,12 @@ Grab the latest installer from [**GitHub Releases**](../../releases/latest).
 ## Features
 
 ### Import
-- **Drag-and-drop or button-pick** a source folder or individual file
+- **One page, source → destination** — pick the source (folder or files, drag-and-drop or button) and the destination in any order; the destination defaults to the open archive but can be any other archive
+- **Automatic analysis** as soon as both are set; changing the destination only re-plans, hashes are reused
 - **EXIF date extraction** — DateTimeOriginal, CreateDate, DateTime, filename-pattern parsing, with original filesystem-mtime preserved as last fallback
 - **SHA-256 duplicate detection** — re-importing the same file is a no-op
-- **Conflict review UI** — keep existing, replace, or keep both side-by-side
-- **Optional source deletion** after import
+- **Conflict review** — choose a resolution per item or apply one to all, before anything is copied
+- **Completion summary** with stats and an error list; source cleanup is an optional action that always asks for confirmation
 
 ### Timeline
 - Browse all archived media in chronological order with sticky month headers
@@ -69,30 +78,48 @@ Grab the latest installer from [**GitHub Releases**](../../releases/latest).
 - Year-range slider and month filter for narrowing the view
 - **No Date** filter for media with no date metadata
 - Filter by group membership
-- Configurable thumbnail size (Small / Medium / Large)
-- Click any item to open a detail panel with metadata, dimensions, file size, group membership, and a **Show in Folder** button
+- **Preview panel** on the right (resizable) with metadata, dimensions, file size, group membership, favourite toggle and **Show in Folder**
+- **Keyboard navigation** — arrows to move, Enter to open, Esc to step back
+- Multi-select with a floating action bar (favourite, add to group, move to trash)
+
+### Fullscreen viewer
+- Full-window view with previous / next navigation
+- Metadata panel on demand (EXIF, location with a link to the map)
 
 ### Videos
-- Full video playback in the detail panel
+- Full video playback in the preview and viewer
 - Duration displayed on thumbnail
 - On-demand transcoding for formats not natively supported by the browser
 
+### Map
+- Media with GPS coordinates shown as pins, clustered when zoomed out
+- Click a pin to see its photos
+
 ### Favourites
-- Mark any media as a favourite from the detail panel
+- Star any media from the preview, the viewer or a multi-selection
 - Dedicated Favourites page for quick access
 
 ### Groups
 - Create named logical collections — no physical folders created on disk
 - Add media from a full-screen picker that mirrors the timeline layout
-- Remove individual items from a group
+- Remove individual items from a group, choose the cover image
 - **Export a group** — copies all its files to a chosen destination folder
+
+### Trash
+- Deleted media are moved to a `Trash/` folder inside the archive — Archivist never deletes files itself
+- Restore single items or everything from the Trash page; emptying `Trash/` is left to you
 
 ### Archive management
 - **Rescan** button in the navbar for quick re-indexing after external changes
-- Rescan detects new files, removes stale DB entries, fixes incorrect dates, relocates misplaced files, and generates missing thumbnails
+- Rescan detects new files, relinks files moved by hand, fixes incorrect dates, relocates misplaced files, and generates missing thumbnails
+- Files missing from disk are **reported, never removed automatically** — you confirm which entries to drop
+- **Regenerate thumbnails** from Settings
 - Close and re-open an archive without restarting the app
 
-Bilingual UI (English / Italian) — folder names on disk are always in English regardless of language setting. Configurable thumbnail size (Small / Medium / Large).
+### Settings
+- Light / dark / system theme
+- Bilingual UI (English / Italian) — folder names on disk are always in English regardless of language setting
+- Configurable thumbnail size (Small / Medium / Large)
 
 ## Archive layout on disk
 
@@ -101,6 +128,8 @@ Bilingual UI (English / Italian) — folder names on disk are always in English 
 ├── 2024/
 │   └── 06 - June/
 │       └── photo.jpg
+├── Trash/
+│   └── ...
 └── .archivist/
     ├── archivist.db
     └── thumbnails/
@@ -177,7 +206,7 @@ Tag name and version in files must match.
 | Layer | Technologies |
 |-------|-------------|
 | Frontend | React 19, TypeScript 5, Tailwind CSS 4, shadcn/ui, Radix UI |
-| State | Zustand 5 (7 stores), React Router 7 |
+| State | Zustand 5 (8 stores), React Router 7 |
 | i18n | i18next + react-i18next (en / it) |
 | Backend | Rust, Tauri v2, rusqlite (SQLite bundled) |
 | Media | nom-exif, image crate, sha2, rayon, ffmpeg-sidecar |
