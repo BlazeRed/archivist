@@ -203,7 +203,10 @@
     "noGroups": "—",
     "showInFolder": "Mostra nella cartella",
     "duration": "Durata",
-    "location": "Posizione"
+    "location": "Posizione",
+    "editDate": "Modifica data",
+    "dateManual": "Impostata a mano",
+    "dateSaveError": "Impossibile modificare la data"
   },
   "conflicts": {
     "keepExisting": "Mantieni esistente",

@@ -203,7 +203,10 @@
     "noGroups": "—",
     "showInFolder": "Show in Folder",
     "duration": "Duration",
-    "location": "Location"
+    "location": "Location",
+    "editDate": "Edit date",
+    "dateManual": "Set manually",
+    "dateSaveError": "Could not change the date"
   },
   "conflicts": {
     "keepExisting": "Keep existing",

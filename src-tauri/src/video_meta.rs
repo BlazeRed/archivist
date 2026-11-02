@@ -60,9 +60,8 @@ pub fn is_web_compatible(codec: &Option<String>, path: &Path) -> bool {
 
 fn probe_via_ffmpeg(path: &Path) -> Option<VideoMeta> {
     let path_str = path.to_str()?;
-    let ffmpeg = ffmpeg_sidecar::paths::ffmpeg_path();
 
-    let output = std::process::Command::new(&ffmpeg)
+    let output = crate::ffmpeg::command()
         .args(["-hide_banner", "-i", path_str])
         .output()
         .ok()?;

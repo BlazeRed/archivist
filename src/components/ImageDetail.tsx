@@ -136,13 +136,21 @@ function Viewer({ image, hideGroups, navImages }: { image: Image; hideGroups?: b
     if (img && to) {
       backdropRef.current?.animate(fade, opts);
       uiRef.current?.animate(fade, opts);
-      img.animate([{ opacity: 1, transform: 'none' }, placedAt(to, img.getBoundingClientRect())], opts).finished.then(done);
+      // done on reject too: a cancelled animation must never leave the viewer stuck open
+      img.animate([{ opacity: 1, transform: 'none' }, placedAt(to, img.getBoundingClientRect())], opts).finished.then(done, done);
+    } else if (rootRef.current) {
+      rootRef.current.animate(fade, opts).finished.then(done, done);
     } else {
-      rootRef.current?.animate(fade, opts).finished.then(done);
+      done();
     }
   };
 
+  // Windows focuses a clicked button (WebKit doesn't): the key would target the page under the viewer
+  // (e.g. the Map's preview card). Take focus so keys start inside the viewer on every platform.
+  useEffect(() => { rootRef.current?.focus({ preventScroll: true }); }, []);
+
   // Keys: ←/→ navigate (no wrap), Esc closes. Open menus/popovers keep their own keys.
+  // Capture phase: runs before page-level and Radix listeners, so nothing underneath can swallow the key.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.defaultPrevented) return;
@@ -153,12 +161,12 @@ function Viewer({ image, hideGroups, navImages }: { image: Image; hideGroups?: b
       else return;
       e.preventDefault();
     };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
   });
 
   return (
-    <div ref={rootRef} className="fixed inset-0 z-50">
+    <div ref={rootRef} tabIndex={-1} className="fixed inset-0 z-50 outline-none">
       {/* Backdrop follows the theme: light in light theme (the viewer stays part of the app), dark letterbox in dark */}
       <div ref={backdropRef} className="absolute inset-0 bg-background dark:bg-media animate-in fade-in duration-300" />
 

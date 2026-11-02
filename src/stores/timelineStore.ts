@@ -28,6 +28,8 @@ interface TimelineState {
   setPreviewImage: (image: Image | null) => void;
   updateImageFavourite: (imageId: string, isFavourite: boolean) => void;
   updateImageWebPath: (imageId: string, webPath: string) => void;
+  /** Swaps in a row the backend changed (e.g. a new date), then re-sorts/re-filters via fetchImages. */
+  replaceImage: (image: Image) => Promise<void>;
   clearImages: () => void;
 }
 
@@ -161,5 +163,12 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
     previewImage: s.previewImage?.id === imageId ? { ...s.previewImage, web_path: webPath } : s.previewImage,
     selectedImage: s.selectedImage?.id === imageId ? { ...s.selectedImage, web_path: webPath } : s.selectedImage,
   })),
+  replaceImage: async (image) => {
+    set((s) => ({
+      previewImage: s.previewImage?.id === image.id ? image : s.previewImage,
+      selectedImage: s.selectedImage?.id === image.id ? image : s.selectedImage,
+    }));
+    await get().fetchImages();
+  },
   clearImages: () => set({ allImages: [], images: [], previewImage: null }),
 }));

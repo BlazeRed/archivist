@@ -1,7 +1,8 @@
 import { useState, useEffect, type ReactNode } from 'react';
-import { CalendarIcon, FolderIcon, MapPinIcon, XIcon, type LucideIcon } from 'lucide-react';
+import { CalendarIcon, CheckIcon, FolderIcon, MapPinIcon, PencilIcon, XIcon, type LucideIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
+import { toast } from 'sonner';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { trimArchivePath } from '@/lib/archivePath';
 import { useTimelineStore } from '../stores/timelineStore';
@@ -10,6 +11,7 @@ import type { Image, GroupWithCount } from '../types';
 import { formatDuration } from '@/lib/formatDuration';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -173,6 +175,107 @@ function LinkRow({ label, onClick, tooltip, icon: Icon, valueClassName, hoverCla
   );
 }
 
+/** "Date taken" row with an edit pencil: files without EXIF often carry a wrong date (mtime) or none.
+ *  Dates are stored as camera wall-clock time tagged UTC (like EXIF), so the input edits that clock as-is. */
+function DateRow({ image, onShowInTimeline }: { image: Image; onShowInTimeline?: () => void }) {
+  const { t } = useTranslation();
+  const replaceImage = useTimelineStore((s) => s.replaceImage);
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => setEditing(false), [image.id]);
+
+  const startEdit = () => {
+    setValue(image.taken_at?.slice(0, 16) ?? ''); // "2024-03-10T12:00:00+00:00" → datetime-local "2024-03-10T12:00"
+    setEditing(true);
+  };
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!value) return;
+    setSaving(true);
+    try {
+      const takenAt = `${value.length === 16 ? `${value}:00` : value}+00:00`;
+      await replaceImage(await invoke<Image>('set_image_date', { imageId: image.id, takenAt }));
+      setEditing(false);
+    } catch (err) {
+      console.error('Failed to set date:', err);
+      toast.error(t('detail.dateSaveError'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (editing) {
+    return (
+      <form onSubmit={save}>
+        <p className="text-[11px] text-muted-foreground mb-0.5">{t('detail.dateTaken')}</p>
+        <div className="flex items-center gap-1">
+          <Input
+            type="datetime-local"
+            required
+            autoFocus
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            // Esc cancels the edit only: the viewer/map/preview leave defaultPrevented keys alone
+            onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); setEditing(false); } }}
+            className="h-8 flex-1 tabular-nums"
+          />
+          <Button type="submit" size="icon-sm" disabled={saving || !value} aria-label={t('common.save')}>
+            <CheckIcon />
+          </Button>
+          <Button type="button" variant="ghost" size="icon-sm" onClick={() => setEditing(false)} aria-label={t('common.cancel')}>
+            <XIcon />
+          </Button>
+        </div>
+      </form>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <LinkRow
+        label={t('detail.dateTaken')}
+        onClick={onShowInTimeline}
+        tooltip={t('map.showInTimeline')}
+        icon={CalendarIcon}
+        valueClassName={onShowInTimeline ? 'text-primary-ink' : 'text-foreground'}
+        hoverClassName="hover:bg-primary/12"
+      >
+        {image.taken_at
+          ? formatDate(image.taken_at, t('detail.noDate'))
+          : <span className="text-muted-foreground">{t('detail.noDate')}</span>
+        }
+        {image.taken_at && image.date_source === 'filename' && (
+          <span className="text-[11px] font-semibold bg-primary/12 text-primary-ink px-2 py-0.5 rounded-full">
+            {t('common.dateFromFilename')}
+          </span>
+        )}
+        {image.taken_at && image.date_source === 'mtime' && (
+          <span className="text-[11px] font-semibold bg-warning/15 text-warning-ink px-2 py-0.5 rounded-full">
+            {t('detail.noExif')}
+          </span>
+        )}
+        {image.taken_at && image.date_source === 'manual' && (
+          <span className="text-[11px] font-semibold bg-success/15 text-success-ink px-2 py-0.5 rounded-full">
+            {t('detail.dateManual')}
+          </span>
+        )}
+      </LinkRow>
+      {/* Sibling, not inside LinkRow: that row is itself a button on the map */}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="ghost" size="icon-xs" onClick={startEdit} aria-label={t('detail.editDate')} className="absolute -top-1 right-0 text-muted-foreground">
+            <PencilIcon />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top">{t('detail.editDate')}</TooltipContent>
+      </Tooltip>
+    </div>
+  );
+}
+
 function formatCoords(image: Image) {
   return image.latitude != null && image.longitude != null
     ? `${image.latitude.toFixed(5)}, ${image.longitude.toFixed(5)}`
@@ -215,29 +318,7 @@ export function ImageMetadataView({ image, groups, hideGroups, readOnly, onShowO
       <div className="space-y-3 text-sm">
         <Field label={t('detail.filename')} value={image.filename} truncate />
 
-        <LinkRow
-          label={t('detail.dateTaken')}
-          onClick={onShowInTimeline}
-          tooltip={t('map.showInTimeline')}
-          icon={CalendarIcon}
-          valueClassName={onShowInTimeline ? 'text-primary-ink' : 'text-foreground'}
-          hoverClassName="hover:bg-primary/12"
-        >
-          {image.taken_at
-            ? formatDate(image.taken_at, t('detail.noDate'))
-            : <span className="text-muted-foreground">{t('detail.noDate')}</span>
-          }
-          {image.taken_at && image.date_source === 'filename' && (
-            <span className="text-[11px] font-semibold bg-primary/12 text-primary-ink px-2 py-0.5 rounded-full">
-              {t('common.dateFromFilename')}
-            </span>
-          )}
-          {image.taken_at && image.date_source === 'mtime' && (
-            <span className="text-[11px] font-semibold bg-warning/15 text-warning-ink px-2 py-0.5 rounded-full">
-              {t('detail.noExif')}
-            </span>
-          )}
-        </LinkRow>
+        <DateRow image={image} onShowInTimeline={onShowInTimeline} />
 
         {image.media_type === 'video' && image.duration_ms != null && (
           <Field label={t('detail.duration')} value={formatDuration(image.duration_ms)} />
