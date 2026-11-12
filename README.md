@@ -86,6 +86,7 @@ Grab the latest installer from [**GitHub Releases**](../../releases/latest).
 ### Fullscreen viewer
 - Full-window view with previous / next navigation
 - Metadata panel on demand (EXIF, location with a link to the map)
+- **Edit the date taken** from the pencil on the metadata row — the file moves to the matching `YYYY/MM` folder, and rescan never overrides a date you set
 
 ### Videos
 - Full video playback in the preview and viewer
@@ -164,8 +165,8 @@ A GitHub Actions workflow is included at `.github/workflows/release.yml`.
 Push a `v*` tag to trigger builds for Linux, Windows, and macOS simultaneously:
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v1.0.0
+git push origin v1.0.0
 ```
 
 A draft GitHub Release is created automatically with all platform installers attached.
@@ -182,16 +183,16 @@ Version must be updated in three files before tagging:
 | `package.json` | `"version"` |
 
 ```bash
-# 1. Edit version in all three files (e.g. 0.2.0)
+# 1. Edit version in all three files (e.g. 1.1.0)
 
 # 2. Commit
 git add src-tauri/tauri.conf.json src-tauri/Cargo.toml package.json
-git commit -m "chore: bump version to 0.2.0"
+git commit -m "chore: bump version to 1.1.0"
 
 # 3. Tag and push — triggers the release workflow
-git tag v0.2.0
+git tag v1.1.0
 git push origin main
-git push origin v0.2.0
+git push origin v1.1.0
 ```
 
 Tag name and version in files must match.
@@ -210,6 +211,7 @@ Tag name and version in files must match.
 | State | Zustand 5 (8 stores), React Router 7 |
 | i18n | i18next + react-i18next (en / it) |
 | Backend | Rust, Tauri v2, rusqlite (SQLite bundled) |
+| Map | MapLibre GL |
 | Media | nom-exif, image crate, sha2, rayon, ffmpeg-sidecar |
 
 ## License
