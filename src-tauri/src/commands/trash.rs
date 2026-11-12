@@ -52,6 +52,28 @@ pub fn restore_images(archive_path: &str, ids: &[String], db: &Database) -> Resu
     Ok(result)
 }
 
+/// Sets a user-chosen date (`date_source = 'manual'`, which rescan never overwrites) and
+/// moves a live file into the folder the new date maps to. Trashed files stay in Trash:
+/// restore already files them by date. The date is undone if the move fails.
+pub fn set_image_date(archive_path: &str, id: &str, taken_at: &str, db: &Database) -> Result<Image, AppError> {
+    let taken_at = chrono::DateTime::parse_from_rfc3339(taken_at)
+        .map_err(|e| AppError::Internal { message: format!("invalid date {taken_at}: {e}") })?
+        .to_rfc3339();
+    let img = db.get_image(id)?.ok_or_else(|| AppError::ImageNotFound { id: id.to_string() })?;
+
+    db.set_image_date(id, Some(&taken_at), Some("manual"))?;
+
+    let dest_dir = destination_path(archive_path, &Some(taken_at.clone()));
+    let current_dir = Path::new(archive_path).join(&img.file_path).parent().map(Path::to_path_buf);
+    let needs_move = img.trashed_at.is_none() && current_dir.as_deref() != Some(Path::new(&dest_dir));
+    if needs_move && !(create_dir(Path::new(&dest_dir)).is_ok() && move_image(archive_path, db, &img, Path::new(&dest_dir), None)) {
+        db.set_image_date(id, img.taken_at.as_deref(), img.date_source.as_deref())?;
+        return Err(AppError::FileWrite { path: img.file_path, message: "could not move the file to its new date folder".into() });
+    }
+
+    db.get_image(id)?.ok_or_else(|| AppError::ImageNotFound { id: id.to_string() })
+}
+
 /// Lists trashed images. Rows whose file is gone were emptied from the Trash folder
 /// by the user, so they are dropped from the DB (with their cached files) here:
 /// the deletion was the user's own explicit act.
@@ -156,6 +178,23 @@ mod tests {
         trash_images(&archive, &["img1".into()], &db).unwrap();
         restore_images(&archive, &["img1".into()], &db).unwrap();
         assert!(dir.path().join("2024/03 - March/a.jpg").exists());
+    }
+
+    #[test]
+    fn set_image_date_moves_live_file_and_keeps_trashed_in_place() {
+        let (dir, archive, db) = setup("2024/03 - March/a.jpg");
+        let img = set_image_date(&archive, "img1", "2019-07-04T09:30:00+00:00", &db).unwrap();
+        assert_eq!(img.file_path, "2019/07 - July/a.jpg");
+        assert_eq!(img.date_source.as_deref(), Some("manual"));
+        assert!(dir.path().join("2019/07 - July/a.jpg").exists());
+
+        trash_images(&archive, &["img1".into()], &db).unwrap();
+        let img = set_image_date(&archive, "img1", "2021-01-02T00:00:00+00:00", &db).unwrap();
+        assert_eq!(img.file_path, "Trash/a.jpg");
+        restore_images(&archive, &["img1".into()], &db).unwrap();
+        assert!(dir.path().join("2021/01 - January/a.jpg").exists());
+
+        assert!(set_image_date(&archive, "img1", "not a date", &db).is_err());
     }
 
     #[test]

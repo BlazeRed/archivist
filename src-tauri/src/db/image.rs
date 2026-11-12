@@ -200,7 +200,7 @@ impl super::Database {
 
     pub fn get_images_without_exif(&self) -> Result<Vec<(String, String)>, super::AppError> {
         let conn = self.connection();
-        let mut stmt = conn.prepare("SELECT id, file_path FROM images WHERE has_exif = 0 AND trashed_at IS NULL")?;
+        let mut stmt = conn.prepare("SELECT id, file_path FROM images WHERE has_exif = 0 AND trashed_at IS NULL AND date_source IS NOT 'manual'")?;
         let rows = stmt.query_map([], |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
         })?.collect::<Result<Vec<_>, _>>()?;
@@ -288,6 +288,16 @@ impl super::Database {
              file_path = ?1, filename = ?2, trashed_at = ?3 \
              WHERE id = ?4",
             params![file_path, filename, trashed_at, id],
+        )?;
+        Ok(())
+    }
+
+    /// Writes the date and its source as given (user edit, or its undo).
+    pub fn set_image_date(&self, id: &str, taken_at: Option<&str>, date_source: Option<&str>) -> Result<(), super::AppError> {
+        let conn = self.connection();
+        conn.execute(
+            "UPDATE images SET taken_at = ?1, date_source = ?2 WHERE id = ?3",
+            params![taken_at, date_source, id],
         )?;
         Ok(())
     }

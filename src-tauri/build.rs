@@ -1,6 +1,6 @@
 fn main() {
-    // Download ffmpeg to src-tauri/binaries/ffmpeg-{target_triple}
-    // so Tauri's externalBin bundler finds it at "binaries/ffmpeg".
+    // Download ffmpeg to src-tauri/binaries/archivist-ffmpeg-{target_triple}
+    // so Tauri's externalBin bundler finds it at "binaries/archivist-ffmpeg".
     //
     // auto_download() places the binary next to the build-script exe
     // (target/debug/build/archivist-*/ffmpeg), NOT in src-tauri/binaries/.
@@ -14,7 +14,7 @@ fn main() {
     // the source lookup and the Tauri-expected destination name.
     let exe_suffix = if cfg!(windows) { ".exe" } else { "" };
 
-    let ffmpeg_dest = binaries_dir.join(format!("ffmpeg-{}{}", target, exe_suffix));
+    let ffmpeg_dest = binaries_dir.join(format!("archivist-ffmpeg-{}{}", target, exe_suffix));
 
     if !ffmpeg_dest.exists() {
         // Build scripts always compile for the HOST triple, never the `--target` being

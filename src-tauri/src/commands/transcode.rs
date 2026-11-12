@@ -52,7 +52,7 @@ pub fn transcode_video_impl(
 }
 
 fn ffmpeg_command(input: &Path, output: &Path) -> Command {
-    let mut cmd = Command::new(ffmpeg_sidecar::paths::ffmpeg_path());
+    let mut cmd = crate::ffmpeg::command();
     // VP8 (libvpx)/Opus WebM: open codecs, no proprietary GStreamer plugins required on Linux.
     // `-f webm`: the `.part` extension doesn't tell ffmpeg the container.
     cmd.arg("-y").arg("-hide_banner")

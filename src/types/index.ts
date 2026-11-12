@@ -10,7 +10,7 @@ export interface Image {
   height: number | null;
   file_size: number | null;
   has_exif: boolean;
-  date_source: 'exif' | 'filename' | 'mtime' | null;
+  date_source: 'exif' | 'filename' | 'mtime' | 'atom' | 'manual' | null;
   thumbnail_path: string | null;
   is_favourite: boolean;
   media_type: MediaType;

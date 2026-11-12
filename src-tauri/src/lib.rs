@@ -2,6 +2,7 @@ pub mod db;
 pub mod error;
 pub mod state;
 pub mod exif;
+pub mod ffmpeg;
 pub mod hasher;
 pub mod thumbnail;
 pub mod video_meta;
@@ -350,6 +351,15 @@ fn get_trash_count(state: tauri::State<'_, Arc<AppState>>) -> Result<i64, error:
 }
 
 #[tauri::command]
+async fn set_image_date(state: tauri::State<'_, Arc<AppState>>, image_id: String, taken_at: String) -> Result<db::image::Image, error::AppError> {
+    let archive_path = require_archive_path(&state)?;
+    let db = state.db();
+    tauri::async_runtime::spawn_blocking(move || commands::set_image_date(&archive_path, &image_id, &taken_at, &*db))
+        .await
+        .map_err(|e| error::AppError::Internal { message: e.to_string() })?
+}
+
+#[tauri::command]
 fn toggle_favourite(state: tauri::State<'_, Arc<AppState>>, image_id: String, is_favourite: bool) -> Result<(), error::AppError> {
     state.db().set_image_favourite(&image_id, is_favourite)
 }
@@ -434,6 +444,7 @@ pub fn run() {
             load_config,
             path_exists,
             toggle_favourite,
+            set_image_date,
             get_favourite_images,
             transcode_video,
             get_media_server,

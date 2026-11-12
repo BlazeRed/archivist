@@ -3,6 +3,7 @@ name = "archivist"
 version = "1.0.0"
 description = "Photographic archive organizer"
 authors = ["Mauro"]
+license = "GPL-3.0-or-later"
 edition = "2021"
 
 [lib]

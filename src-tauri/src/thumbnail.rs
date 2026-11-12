@@ -108,7 +108,7 @@ pub fn generate_video_thumbnail(
     let src_str = source_path.to_string_lossy();
 
     // First attempt: seek to 1s (good for long videos)
-    let result1 = std::process::Command::new(ffmpeg_sidecar::paths::ffmpeg_path())
+    let result1 = crate::ffmpeg::command()
         .args(["-y", "-ss", "1", "-i", src_str.as_ref(),
                "-vframes", "1", "-vf", scale_filter.as_str(),
                "-q:v", "3", dest_str.as_ref()])
@@ -119,7 +119,7 @@ pub fn generate_video_thumbnail(
     }
 
     // Fallback: capture at start (short videos / seek failures)
-    let result2 = std::process::Command::new(ffmpeg_sidecar::paths::ffmpeg_path())
+    let result2 = crate::ffmpeg::command()
         .args(["-y", "-i", src_str.as_ref(),
                "-vframes", "1", "-vf", scale_filter.as_str(),
                "-q:v", "3", dest_str.as_ref()])

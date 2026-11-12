@@ -210,3 +210,9 @@ Tag name and version in files must match.
 | i18n | i18next + react-i18next (en / it) |
 | Backend | Rust, Tauri v2, rusqlite (SQLite bundled) |
 | Media | nom-exif, image crate, sha2, rayon, ffmpeg-sidecar |
+
+## License
+
+Copyright (C) 2026 BlazeRed
+
+This program is free software: you can redistribute it and/or modify it under the terms of the [GNU General Public License v3.0](LICENSE) or (at your option) any later version. It is distributed without any warranty.
