@@ -9,6 +9,7 @@
   <img alt="Tauri" src="https://img.shields.io/badge/Tauri-v2-24C8D8?logo=tauri&logoColor=white">
   <img alt="Rust" src="https://img.shields.io/badge/Rust-stable-CE422B?logo=rust&logoColor=white">
   <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white">
+  <a href="LICENSE"><img alt="License: GPL-3.0-or-later" src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue?logo=gnu&logoColor=white"></a>
 </p>
 
 <p align="center"><em>Your media, organized locally. No cloud. No accounts. No subscription.</em></p>
